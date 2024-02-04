@@ -132,7 +132,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x12 + sprintf( mBuffer + 0x12, "sh      r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::SHLQ:
-    mBuffer[0x12 + sprintf( mBuffer + 0x12, "shlq    #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x12 + sprintf( mBuffer + 0x12, "shlq    #%02d,r%02d", 32-reg1, reg2 )] = ' ';
     break;
   case DSPI::SHRQ:
     mBuffer[0x12 + sprintf( mBuffer + 0x12, "shrq    #%02d,r%02d", reg1, reg2 )] = ' ';

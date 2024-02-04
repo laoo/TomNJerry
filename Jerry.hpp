@@ -88,7 +88,7 @@ private:
   bool dualPortWrite( uint32_t reg, uint32_t data );
   bool dualPortRead( uint32_t reg1, uint32_t reg2 );
   bool dualPortRead( uint32_t reg );
-  void dualPortCommit();
+  void dualPortCommit( bool writeRead = false );
 
 
 private:
