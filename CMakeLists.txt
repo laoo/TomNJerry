@@ -2,7 +2,7 @@
 
 project( "TomNJery" )
 
-set( CMAKE_CXX_STANDARD 20 )
+set( CMAKE_CXX_STANDARD 23 )
 
 add_executable( Tom
   Tom.cpp
@@ -11,9 +11,12 @@ add_executable( Tom
 )
 
 add_executable( Jerry
+  BS94.cpp
   Jerry.cpp
   JerryMain.cpp
   Log.cpp
+  PipelineLog.cpp
+  ProgramOptions.cpp
 )
 
 target_precompile_headers( Tom PRIVATE

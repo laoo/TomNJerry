@@ -1,0 +1,28 @@
+#pragma once
+
+#include "Opcodes.hpp"
+
+class PipelineLog
+{
+public:
+  PipelineLog();
+
+
+  void prefetch( uint32_t address, uint32_t code );
+  void decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 );
+  void portImm( uint32_t value );
+  void port1Read( uint32_t reg, uint32_t value );
+  void port2Read( uint32_t reg, uint32_t value );
+  void port1Write( uint32_t reg, uint32_t value );
+  void computeReg( uint32_t reg );
+  void computeRegFlags( uint32_t reg );
+  void computeFlags();
+  void flush();
+
+private:
+
+  void init();
+
+  char mBuffer[ 256 ];
+
+};

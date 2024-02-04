@@ -1,5 +1,8 @@
 #pragma once
 #include "IChip.hpp"
+#include "Opcodes.hpp"
+
+class PipelineLog;
 
 class Jerry : public IChip
 {
@@ -52,7 +55,7 @@ public:
 
 
   Jerry();
-  ~Jerry() override = default;
+  ~Jerry() override;
 
   void debugWrite( uint32_t address, uint32_t data ) override;
   void debugWrite( uint32_t address, std::span<uint32_t const> data ) override;
@@ -128,73 +131,6 @@ private:
   uint64_t mCycle = 0;
 
 
-  enum struct I
-  {
-    EMPTY   = -1,
-    ADD     = 0,
-    ADDC    = 1,
-    ADDQ    = 2,
-    ADDQT   = 3,
-    SUB     = 4,
-    SUBC    = 5,
-    SUBQ    = 6,
-    SUBQT   = 7,
-    NEG     = 8,
-    AND     = 9,
-    OR      = 10,
-    XOR     = 11,
-    NOT     = 12,
-    BTST    = 13,
-    BSET    = 14,
-    BCLR    = 15,
-    MULT    = 16,
-    IMULT   = 17,
-    IMULTN  = 18,
-    RESMAC  = 19,
-    IMACN   = 20,
-    DIV     = 21,
-    ABS     = 22,
-    SH      = 23,
-    SHLQ    = 24,
-    SHRQ    = 25,
-    SHA     = 26,
-    SHARQ   = 27,
-    ROR     = 28,
-    RORQ    = 29,
-    CMP     = 30,
-    CMPQ    = 31,
-    SUBQMOD = 32,
-    SAT16S  = 33,
-    MOVE    = 34,
-    MOVEQ   = 35,
-    MOVETA  = 36,
-    MOVEFA  = 37,
-    MOVEI   = 38,
-    LOADB   = 39,
-    LOADW   = 40,
-    LOAD    = 41,
-    SAT32S  = 42,
-    LOAD14N = 43,
-    LOAD15N = 44,
-    STOREB  = 45,
-    STOREW  = 46,
-    STORE   = 47,
-    MIRROR  = 48,
-    STORE14N= 49,
-    STORE15N= 50,
-    MOVEPC  = 51,
-    JUMP    = 52,
-    JR      = 53,
-    MMULT   = 54,
-    MTOI    = 55,
-    NORMI   = 56,
-    NOP     = 57,
-    LOAD14R = 58,
-    LOAD15R = 59,
-    STORE14R= 60,
-    STORE15R= 61,
-    ADDQMOD = 63
-  };
 
   struct Prefetch
   {
@@ -207,20 +143,25 @@ private:
 
   struct StageRead
   {
-    I instruction = I::EMPTY;
+    DSPI instruction = DSPI::EMPTY;
     uint32_t data1 = 0;
     uint32_t data2 = 0;
-    uint16_t reg1 = 0;
-    uint16_t reg2 = 0;
+    uint32_t reg1 = 0;
+    uint32_t reg2 = 0;
   } mStageRead = {};
 
   struct StageCompute
   {
-    I instruction = I::EMPTY;
+    DSPI instruction = DSPI::EMPTY;
+    uint32_t data1 = 0;
+    uint32_t data2 = 0;
+    uint32_t reg1 = 0;
+    uint32_t reg2 = 0;
   } mStageCompute = {};
 
   struct StageWrite 
   {
+    bool updateFlags = false;
     int32_t z = -1;
     int32_t n = -1;
     int32_t c = -1;
@@ -259,6 +200,8 @@ private:
 
   std::array<RegStatus, 32> mRegStatus;
   std::array<uint32_t, 64> mRegs;
-  RegStatus mFlagsStatus = FREE;
+  int mFlagsSemaphore = 0;
   uint32_t mMulatiplyAccumulator = 0;
+
+  std::unique_ptr<PipelineLog> mLog;
 };
