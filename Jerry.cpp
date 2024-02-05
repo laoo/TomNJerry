@@ -826,7 +826,12 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MOVEI:
-    throw Ex{ "MOVEI NYI" };
+    if ( mStageWrite.reg < 0 )
+    {
+      mRegStatus[mStageRead.regDst] = LOCKED;
+      mStageRead.instruction = DSPI::EMPTY;
+      mStageRead.decodeStage = StageRead::MOVEI1;
+    }
     break;
   case DSPI::LOADB:
   case DSPI::LOADW:
@@ -881,19 +886,41 @@ void Jerry::stageRead()
 
 void Jerry::decode()
 {
-  if ( mStageRead.instruction != DSPI::EMPTY )
-    return;
+  switch ( mStageRead.decodeStage )
+  {
+  case StageRead::NORMAL:
+    if ( int32_t pull = mPrefetch.pull(); pull >= 0 )
+    {
+      mStageRead.instruction = ( DSPI )( pull >> 10 );
+      mStageRead.regSrc = ( pull >> 5 ) & 0x1f;
+      mStageRead.regDst = pull & 0x1f;
 
-  int32_t pull = mPrefetch.pull();
+      mLog->decodeDSP( mStageRead.instruction, mStageRead.regSrc, mStageRead.regDst );
+    }
+    break;
+  case StageRead::MOVEI1:
+    if ( int32_t pull = mPrefetch.pull(); pull >= 0 )
+    {
+      mStageRead.dataSrc = ( uint16_t )pull;
 
-  if ( pull < 0 )
-    return;
+      mLog->decodeMOVEI( 0, mStageRead.dataSrc );
+      mStageRead.decodeStage = StageRead::MOVEI2;
+    }
+    break;
+  case StageRead::MOVEI2:
+    if ( int32_t pull = mPrefetch.pull(); pull >= 0 )
+    {
+      mStageRead.dataSrc |= ( uint32_t )pull << 16;
 
-  mStageRead.instruction = ( DSPI )( pull >> 10 );
-  mStageRead.regSrc = ( pull >> 5 ) & 0x1f;
-  mStageRead.regDst = pull & 0x1f;
-
-  mLog->decodeDSP( mStageRead.instruction, mStageRead.regSrc, mStageRead.regDst );
+      mStageWrite.reg = mStageRead.regDst;
+      mStageWrite.data = mStageRead.dataSrc;
+      mLog->decodeMOVEI( 1, mStageRead.dataSrc );
+      mStageRead.decodeStage = StageRead::NORMAL;
+    }
+    break;
+  default:
+    break;
+  }
 }
 
 void Jerry::prefetch()

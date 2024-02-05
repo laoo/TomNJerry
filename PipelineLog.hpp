@@ -10,6 +10,7 @@ public:
 
   void prefetch( uint32_t address, uint32_t code );
   void decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 );
+  void decodeMOVEI( int stage, uint32_t data );
   void portImm( uint32_t value );
   void portReadSrc( uint32_t reg, uint32_t value );
   void portReadDst( uint32_t reg, uint32_t value );

@@ -243,7 +243,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "movefa  r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::MOVEI:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "movei              ")] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "movei   #--------,r%02d", reg2)] = ' ';
     break;
   case DSPI::LOADB:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "loadb   (r%02d),r%02d", reg1, reg2 )] = ' ';
@@ -288,7 +288,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "jump    %s(r%02d)", kJumpConditions[reg2 & 31], reg1 )] = ' ';
     break;
   case DSPI::JR:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "jump    %s%c%d", kJumpConditions[reg2 & 31], (reg1&5) == 0?'+':'-', ( ( int8_t )( reg1 << 3 ) >> 2 ) )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "jr      %s%c%d", kJumpConditions[reg2 & 31], (reg1&5) == 0?'+':'-', ( ( int8_t )( reg1 << 3 ) >> 2 ) )] = ' ';
     break;
   case DSPI::MMULT:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "mmult   r%02d,r%02d", reg1, reg2 )] = ' ';
@@ -317,6 +317,20 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
   case DSPI::ADDQMOD:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "addqmod #%02d,r%02d", reg1, reg2 )] = ' ';
     break;
+  }
+}
+
+void PipelineLog::decodeMOVEI( int stage, uint32_t data )
+{
+  if ( stage == 0 )
+  {
+    //mBuffer[0x21 + sprintf( mBuffer + 0x21, "#----%04x", data )] = ' ';
+    mBuffer[0x38 + sprintf( mBuffer + 0x38, "#%04x", data )] = ' ';
+  }
+  else
+  {
+    mBuffer[0x38 + sprintf( mBuffer + 0x38, "#%04x", data >> 16 )] = ' ';
+    //mBuffer[0x21 + sprintf( mBuffer + 0x21, "#%04x----", data >> 16 )] = ' ';
   }
 }
 
