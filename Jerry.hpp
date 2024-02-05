@@ -85,10 +85,11 @@ private:
   void decode();
   void prefetch();
 
-  bool dualPortWrite( uint32_t reg, uint32_t data );
-  bool dualPortRead( uint32_t reg1, uint32_t reg2 );
-  bool dualPortRead( uint32_t reg );
-  void dualPortCommit( bool writeRead = false );
+  bool portWriteDst( uint32_t reg, uint32_t data );
+  bool portReadSrc( uint32_t regSrc );
+  bool portReadDst( uint32_t regDst );
+  bool portReadBoth( uint32_t regSrc, uint32_t regDst );
+  void dualPortCommit();
 
 
 private:
@@ -168,25 +169,10 @@ private:
     uint32_t data = 0;
   } mStageWrite = {};
 
-  struct DualPort
-  {
-    enum PortStatus
-    {
-      EMPTY,
-      READ,
-      WRITE
-    };
-
-    struct Port
-    {
-      PortStatus status = EMPTY;
-      uint32_t reg = 0;
-      uint32_t data = 0;
-    };
-
-    Port port1;
-    Port port2;
-  } mDualPort;
+  int32_t mPortReadSrcReg = -1;
+  int32_t mPortReadDstReg = -1;
+  int32_t mPortWriteDstReg = -1;
+  uint32_t mPortWriteDstData = 0;
 
   std::array<uint32_t, RAM_SIZE / sizeof( uint32_t )> mLocalRAM;
   uint64_t mLastLocalRAMAccessCycle = ~0;

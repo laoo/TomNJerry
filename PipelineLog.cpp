@@ -256,10 +256,10 @@ void PipelineLog::portImm( uint32_t value )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345:01234567 | store   r31,(r31+r31) | R31:01234567 R31:01234567 | CR31 F | W31:01234567
-  mBuffer[0x2e + sprintf( mBuffer + 0x2e, "%8d", value )] = ' ';
+  mBuffer[0x33 + sprintf( mBuffer + 0x33, "#%02x", value )] = ' ';
 }
                                                   
-void PipelineLog::port1Read( uint32_t reg, uint32_t value )
+void PipelineLog::portReadSrc( uint32_t reg, uint32_t value )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
@@ -267,7 +267,7 @@ void PipelineLog::port1Read( uint32_t reg, uint32_t value )
   mBuffer[0x2a + sprintf( mBuffer + 0x2a, "R%02d:%08x", reg, value )] = ' ';
 }
 
-void PipelineLog::port2Read( uint32_t reg, uint32_t value )
+void PipelineLog::portReadDst( uint32_t reg, uint32_t value )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
@@ -275,7 +275,7 @@ void PipelineLog::port2Read( uint32_t reg, uint32_t value )
   mBuffer[0x37 + sprintf( mBuffer + 0x37, "R%02d:%08x", reg, value )] = ' ';
 }
 
-void PipelineLog::port1Write( uint32_t reg, uint32_t value )
+void PipelineLog::portWriteDst( uint32_t reg, uint32_t value )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab

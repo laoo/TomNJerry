@@ -62,6 +62,7 @@ AdvanceResult Jerry::advance()
   stageWrite();
   compute();
   stageRead();
+  dualPortCommit();
   decode();
   prefetch();
 
@@ -69,6 +70,7 @@ AdvanceResult Jerry::advance()
   stageWrite();
   compute();
   stageRead();
+  dualPortCommit();
   decode();
   prefetch();
 
@@ -251,7 +253,7 @@ void Jerry::stageWrite()
 {
   if ( mStageWrite.reg >= 0 )
   {
-    if ( dualPortWrite( mStageWrite.reg, mStageWrite.data ) )
+    if ( portWriteDst( mStageWrite.reg, mStageWrite.data ) )
     {
       mStageWrite.reg = -1;
     }
@@ -640,7 +642,6 @@ void Jerry::stageRead()
   case DSPI::EMPTY:
     break;
   case DSPI::NOP:
-    dualPortCommit();
     mStageRead.instruction = DSPI::EMPTY;
     break;
   case DSPI::ADD:
@@ -654,11 +655,9 @@ void Jerry::stageRead()
   case DSPI::SHA:
   case DSPI::ROR:
   case DSPI::MTOI:
-    if ( dualPortRead( mStageRead.regSrc, mStageRead.regDst ) )
+    if ( portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
     {
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
-      assert( mRegStatus[mStageRead.regDst] == FREE );
       mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
@@ -668,11 +667,9 @@ void Jerry::stageRead()
     break;
   case DSPI::ADDC:
   case DSPI::SUBC:
-    if ( mFlagsSemaphore == 0 && dualPortRead( mStageRead.regSrc, mStageRead.regDst ) )
+    if ( mFlagsSemaphore == 0 && portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
     {
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
-      assert( mRegStatus[mStageRead.regDst] == FREE );
       mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
@@ -684,12 +681,10 @@ void Jerry::stageRead()
   case DSPI::SUBQ:
   case DSPI::SUBQMOD:
   case DSPI::ADDQMOD:
-    if ( dualPortRead( mStageRead.regDst ) )
+    if ( portReadDst( mStageRead.regDst ) )
     {
       mLog->portImm( mStageRead.regSrc );
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
-      assert( mRegStatus[mStageRead.regDst] == FREE );
       mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
@@ -702,12 +697,10 @@ void Jerry::stageRead()
   case DSPI::SHRQ:
   case DSPI::SHARQ:
   case DSPI::RORQ:
-    if ( dualPortRead( mStageRead.regDst ) )
+    if ( portReadDst( mStageRead.regDst ) )
     {
       mLog->portImm( mStageRead.regSrc );
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
-      assert( mRegStatus[mStageRead.regDst] == FREE );
       mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
@@ -716,12 +709,10 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::SHLQ:
-    if ( dualPortRead( mStageRead.regDst ) )
+    if ( portReadDst( mStageRead.regDst ) )
     {
       mLog->portImm( 32 - mStageRead.regSrc );
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
-      assert( mRegStatus[mStageRead.regDst] == FREE );
       mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
@@ -736,11 +727,9 @@ void Jerry::stageRead()
   case DSPI::SAT32S:
   case DSPI::MIRROR:
   case DSPI::NORMI:
-    if ( dualPortRead( mStageRead.regDst ) )
+    if ( portReadDst( mStageRead.regDst ) )
     {
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
-      assert( mRegStatus[mStageRead.regDst] == FREE );
       mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
@@ -749,11 +738,9 @@ void Jerry::stageRead()
     break;
   case DSPI::ADDQT:
   case DSPI::SUBQT:
-    if ( dualPortRead( mStageRead.regDst ) )
+    if ( portReadDst( mStageRead.regDst ) )
     {
       mLog->portImm( mStageRead.regSrc );
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
-      assert( mRegStatus[mStageRead.regDst] == FREE );
       mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
@@ -763,12 +750,10 @@ void Jerry::stageRead()
     break;
   case DSPI::BTST:
   case DSPI::CMPQ:
-    if ( dualPortRead( mStageRead.regDst ) )
+    if ( portReadDst( mStageRead.regDst ) )
     {
       mLog->portImm( mStageRead.regSrc );
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
-      assert( mRegStatus[mStageRead.regDst] == FREE );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.regSrc;
       mStageCompute.dataDst = mStageRead.dataDst;
@@ -777,11 +762,9 @@ void Jerry::stageRead()
   case DSPI::IMULTN:
   case DSPI::IMACN:
   case DSPI::CMP:
-    if ( dualPortRead( mStageRead.regSrc, mStageRead.regDst ) )
+    if ( portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
     {
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
-      assert( mRegStatus[mStageRead.regDst] == FREE );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;
       mStageCompute.dataDst = mStageRead.dataDst;
@@ -799,7 +782,6 @@ void Jerry::stageRead()
   case DSPI::MOVEQ:
     if ( mStageWrite.reg < 0 )
     {
-      dualPortCommit();
       mLog->portImm( mStageRead.regSrc );
       mStageWrite.reg = mStageRead.regDst;
       mStageWrite.data = mStageRead.regSrc;
@@ -817,10 +799,8 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::DIV:
-    if ( dualPortRead( mStageRead.regSrc, mStageRead.regDst ) )
+    if ( portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
     {
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
-      assert( mRegStatus[mStageRead.regDst] == FREE );
       mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
@@ -829,9 +809,8 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MOVE:
-    if ( mStageWrite.reg < 0 && dualPortRead( mStageRead.regSrc ) )
+    if ( mStageWrite.reg < 0 && portReadSrc( mStageRead.regSrc ) )
     {
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
       // mRegStatus[mStageRead.reg2] != FREE is an error;
       mStageWrite.reg = mStageRead.regDst;
       mStageWrite.data = mStageRead.dataSrc;
@@ -840,9 +819,8 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MOVETA:
-    if ( dualPortRead( mStageRead.regSrc ) )
+    if ( portReadSrc( mStageRead.regSrc ) )
     {
-      assert( mRegStatus[mStageRead.regSrc] == FREE );
       mRegs[mAnotherRegisterFile + mStageRead.regDst] = mStageRead.dataSrc;
       mStageRead.instruction = DSPI::EMPTY;
     }
@@ -887,7 +865,7 @@ void Jerry::stageRead()
     break;
   case DSPI::JUMP:
   case DSPI::JR:
-    if ( mFlagsSemaphore == 0 && dualPortRead( mStageRead.regDst ) )
+    if ( mFlagsSemaphore == 0 && portReadDst( mStageRead.regDst ) )
     {
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;
@@ -898,6 +876,7 @@ void Jerry::stageRead()
     throw Ex{ "MMULT NYI" };
     break;
   }
+
 }
 
 void Jerry::decode()
@@ -938,113 +917,87 @@ void Jerry::prefetch()
   mLog->flush();
 }
 
-bool Jerry::dualPortWrite( uint32_t reg, uint32_t data )
+bool Jerry::portWriteDst( uint32_t reg, uint32_t data )
 {
-  if ( mDualPort.port1.status == DualPort::EMPTY )
-  {
-    mDualPort.port1.status = DualPort::WRITE;
-    mDualPort.port1.reg = reg;
-    mDualPort.port1.data = data;
-    mLog->port1Write( reg, data );
-    return true;
-  }
-  else
-  {
+  if ( mPortWriteDstReg >= 0 )
     return false;
-  }
+
+  mPortWriteDstReg = reg;
+  mPortWriteDstData = data;
+  return true;
 }
 
-bool Jerry::dualPortRead( uint32_t reg1, uint32_t reg2 )
+bool Jerry::portReadSrc( uint32_t regSrc )
 {
-  if ( mDualPort.port2.status == DualPort::EMPTY )
-  {
-    if ( mDualPort.port1.status == DualPort::EMPTY )
-    {
-      mDualPort.port1.status = DualPort::READ;
-      mDualPort.port1.reg = reg1;
-      mDualPort.port2.status = DualPort::READ;
-      mDualPort.port2.reg = reg2;
-      dualPortCommit();
-      return true;
-    }
-    else if ( mDualPort.port1.status == DualPort::WRITE )
-    {
-      if ( mDualPort.port1.reg == reg1 )
-      {
-        mDualPort.port2.status = DualPort::READ;
-        mDualPort.port2.reg = reg2;
-        dualPortCommit( true );
-        return true;
-      }
-      else if ( mDualPort.port1.reg == reg2 )
-      {
-        mDualPort.port2.status = DualPort::READ;
-        mDualPort.port2.reg = reg1;
-        dualPortCommit( true );
-        return true;
-      }
-    }
-  }
+  assert( mPortReadSrcReg < 0 );
+  assert( regSrc >= 0 );
 
-  dualPortCommit();
-  return false;
+  if ( mRegStatus[regSrc] != FREE && mPortWriteDstReg != regSrc )
+    return false;
+
+  mPortReadSrcReg = regSrc;
+
+  return true;
 }
 
-bool Jerry::dualPortRead( uint32_t reg )
+bool Jerry::portReadDst( uint32_t regDst )
 {
-  if ( mRegStatus[reg] == FREE )
-  {
-    assert( mDualPort.port2.status == DualPort::EMPTY );
-    mDualPort.port2.status = DualPort::READ;
-    mDualPort.port2.reg = reg;
-    dualPortCommit();
-    return true;
-  }
-  else
-  {
-    dualPortCommit();
-    if ( mRegStatus[reg] == FREE )
-    {
-      assert( mDualPort.port2.status == DualPort::EMPTY );
-      mDualPort.port2.status = DualPort::READ;
-      mDualPort.port2.reg = reg;
-      dualPortCommit();
-      return true;
-    }
-  }
+  assert( mPortReadDstReg < 0 );
+  assert( regDst >= 0 );
 
-  return false;
+  if ( mRegStatus[regDst] != FREE && mPortWriteDstReg != regDst )
+    return false;
+
+  mPortReadDstReg = regDst;
+
+  return true;
 }
 
-void Jerry::dualPortCommit( bool writeRead )
+bool Jerry::portReadBoth( uint32_t regSrc, uint32_t regDst )
 {
-  if ( mDualPort.port1.status == DualPort::WRITE )
+  assert( mPortReadSrcReg < 0 );
+  assert( mPortReadDstReg < 0 );
+  assert( regSrc >= 0 );
+  assert( regDst >= 0 );
+
+  if ( mRegStatus[regSrc] != FREE && mPortWriteDstReg != regSrc )
+    return false;
+
+  if ( mRegStatus[regDst] != FREE && mPortWriteDstReg != regDst )
+    return false;
+
+  if ( mPortWriteDstReg >= 0 && mPortWriteDstReg != regSrc && mPortWriteDstReg != regDst )
+    return false;
+
+  mPortReadSrcReg = regSrc;
+  mPortReadDstReg = regDst;
+
+  return true;
+}
+
+void Jerry::dualPortCommit()
+{
+  if ( mPortWriteDstReg >= 0 )
   {
-    mRegStatus[mDualPort.port1.reg] = FREE;
-    mRegs[mRegisterFile + mDualPort.port1.reg] = mDualPort.port1.data;
-    mDualPort.port1.status = DualPort::EMPTY;
-    if ( writeRead )
-    {
-      mLog->port1Read( mDualPort.port1.reg, mDualPort.port1.data );
-    }
+    mRegStatus[mPortWriteDstReg] = FREE;
+    mRegs[mRegisterFile + mPortWriteDstReg] = mPortWriteDstData;
+    mLog->portWriteDst( mPortWriteDstReg, mPortWriteDstData );
+    mPortWriteDstReg = -1;
   }
-  else if ( mDualPort.port1.status == DualPort::READ )
+
+  if ( mPortReadSrcReg >= 0 )
   {
-    assert( mRegStatus[mDualPort.port1.reg] == FREE );
-    assert( mStageRead.regSrc == mDualPort.port1.reg );
-    mStageRead.dataSrc = mRegs[mRegisterFile + mDualPort.port1.reg];
-    mDualPort.port1.status = DualPort::EMPTY;
-    mLog->port1Read( mDualPort.port1.reg, mStageRead.dataSrc );
+    mStageRead.dataSrc = mRegs[mRegisterFile + mPortReadSrcReg];
+    mLog->portReadSrc( mPortReadSrcReg, mStageRead.dataSrc );
+    mPortReadSrcReg = -1;
   }
-  
-  if ( mDualPort.port2.status == DualPort::READ )
+
+  if ( mPortReadDstReg >= 0 )
   {
-    assert( mRegStatus[mDualPort.port2.reg] == FREE );
-    mStageRead.dataDst = mRegs[mRegisterFile + mDualPort.port2.reg];
-    mDualPort.port2.status = DualPort::EMPTY;
-    mLog->port2Read( mDualPort.port2.reg, mStageRead.dataDst );
+    mStageRead.dataDst = mRegs[mRegisterFile + mPortReadDstReg];
+    mLog->portReadDst( mPortReadDstReg, mStageRead.dataDst );
+    mPortReadDstReg = -1;
   }
-  assert( mDualPort.port2.status == DualPort::EMPTY );
 }
 
 int32_t Jerry::Prefetch::pull()
