@@ -144,19 +144,18 @@ private:
   struct StageRead
   {
     DSPI instruction = DSPI::EMPTY;
-    uint32_t data1 = 0;
-    uint32_t data2 = 0;
-    uint32_t reg1 = 0;
-    uint32_t reg2 = 0;
+    uint32_t dataSrc = 0;
+    uint32_t dataDst = 0;
+    uint32_t regSrc = 0;
+    uint32_t regDst = 0;
   } mStageRead = {};
 
   struct StageCompute
   {
     DSPI instruction = DSPI::EMPTY;
-    uint32_t data1 = 0;
-    uint32_t data2 = 0;
-    uint32_t reg1 = 0;
-    uint32_t reg2 = 0;
+    uint32_t dataSrc = 0;
+    uint32_t dataDst = 0;
+    uint32_t regDst = 0;
   } mStageCompute = {};
 
   struct StageWrite 

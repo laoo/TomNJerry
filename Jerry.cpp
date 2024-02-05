@@ -284,10 +284,10 @@ void Jerry::compute()
   case DSPI::ADDQ:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data1 + mStageCompute.data2;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataSrc + mStageCompute.dataDst;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
-      mStageWrite.c = mStageWrite.data < mStageCompute.data1 ? 1 : 0;
+      mStageWrite.c = mStageWrite.data < mStageCompute.dataSrc ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
       mStageCompute.instruction = DSPI::EMPTY;
@@ -297,10 +297,10 @@ void Jerry::compute()
   case DSPI::ADDC:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data1 + mStageCompute.data2 + ( mFlags.value & ( FLAGS::CARRY_FLAG >> 1 ) );
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataSrc + mStageCompute.dataDst + ( mFlags.value & ( FLAGS::CARRY_FLAG >> 1 ) );
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
-      mStageWrite.c = mStageWrite.data < mStageCompute.data1 ? 1 : 0;
+      mStageWrite.c = mStageWrite.data < mStageCompute.dataSrc ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
       mStageCompute.instruction = DSPI::EMPTY;
@@ -310,8 +310,8 @@ void Jerry::compute()
   case DSPI::ADDQT:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data1 + mStageCompute.data2;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataSrc + mStageCompute.dataDst;
       mStageCompute.instruction = DSPI::EMPTY;
       mLog->computeReg( mStageWrite.reg );
     }
@@ -320,10 +320,10 @@ void Jerry::compute()
   case DSPI::SUBQ:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data2 - mStageCompute.data1;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataDst - mStageCompute.dataSrc;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
-      mStageWrite.c = mStageCompute.data1 < mStageCompute.data2 ? 1 : 0;
+      mStageWrite.c = mStageCompute.dataSrc < mStageCompute.dataDst ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
       mStageCompute.instruction = DSPI::EMPTY;
@@ -333,8 +333,8 @@ void Jerry::compute()
   case DSPI::SUBC:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      uint64_t res = (uint64_t)mStageCompute.data2 + (uint64_t)( mStageCompute.data1 ^ 0xffffffff ) + (uint64_t)( ( mFlags.value & ( FLAGS::CARRY_FLAG >> 1 ) ) ^ 1 );
+      mStageWrite.reg = mStageCompute.regDst;
+      uint64_t res = (uint64_t)mStageCompute.dataDst + (uint64_t)( mStageCompute.dataSrc ^ 0xffffffff ) + (uint64_t)( ( mFlags.value & ( FLAGS::CARRY_FLAG >> 1 ) ) ^ 1 );
       mStageWrite.data = (uint32_t)res;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.c = ( ( res >> 32 ) & 1 ) ? 0 : 1;
@@ -347,8 +347,8 @@ void Jerry::compute()
   case DSPI::SUBQT:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data2 - mStageCompute.data1;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataDst - mStageCompute.dataSrc;
       mStageCompute.instruction = DSPI::EMPTY;
       mLog->computeReg( mStageWrite.reg );
     }
@@ -356,10 +356,10 @@ void Jerry::compute()
   case DSPI::NEG:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = -mStageCompute.data2;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = -mStageCompute.dataDst;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
-      mStageWrite.c = mStageCompute.data2 != 0 ? 1 : 0;
+      mStageWrite.c = mStageCompute.dataDst != 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
       mStageCompute.instruction = DSPI::EMPTY;
@@ -369,8 +369,8 @@ void Jerry::compute()
   case DSPI::AND:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data1 & mStageCompute.data2;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataSrc & mStageCompute.dataDst;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
@@ -381,8 +381,8 @@ void Jerry::compute()
   case DSPI::OR:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data1 | mStageCompute.data2;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataSrc | mStageCompute.dataDst;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
@@ -393,8 +393,8 @@ void Jerry::compute()
   case DSPI::XOR:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data1 ^ mStageCompute.data2;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataSrc ^ mStageCompute.dataDst;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
@@ -405,8 +405,8 @@ void Jerry::compute()
   case DSPI::NOT:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = ~mStageCompute.data2;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = ~mStageCompute.dataDst;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
@@ -417,7 +417,7 @@ void Jerry::compute()
   case DSPI::BTST:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.z = ( mStageCompute.data2 & ( 1 << mStageCompute.data1 ) ) == 0 ? 1 : 0;
+      mStageWrite.z = ( mStageCompute.dataDst & ( 1 << mStageCompute.dataSrc ) ) == 0 ? 1 : 0;
       mStageWrite.updateFlags = true;
       mStageCompute.instruction = DSPI::EMPTY;
       mLog->computeFlags();
@@ -426,8 +426,8 @@ void Jerry::compute()
   case DSPI::BSET:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data2 | ( 1 << mStageCompute.data1 );
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataDst | ( 1 << mStageCompute.dataSrc );
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
@@ -438,8 +438,8 @@ void Jerry::compute()
   case DSPI::BCLR:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data2 & ~( 1 << mStageCompute.data1 );
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataDst & ~( 1 << mStageCompute.dataSrc );
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
@@ -450,8 +450,8 @@ void Jerry::compute()
   case DSPI::MULT:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = (uint16_t)mStageCompute.data1 * (uint16_t)mStageCompute.data2;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = (uint16_t)mStageCompute.dataSrc * (uint16_t)mStageCompute.dataDst;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
@@ -462,8 +462,8 @@ void Jerry::compute()
   case DSPI::IMULT:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = (int16_t)mStageCompute.data1 * (int16_t)mStageCompute.data2;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = (int16_t)mStageCompute.dataSrc * (int16_t)mStageCompute.dataDst;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
@@ -472,7 +472,7 @@ void Jerry::compute()
     }
     break;
   case DSPI::IMULTN:
-    mMulatiplyAccumulator = (int16_t)mStageCompute.data1 * (int16_t)mStageCompute.data2;
+    mMulatiplyAccumulator = (int16_t)mStageCompute.dataSrc * (int16_t)mStageCompute.dataDst;
     mStageWrite.z = mMulatiplyAccumulator == 0 ? 1 : 0;
     mStageWrite.n = mStageWrite.data >> 31;
     mStageWrite.updateFlags = true;
@@ -482,14 +482,14 @@ void Jerry::compute()
   case DSPI::RESMAC:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
+      mStageWrite.reg = mStageCompute.regDst;
       mStageWrite.data = mMulatiplyAccumulator;
       mStageCompute.instruction = DSPI::EMPTY;
       mLog->computeReg( mStageWrite.reg );
     }
     break;
   case DSPI::IMACN:
-    mMulatiplyAccumulator += ( int16_t )mStageCompute.data1 * ( int16_t )mStageCompute.data2;
+    mMulatiplyAccumulator += ( int16_t )mStageCompute.dataSrc * ( int16_t )mStageCompute.dataDst;
     mStageWrite.z = mMulatiplyAccumulator == 0 ? 1 : 0;
     mStageWrite.n = mStageWrite.data >> 31;
     mStageWrite.updateFlags = true;
@@ -501,8 +501,8 @@ void Jerry::compute()
   case DSPI::ABS:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data2 < 0 ? -mStageRead.data2 : mStageCompute.data2;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataDst < 0 ? -mStageCompute.dataDst : mStageCompute.dataDst;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = 0;
       mStageWrite.updateFlags = true;
@@ -513,11 +513,11 @@ void Jerry::compute()
   case DSPI::SH:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data1 > 0 ? mStageCompute.data2 >> mStageCompute.data1 : mStageCompute.data2 << mStageCompute.data1;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataSrc > 0 ? mStageCompute.dataDst >> mStageCompute.dataSrc : mStageCompute.dataDst << mStageCompute.dataSrc;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
-      mStageWrite.c = mStageCompute.data1 > 0 ? ( mStageCompute.data2 & 1 ) : ( mStageCompute.data2 >> 31 );
+      mStageWrite.c = mStageCompute.dataSrc > 0 ? ( mStageCompute.dataDst & 1 ) : ( mStageCompute.dataDst >> 31 );
       mStageWrite.updateFlags = true;
       mStageCompute.instruction = DSPI::EMPTY;
       mLog->computeRegFlags( mStageWrite.reg );
@@ -526,11 +526,11 @@ void Jerry::compute()
   case DSPI::SHLQ:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data2 << ( 32 - mStageCompute.data1 );
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataDst << ( 32 - mStageCompute.dataSrc );
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
-      mStageWrite.c = mStageCompute.data2 >> 31;
+      mStageWrite.c = mStageCompute.dataDst >> 31;
       mStageWrite.updateFlags = true;
       mStageCompute.instruction = DSPI::EMPTY;
       mLog->computeRegFlags( mStageWrite.reg );
@@ -539,11 +539,11 @@ void Jerry::compute()
   case DSPI::SHRQ:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data2 >> mStageCompute.data1;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataDst >> mStageCompute.dataSrc;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
-      mStageWrite.c = mStageCompute.data2 & 1;
+      mStageWrite.c = mStageCompute.dataDst & 1;
       mStageWrite.updateFlags = true;
       mStageCompute.instruction = DSPI::EMPTY;
       mLog->computeRegFlags( mStageWrite.reg );
@@ -552,11 +552,11 @@ void Jerry::compute()
   case DSPI::SHA:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageCompute.reg2;
-      mStageWrite.data = mStageCompute.data1 > 0 ? (uint32_t)( (int64_t)( mStageCompute.data2 ) >> mStageCompute.data1 ) : mStageCompute.data2 << mStageCompute.data1;
+      mStageWrite.reg = mStageCompute.regDst;
+      mStageWrite.data = mStageCompute.dataSrc > 0 ? (uint32_t)( (int64_t)( mStageCompute.dataDst ) >> mStageCompute.dataSrc ) : mStageCompute.dataDst << mStageCompute.dataSrc;
       mStageWrite.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.n = mStageWrite.data >> 31;
-      mStageWrite.c = mStageCompute.data1 > 0 ? ( mStageCompute.data2 & 1 ) : ( mStageCompute.data2 >> 31 );
+      mStageWrite.c = mStageCompute.dataSrc > 0 ? ( mStageCompute.dataDst & 1 ) : ( mStageCompute.dataDst >> 31 );
       mStageWrite.updateFlags = true;
       mStageCompute.instruction = DSPI::EMPTY;
       mLog->computeRegFlags( mStageWrite.reg );
@@ -654,47 +654,47 @@ void Jerry::stageRead()
   case DSPI::SHA:
   case DSPI::ROR:
   case DSPI::MTOI:
-    if ( dualPortRead( mStageRead.reg1, mStageRead.reg2 ) )
+    if ( dualPortRead( mStageRead.regSrc, mStageRead.regDst ) )
     {
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.reg1] == FREE );
-      assert( mRegStatus[mStageRead.reg2] == FREE );
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
+      assert( mRegStatus[mStageRead.regDst] == FREE );
+      mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.reg2 = mStageRead.reg2;
-      mStageCompute.data1 = mStageRead.data1;
-      mStageCompute.data2 = mStageRead.data2;
+      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.dataSrc = mStageRead.dataSrc;
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     break;
   case DSPI::ADDC:
   case DSPI::SUBC:
-    if ( mFlagsSemaphore == 0 && dualPortRead( mStageRead.reg1, mStageRead.reg2 ) )
+    if ( mFlagsSemaphore == 0 && dualPortRead( mStageRead.regSrc, mStageRead.regDst ) )
     {
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.reg1] == FREE );
-      assert( mRegStatus[mStageRead.reg2] == FREE );
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
+      assert( mRegStatus[mStageRead.regDst] == FREE );
+      mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.reg2 = mStageRead.reg2;
-      mStageCompute.data1 = mStageRead.data1;
-      mStageCompute.data2 = mStageRead.data2;
+      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.dataSrc = mStageRead.dataSrc;
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     break;
   case DSPI::ADDQ:
   case DSPI::SUBQ:
   case DSPI::SUBQMOD:
   case DSPI::ADDQMOD:
-    if ( dualPortRead( mStageRead.reg2 ) )
+    if ( dualPortRead( mStageRead.regDst ) )
     {
-      mLog->portImm( mStageRead.reg1 );
+      mLog->portImm( mStageRead.regSrc );
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.reg1] == FREE );
-      assert( mRegStatus[mStageRead.reg2] == FREE );
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
+      assert( mRegStatus[mStageRead.regDst] == FREE );
+      mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.reg2 = mStageRead.reg2;
-      mStageCompute.data1 = tabAddSubQ[ mStageRead.reg1 ];
-      mStageCompute.data2 = mStageRead.data2;
+      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.dataSrc = tabAddSubQ[ mStageRead.regSrc];
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     break;
   case DSPI::BSET:
@@ -702,31 +702,31 @@ void Jerry::stageRead()
   case DSPI::SHRQ:
   case DSPI::SHARQ:
   case DSPI::RORQ:
-    if ( dualPortRead( mStageRead.reg2 ) )
+    if ( dualPortRead( mStageRead.regDst ) )
     {
-      mLog->portImm( mStageRead.reg1 );
+      mLog->portImm( mStageRead.regSrc );
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.reg1] == FREE );
-      assert( mRegStatus[mStageRead.reg2] == FREE );
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
+      assert( mRegStatus[mStageRead.regDst] == FREE );
+      mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.reg2 = mStageRead.reg2;
-      mStageCompute.data1 = mStageRead.reg1;
-      mStageCompute.data2 = mStageRead.data2;
+      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.dataSrc = mStageRead.regSrc;
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     break;
   case DSPI::SHLQ:
-    if ( dualPortRead( mStageRead.reg2 ) )
+    if ( dualPortRead( mStageRead.regDst ) )
     {
-      mLog->portImm( 32 - mStageRead.reg1 );
+      mLog->portImm( 32 - mStageRead.regSrc );
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.reg1] == FREE );
-      assert( mRegStatus[mStageRead.reg2] == FREE );
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
+      assert( mRegStatus[mStageRead.regDst] == FREE );
+      mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.reg2 = mStageRead.reg2;
-      mStageCompute.data1 = mStageRead.reg1;
-      mStageCompute.data2 = mStageRead.data2;
+      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.dataSrc = mStageRead.regSrc;
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     break;
   case DSPI::NEG:
@@ -736,63 +736,63 @@ void Jerry::stageRead()
   case DSPI::SAT32S:
   case DSPI::MIRROR:
   case DSPI::NORMI:
-    if ( dualPortRead( mStageRead.reg2 ) )
+    if ( dualPortRead( mStageRead.regDst ) )
     {
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.reg1] == FREE );
-      assert( mRegStatus[mStageRead.reg2] == FREE );
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
+      assert( mRegStatus[mStageRead.regDst] == FREE );
+      mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.reg2 = mStageRead.reg2;
-      mStageCompute.data2 = mStageRead.data2;
+      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     break;
   case DSPI::ADDQT:
   case DSPI::SUBQT:
-    if ( dualPortRead( mStageRead.reg2 ) )
+    if ( dualPortRead( mStageRead.regDst ) )
     {
-      mLog->portImm( mStageRead.reg1 );
-      assert( mRegStatus[mStageRead.reg1] == FREE );
-      assert( mRegStatus[mStageRead.reg2] == FREE );
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      mLog->portImm( mStageRead.regSrc );
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
+      assert( mRegStatus[mStageRead.regDst] == FREE );
+      mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.reg2 = mStageRead.reg2;
-      mStageCompute.data1 = tabAddSubQ[mStageRead.reg1];
-      mStageCompute.data2 = mStageRead.data2;
+      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.dataSrc = tabAddSubQ[mStageRead.regSrc];
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     break;
   case DSPI::BTST:
   case DSPI::CMPQ:
-    if ( dualPortRead( mStageRead.reg2 ) )
+    if ( dualPortRead( mStageRead.regDst ) )
     {
-      mLog->portImm( mStageRead.reg1 );
+      mLog->portImm( mStageRead.regSrc );
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.reg1] == FREE );
-      assert( mRegStatus[mStageRead.reg2] == FREE );
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
+      assert( mRegStatus[mStageRead.regDst] == FREE );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.data1 = mStageRead.reg1;
-      mStageCompute.data2 = mStageRead.data2;
+      mStageCompute.dataSrc = mStageRead.regSrc;
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     break;
   case DSPI::IMULTN:
   case DSPI::IMACN:
   case DSPI::CMP:
-    if ( dualPortRead( mStageRead.reg1, mStageRead.reg2 ) )
+    if ( dualPortRead( mStageRead.regSrc, mStageRead.regDst ) )
     {
       mFlagsSemaphore += 1;
-      assert( mRegStatus[mStageRead.reg1] == FREE );
-      assert( mRegStatus[mStageRead.reg2] == FREE );
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
+      assert( mRegStatus[mStageRead.regDst] == FREE );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.data1 = mStageRead.data1;
-      mStageCompute.data2 = mStageRead.data2;
+      mStageCompute.dataSrc = mStageRead.dataSrc;
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     break;
   case DSPI::RESMAC:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageRead.reg2;
+      mStageWrite.reg = mStageRead.regDst;
       mStageWrite.data = mMulatiplyAccumulator;
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      mRegStatus[mStageRead.regDst] = LOCKED;
       mStageRead.instruction = DSPI::EMPTY;
     }
     break;
@@ -800,50 +800,50 @@ void Jerry::stageRead()
     if ( mStageWrite.reg < 0 )
     {
       dualPortCommit();
-      mLog->portImm( mStageRead.reg1 );
-      mStageWrite.reg = mStageRead.reg2;
-      mStageWrite.data = mStageRead.reg1;
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      mLog->portImm( mStageRead.regSrc );
+      mStageWrite.reg = mStageRead.regDst;
+      mStageWrite.data = mStageRead.regSrc;
+      mRegStatus[mStageRead.regDst] = LOCKED;
       mStageRead.instruction = DSPI::EMPTY;
     }
     break;
   case DSPI::MOVEFA:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageRead.reg2;
-      mStageWrite.data = mRegs[ mAnotherRegisterFile + mStageRead.reg1 ];
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      mStageWrite.reg = mStageRead.regDst;
+      mStageWrite.data = mRegs[ mAnotherRegisterFile + mStageRead.regSrc];
+      mRegStatus[mStageRead.regDst] = LOCKED;
       mStageRead.instruction = DSPI::EMPTY;
     }
     break;
   case DSPI::DIV:
-    if ( dualPortRead( mStageRead.reg1, mStageRead.reg2 ) )
+    if ( dualPortRead( mStageRead.regSrc, mStageRead.regDst ) )
     {
-      assert( mRegStatus[mStageRead.reg1] == FREE );
-      assert( mRegStatus[mStageRead.reg2] == FREE );
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
+      assert( mRegStatus[mStageRead.regDst] == FREE );
+      mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.reg2 = mStageRead.reg2;
-      mStageCompute.data1 = mStageRead.data1;
-      mStageCompute.data2 = mStageRead.data2;
+      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.dataSrc = mStageRead.dataSrc;
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     break;
   case DSPI::MOVE:
-    if ( mStageWrite.reg < 0 && dualPortRead( mStageRead.reg1 ) )
+    if ( mStageWrite.reg < 0 && dualPortRead( mStageRead.regSrc ) )
     {
-      assert( mRegStatus[mStageRead.reg1] == FREE );
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
       // mRegStatus[mStageRead.reg2] != FREE is an error;
-      mStageWrite.reg = mStageRead.reg2;
-      mStageWrite.data = mStageRead.data1;
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      mStageWrite.reg = mStageRead.regDst;
+      mStageWrite.data = mStageRead.dataSrc;
+      mRegStatus[mStageRead.regDst] = LOCKED;
       mStageRead.instruction = DSPI::EMPTY;
     }
     break;
   case DSPI::MOVETA:
-    if ( dualPortRead( mStageRead.reg1 ) )
+    if ( dualPortRead( mStageRead.regSrc ) )
     {
-      assert( mRegStatus[mStageRead.reg1] == FREE );
-      mRegs[mAnotherRegisterFile + mStageRead.reg2] = mStageRead.data1;
+      assert( mRegStatus[mStageRead.regSrc] == FREE );
+      mRegs[mAnotherRegisterFile + mStageRead.regDst] = mStageRead.dataSrc;
       mStageRead.instruction = DSPI::EMPTY;
     }
     break;
@@ -879,19 +879,19 @@ void Jerry::stageRead()
   case DSPI::MOVEPC:
     if ( mStageWrite.reg < 0 )
     {
-      mStageWrite.reg = mStageRead.reg2;
+      mStageWrite.reg = mStageRead.regDst;
       mStageWrite.data = mPC;
-      mRegStatus[mStageRead.reg2] = LOCKED;
+      mRegStatus[mStageRead.regDst] = LOCKED;
       mStageRead.instruction = DSPI::EMPTY;
     }
     break;
   case DSPI::JUMP:
   case DSPI::JR:
-    if ( mFlagsSemaphore == 0 && dualPortRead( mStageRead.reg2 ) )
+    if ( mFlagsSemaphore == 0 && dualPortRead( mStageRead.regDst ) )
     {
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.data1 = mStageRead.data1;
-      mStageCompute.data2 = mStageRead.data2;
+      mStageCompute.dataSrc = mStageRead.dataSrc;
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     break;
   case DSPI::MMULT:
@@ -911,10 +911,10 @@ void Jerry::decode()
     return;
 
   mStageRead.instruction = ( DSPI )( pull >> 10 );
-  mStageRead.reg1 = ( pull >> 5 ) & 0x1f;
-  mStageRead.reg2 = pull & 0x1f;
+  mStageRead.regSrc = ( pull >> 5 ) & 0x1f;
+  mStageRead.regDst = pull & 0x1f;
 
-  mLog->decodeDSP( mStageRead.instruction, mStageRead.reg1, mStageRead.reg2 );
+  mLog->decodeDSP( mStageRead.instruction, mStageRead.regSrc, mStageRead.regDst );
 }
 
 void Jerry::prefetch()
@@ -1031,18 +1031,18 @@ void Jerry::dualPortCommit( bool writeRead )
   else if ( mDualPort.port1.status == DualPort::READ )
   {
     assert( mRegStatus[mDualPort.port1.reg] == FREE );
-    assert( mStageRead.reg1 == mDualPort.port1.reg );
-    mStageRead.data1 = mRegs[mRegisterFile + mDualPort.port1.reg];
+    assert( mStageRead.regSrc == mDualPort.port1.reg );
+    mStageRead.dataSrc = mRegs[mRegisterFile + mDualPort.port1.reg];
     mDualPort.port1.status = DualPort::EMPTY;
-    mLog->port1Read( mDualPort.port1.reg, mStageRead.data1 );
+    mLog->port1Read( mDualPort.port1.reg, mStageRead.dataSrc );
   }
   
   if ( mDualPort.port2.status == DualPort::READ )
   {
     assert( mRegStatus[mDualPort.port2.reg] == FREE );
-    mStageRead.data2 = mRegs[mRegisterFile + mDualPort.port2.reg];
+    mStageRead.dataDst = mRegs[mRegisterFile + mDualPort.port2.reg];
     mDualPort.port2.status = DualPort::EMPTY;
-    mLog->port2Read( mDualPort.port2.reg, mStageRead.data2 );
+    mLog->port2Read( mDualPort.port2.reg, mStageRead.dataDst );
   }
   assert( mDualPort.port2.status == DualPort::EMPTY );
 }
