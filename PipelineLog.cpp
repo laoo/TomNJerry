@@ -137,10 +137,10 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "addc    r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::ADDQ:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "addq    #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "addq    #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::ADDQT:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "addqt   #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "addqt   #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::SUB:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "sub     r%02d,r%02d", reg1, reg2 )] = ' ';
@@ -149,10 +149,10 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "subc    r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::SUBQ:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "subq    #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "subq    #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::SUBQT:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "subqt   #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "subqt   #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::NEG:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "neg           r%02d", reg2 )] = ' ';
@@ -170,13 +170,13 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "not           r%02d", reg2 )] = ' ';
     break;
   case DSPI::BTST:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "btst    #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "btst    #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::BSET:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "bset    #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "bset    #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::BCLR:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "bclr    #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "bclr    #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::MULT:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "mult    r%02d,r%02d", reg1, reg2 )] = ' ';
@@ -203,31 +203,31 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "sh      r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::SHLQ:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "shlq    #%02d,r%02d", 32-reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "shlq    #%02x,r%02d", 32-reg1, reg2 )] = ' ';
     break;
   case DSPI::SHRQ:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "shrq    #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "shrq    #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::SHA:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "sha     r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::SHARQ:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "sharq   #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "sharq   #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::ROR:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "ror     r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::RORQ:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "rorq    #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "rorq    #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::CMP:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "cmp     r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::CMPQ:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "cmpq    #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "cmpq    #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::SUBQMOD:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "sumbmod #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "sumbmod #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::SAT16S:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "sat16s        r%02d", reg2 )] = ' ';
@@ -236,7 +236,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "move    r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::MOVEQ:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "moveq   #%02d,r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "moveq   #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::MOVETA:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "moveta  r%02d,r%02d", reg1, reg2 )] = ' ';
@@ -260,28 +260,28 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "sat32s        r%02d", reg2 )] = ' ';
     break;
   case DSPI::LOAD14N:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "load    (r14+#%02d),r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "load    (r14+#%02x),r%02d", ( reg1 + 1 ) * 4, reg2)] = ' ';
     break;
   case DSPI::LOAD15N:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "load    (r15+#%02d),r%02d", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "load    (r15+#%02x),r%02d", ( reg1 + 1 ) * 4, reg2 )] = ' ';
     break;
   case DSPI::STOREB:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "storeb  r%02d,(r%02d)", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "storeb  r%02d,(r%02d)", reg2, reg1 )] = ' ';
     break;
   case DSPI::STOREW:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "storew  r%02d,(r%02d)", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "storew  r%02d,(r%02d)", reg2, reg1 )] = ' ';
     break;
   case DSPI::STORE:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r%02d)", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r%02d)", reg2, reg1 )] = ' ';
     break;
   case DSPI::MIRROR:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "mirror        r%02d", reg2 )] = ' ';
     break;
   case DSPI::STORE14N:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r14+#%02d)", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r14+#%02x)", reg2, ( reg1 + 1 ) * 4 )] = ' ';
     break;
   case DSPI::STORE15N:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r14+#%02d)", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r15+#%02x)", reg2, ( reg1 + 1 ) * 4 )] = ' ';
     break;
   case DSPI::MOVEPC:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "move    pc,r%02d",       reg2 )] = ' ';
@@ -311,10 +311,10 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "load    (r15+#%02d),r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::STORE14R:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r14+r%02d)", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r14+r%02d)", reg2, reg1 )] = ' ';
     break;
   case DSPI::STORE15R:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r15+r%02d)", reg1, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r15+r%02d)", reg2, reg1 )] = ' ';
     break;
   case DSPI::ADDQMOD:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "addqmod #%02d,r%02d", reg1, reg2 )] = ' ';
@@ -392,6 +392,40 @@ void PipelineLog::computeFlags()
   mBuffer[0x52] = 'F';
 }
 
+void PipelineLog::computeIndex()
+{
+  //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
+  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | Cr31 F | W31:01234567
+  mBuffer[0x4f] = 'I';
+  mBuffer[0x50] = 'N';
+  mBuffer[0x51] = 'D';
+}
+
+void PipelineLog::storeLong( uint32_t address, uint32_t value )
+{
+  //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
+  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | Cr31 F | W31:01234567 | S(123456)=12345678
+  mBuffer[0x65 + sprintf( mBuffer + 0x65, "S(%06x)=%08x", address, value )] = ' ';
+}
+
+void PipelineLog::storeWord( uint32_t address, uint16_t value )
+{
+  //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
+  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | Cr31 F | W31:01234567 | S(123456)=12345678
+  mBuffer[0x65 + sprintf( mBuffer + 0x65, "S(%06x)=%04x", address, value )] = ' ';
+}
+
+void PipelineLog::storeByte( uint32_t address, uint8_t value )
+{
+  //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
+  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | Cr31 F | W31:01234567 | S(123456)=12345678
+  mBuffer[0x65 + sprintf( mBuffer + 0x65, "S(%06x)=%02x", address, value )] = ' ';
+}
+
 void PipelineLog::flush()
 {
   std::cout << mBuffer;
@@ -400,7 +434,7 @@ void PipelineLog::flush()
 
 void PipelineLog::init()
 {
-  sprintf( mBuffer, "                       |                       |                           |        |                \n" );
+  sprintf( mBuffer, "                       |                       |                           |        |              |                    \n" );
 }
 
 char const* PipelineLog::prefetchDSPMapper( uint32_t code )

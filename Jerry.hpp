@@ -68,13 +68,20 @@ public:
   AdvanceResult busCycleRead( uint64_t value ) override;
 
 private:
-  void writeByte( uint32_t address, uint8_t data );
-  void writeWord( uint32_t address, uint16_t data );
-  void writeLong( uint32_t address, uint32_t data );
+  // returns true for external access
+  bool storeByte( uint32_t address, uint8_t data );
+  // returns true for external access
+  bool storeWord( uint32_t address, uint16_t data );
+  // returns true for external access
+  bool storeLong( uint32_t address, uint32_t data );
 
-  void readByte( uint32_t address );
-  void readWord( uint32_t address );
-  void readLong( uint32_t address );
+  void loadByte( uint32_t address );
+  void loadWord( uint32_t address );
+  void loadLong( uint32_t address );
+
+  void ackWrite();
+  void ackRead();
+
 
   AdvanceResult advance();
 
@@ -88,6 +95,7 @@ private:
   bool portWriteDst( uint32_t reg, uint32_t data );
   bool portReadSrc( uint32_t regSrc );
   bool portReadDst( uint32_t regDst );
+  bool portReadDstAndHiddenCommit( uint32_t regDst ); //to be used with indexed addressing modes
   bool portReadBoth( uint32_t regSrc, uint32_t regDst );
   void dualPortCommit();
 
@@ -169,6 +177,7 @@ private:
     DSPI instruction = DSPI::EMPTY;
     uint32_t dataSrc = 0;
     uint32_t dataDst = 0;
+    uint32_t regSrc = 0;
     uint32_t regDst = 0;
   } mStageCompute = {};
 
@@ -181,6 +190,33 @@ private:
     int32_t reg = -1;
     uint32_t data = 0;
   } mStageWrite = {};
+
+  struct StageStore
+  {
+    enum State
+    {
+      IDLE,
+      STORE_LONG,
+      STORE_WORD,
+      STORE_BYTE,
+      WORKING
+    } state = IDLE;
+    uint32_t address = 0;
+    uint32_t data = 0;
+  } mStageStore;
+
+  struct StageLoad
+  {
+    enum State
+    {
+      IDLE,
+      LOAD_LONG,
+      LOAD_WORD,
+      LOAD_BYTE
+    } state = IDLE;
+    uint32_t address = 0;
+    int32_t reg = -1;
+  } mStageLoad;
 
   int32_t mPortReadSrcReg = -1;
   int32_t mPortReadDstReg = -1;

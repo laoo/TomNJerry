@@ -18,6 +18,10 @@ public:
   void computeReg( uint32_t reg );
   void computeRegFlags( uint32_t reg );
   void computeFlags();
+  void computeIndex();
+  void storeLong( uint32_t address, uint32_t value );
+  void storeWord( uint32_t address, uint16_t value );
+  void storeByte( uint32_t address, uint8_t value );
   void flush();
 
 private:
