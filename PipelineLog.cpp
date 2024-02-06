@@ -121,7 +121,9 @@ void PipelineLog::prefetch( uint32_t address, uint32_t code )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345:addqmod addqmod | store   r31,(r31+r31) |    #31          #31       | C31 F | W31:01234567
-  mBuffer[0x00 + sprintf( mBuffer + 0x00, "%06x:%8s%8s", address, kPrefetchDSPOpcodes[code >> ( 10 + 16 )], kPrefetchDSPOpcodes[( code >> 10 ) & 63] )] = '|';
+  mBuffer[0x00 + sprintf( mBuffer + 0x00, "%06x", address )] = ':';
+  mBuffer[0x07 + sprintf( mBuffer + 0x07, "%s", prefetchDSPMapper( code >> 16 ))] = ' ';
+  mBuffer[0x0e + sprintf( mBuffer + 0x0e, "%s", prefetchDSPMapper(code&0xffff))] = ' ';
 }
 
 void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
@@ -399,5 +401,25 @@ void PipelineLog::flush()
 void PipelineLog::init()
 {
   sprintf( mBuffer, "                       |                       |                           |        |                \n" );
+}
+
+char const* PipelineLog::prefetchDSPMapper( uint32_t code )
+{
+  switch ( mPrefetchDSPMapperState )
+  {
+  case 1:
+    sprintf( mPrefetchDSPMapperBuf, "%04x", code );
+    mPrefetchDSPMapperState = 2;
+    return mPrefetchDSPMapperBuf;
+  case 2:
+    sprintf( mPrefetchDSPMapperBuf, "%04x", code );
+    mPrefetchDSPMapperState = 0;
+    return mPrefetchDSPMapperBuf;
+  default:
+    code >>= 10;
+    if ( (DSPI)code == DSPI::MOVEI )
+      mPrefetchDSPMapperState = 1;
+    return kPrefetchDSPOpcodes[code];
+  }
 }
 

@@ -135,10 +135,17 @@ private:
 
   struct Prefetch
   {
+    enum PullStatus : uint16_t
+    {
+      EMPTY,
+      OPCODE,
+      OPERAND1,
+      OPERAND2
+    } status = OPCODE;
     uint64_t queue = 0;
     size_t queueSize = 0;
 
-    int32_t pull();
+    std::pair<PullStatus, uint16_t> pull();
     bool push( uint32_t value );
   } mPrefetch = {};
 

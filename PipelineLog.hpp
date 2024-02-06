@@ -23,7 +23,10 @@ public:
 private:
 
   void init();
+  char const* prefetchDSPMapper( uint32_t code );
 
   char mBuffer[ 256 ];
+  int mPrefetchDSPMapperState = 0;
+  char mPrefetchDSPMapperBuf[8];
 
 };
