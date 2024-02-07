@@ -37,3 +37,14 @@ private:
   mutable std::string mStr;
 };
 
+class EmulationViolation : public Ex
+{
+public:
+  EmulationViolation() : Ex{}
+  {
+  }
+
+  EmulationViolation( char const* str ) : Ex{ str }
+  {
+  }
+};

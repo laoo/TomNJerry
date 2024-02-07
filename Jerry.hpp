@@ -69,11 +69,11 @@ public:
 
 private:
   // returns true for external access
-  bool storeByte( uint32_t address, uint8_t data );
+  void storeByte( uint32_t address, uint8_t data );
   // returns true for external access
-  bool storeWord( uint32_t address, uint16_t data );
+  void storeWord( uint32_t address, uint16_t data );
   // returns true for external access
-  bool storeLong( uint32_t address, uint32_t data );
+  void storeLong( uint32_t address, uint32_t data );
 
   void loadByte( uint32_t address );
   void loadWord( uint32_t address );
@@ -95,9 +95,11 @@ private:
   bool portWriteDst( uint32_t reg, uint32_t data );
   bool portReadSrc( uint32_t regSrc );
   bool portReadDst( uint32_t regDst );
-  bool portReadDstAndHiddenCommit( uint32_t regDst ); //to be used with indexed addressing modes
+  void portReadDstAndHiddenCommit( uint32_t regDst ); //to be used with indexed addressing modes
   bool portReadBoth( uint32_t regSrc, uint32_t regDst );
   void dualPortCommit();
+  void busGatePush( AdvanceResult result );
+  void busGatePop();
 
 
 private:
@@ -134,8 +136,6 @@ private:
   uint32_t mMachi = 0;
   uint32_t mRegisterFile = 0;
   uint32_t mAnotherRegisterFile = 32;
-
-  AdvanceResult mResult = AdvanceResult::nop();
 
   uint64_t mCycle = 0;
 
@@ -199,7 +199,6 @@ private:
       STORE_LONG,
       STORE_WORD,
       STORE_BYTE,
-      WORKING
     } state = IDLE;
     uint32_t address = 0;
     uint32_t data = 0;
@@ -222,6 +221,18 @@ private:
   int32_t mPortReadDstReg = -1;
   int32_t mPortWriteDstReg = -1;
   uint32_t mPortWriteDstData = 0;
+
+  struct BusGate
+  {
+    //two element queue
+    AdvanceResult front = AdvanceResult::nop();
+    AdvanceResult back = AdvanceResult::nop();
+
+    explicit operator bool() const
+    {
+      return !( front && back );
+    }
+  } mBusGate;
 
   std::array<uint32_t, RAM_SIZE / sizeof( uint32_t )> mLocalRAM;
   uint64_t mLastLocalRAMAccessCycle = ~0;

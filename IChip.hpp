@@ -29,7 +29,7 @@ public:
   {
     return AdvanceResult{ kByteFlag | kWriteFlag | ( (uint64_t)addres << 32 ) & kAddressMask | (uint64_t)value };
   }
-  static AdvanceResult writeShort( uint32_t addres, uint16_t value )
+  static AdvanceResult writeWord( uint32_t addres, uint16_t value )
   {
     return AdvanceResult{ kShortFlag | kWriteFlag | ( (uint64_t)addres << 32 ) & kAddressMask | (uint64_t)value };
   }
@@ -48,6 +48,8 @@ public:
   // Returns 0 for nop, positive for read, negative for write
   int64_t getOperation() const { return std::bit_cast< int64_t >( mData & kFlagsMask ); }
   size_t getSize() const { return ( mData >> 56 ) & 7; }
+
+  explicit operator bool() const { return ( mData & kFlagsMask ) != 0; }
 
 private:
   AdvanceResult( uint64_t data ) : mData( data ) {}
