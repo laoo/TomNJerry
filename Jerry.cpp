@@ -891,6 +891,8 @@ void Jerry::stageRead()
   case DSPI::RESMAC:
     if ( mStageWrite.reg < 0 )
     {
+      if ( mRegStatus[mStageRead.regDst] != FREE )
+        throw EmulationViolation{ "RESMAC writes to register in use" };
       dualPortCommit();
       mStageWrite.reg = mStageRead.regDst;
       mStageWrite.data = mMulatiplyAccumulator;
@@ -905,6 +907,8 @@ void Jerry::stageRead()
   case DSPI::MOVEQ:
     if ( mStageWrite.reg < 0 )
     {
+      if ( mRegStatus[mStageRead.regDst] != FREE )
+        throw EmulationViolation{ "MOVEQ writes to register in use" };
       dualPortCommit();
       mLog->portImm( mStageRead.regSrc );
       mStageWrite.reg = mStageRead.regDst;
@@ -920,6 +924,8 @@ void Jerry::stageRead()
   case DSPI::MOVEFA:
     if ( mStageWrite.reg < 0 )
     {
+      if ( mRegStatus[mStageRead.regDst] != FREE )
+        throw EmulationViolation{ "MOVEFA writes to register in use" };
       dualPortCommit();
       mStageWrite.reg = mStageRead.regDst;
       mStageWrite.data = mRegs[ mAnotherRegisterFile + mStageRead.regSrc];
@@ -949,8 +955,10 @@ void Jerry::stageRead()
   case DSPI::MOVE:
     if ( mStageWrite.reg < 0 && portReadSrc( mStageRead.regSrc ) )
     {
+      if ( mRegStatus[mStageRead.regDst] != FREE )
+        throw EmulationViolation{ "MOVE writes to register in use" };
+
       dualPortCommit();
-      // mRegStatus[mStageRead.reg2] != FREE is an error;
       mStageWrite.reg = mStageRead.regDst;
       mStageWrite.data = mStageRead.dataSrc;
       mRegStatus[mStageRead.regDst] = LOCKED;
@@ -976,6 +984,8 @@ void Jerry::stageRead()
   case DSPI::MOVEI:
     if ( mStageWrite.reg < 0 )
     {
+      if ( mRegStatus[mStageRead.regDst] != FREE )
+        throw EmulationViolation{ "MOVEI writes to register in use" };
       dualPortCommit();
       mRegStatus[mStageRead.regDst] = LOCKED;
       mStageRead.instruction = DSPI::EMPTY;
@@ -1100,6 +1110,8 @@ void Jerry::stageRead()
   case DSPI::MOVEPC:
     if ( mStageWrite.reg < 0 )
     {
+      if ( mRegStatus[mStageRead.regDst] != FREE )
+        throw EmulationViolation{ "MOVE PC writes to register in use" };
       dualPortCommit();
       mStageWrite.reg = mStageRead.regDst;
       mStageWrite.data = mPC;
