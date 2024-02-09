@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Opcodes.hpp"
+#include "RegFlags.hpp"
 
 class PipelineLog
 {
@@ -12,12 +13,13 @@ public:
   void decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 );
   void decodeMOVEI( int stage, uint32_t data );
   void portImm( uint32_t value );
+  void portCond( uint32_t value );
   void portReadSrc( uint32_t reg, uint32_t value );
   void portReadDst( uint32_t reg, uint32_t value );
   void portWriteDst( uint32_t reg, uint32_t value );
-  void computeReg( uint32_t reg );
-  void computeRegFlags( uint32_t reg );
-  void computeFlags();
+  void computeReg( RegFlags regFlags );
+  void computeRegFlags( RegFlags regFlags );
+  void computeFlags( RegFlags regFlags );
   void computeIndex();
   void storeLong( uint32_t address, uint32_t value );
   void storeWord( uint32_t address, uint16_t value );

@@ -1,6 +1,7 @@
 #pragma once
 #include "IChip.hpp"
 #include "Opcodes.hpp"
+#include "RegFlags.hpp"
 
 class PipelineLog;
 
@@ -79,6 +80,8 @@ private:
   void loadWord( uint32_t address );
   void loadLong( uint32_t address );
 
+  bool testCondition( uint32_t condition ) const;
+
   void ackWrite();
   void ackRead();
 
@@ -154,7 +157,7 @@ private:
     size_t queueSize = 0;
 
     std::pair<PullStatus, uint16_t> pull();
-    bool push( uint32_t value );
+    uint32_t push( uint32_t value, uint32_t oddWord );
   } mPrefetch = {};
 
   struct StageRead
@@ -184,10 +187,7 @@ private:
   struct StageWrite 
   {
     bool updateFlags = false;
-    int32_t z = -1;
-    int32_t n = -1;
-    int32_t c = -1;
-    int32_t reg = -1;
+    RegFlags regFlags = {};
     uint32_t data = 0;
   } mStageWrite = {};
 
