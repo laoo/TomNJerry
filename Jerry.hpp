@@ -85,7 +85,7 @@ private:
   void ackRead( uint32_t data );
 
 
-  AdvanceResult advance( bool skipIO );
+  AdvanceResult advance();
 
   void io();
   void stageWrite();
@@ -190,7 +190,7 @@ private:
     uint32_t data = 0;
   } mStageWrite = {};
 
-  struct StageStore
+  struct StageIO
   {
     enum State
     {
@@ -198,40 +198,24 @@ private:
       STORE_LONG,
       STORE_WORD,
       STORE_BYTE,
-    } state = IDLE;
-    uint32_t address = 0;
-    uint32_t data = 0;
-  } mStageStore;
-
-  struct StageLoad
-  {
-    enum State
-    {
-      IDLE,
       LOAD_LONG,
       LOAD_WORD,
       LOAD_BYTE
     } state = IDLE;
     uint32_t address = 0;
-    int32_t reg = -1;
-  } mStageLoad;
+    union
+    {
+      uint32_t data = 0;
+      uint32_t reg;
+    };
+  } mStageIO;
 
   int32_t mPortReadSrcReg = -1;
   int32_t mPortReadDstReg = -1;
   int32_t mPortWriteDstReg = -1;
   uint32_t mPortWriteDstData = 0;
 
-  struct BusGate
-  {
-    //two element queue
-    AdvanceResult front = AdvanceResult::nop();
-    AdvanceResult back = AdvanceResult::nop();
-
-    explicit operator bool() const
-    {
-      return !( front && back );
-    }
-  } mBusGate;
+  AdvanceResult mBusGate = AdvanceResult::nop();
 
   std::array<uint32_t, RAM_SIZE / sizeof( uint32_t )> mLocalRAM;
   uint64_t mLastLocalRAMAccessCycle = ~0;
