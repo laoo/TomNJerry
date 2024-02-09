@@ -24,6 +24,9 @@ public:
   void storeLong( uint32_t address, uint32_t value );
   void storeWord( uint32_t address, uint16_t value );
   void storeByte( uint32_t address, uint8_t value );
+  void loadLong( uint32_t address, uint32_t value );
+  void loadWord( uint32_t address, uint16_t value );
+  void loadByte( uint32_t address, uint8_t value );
   void flush();
 
 private:
@@ -36,3 +39,6 @@ private:
   char mPrefetchDSPMapperBuf[8];
 
 };
+
+static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31 };
+

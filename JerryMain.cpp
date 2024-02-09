@@ -21,10 +21,34 @@ int main( int argc, char const* argv[] )
       switch ( result.getOperation() )
       {
       case AdvanceResult::kByteFlag:
+        if ( i % 6 == 0 )
+        {
+          result = jerry.busCycleRead( (uint8_t)0x42 );
+        }
+        else
+        {
+          result = jerry.busCycleIdle();
+        }
         break;
       case AdvanceResult::kShortFlag:
+        if ( i % 6 == 0 )
+        {
+          result = jerry.busCycleRead( ( uint16_t )0x4242 );
+        }
+        else
+        {
+          result = jerry.busCycleIdle();
+        }
         break;
       case AdvanceResult::kLongFlag:
+        if ( i % 6 == 0 )
+        {
+          result = jerry.busCycleRead( ( uint32_t )0x42424242 );
+        }
+        else
+        {
+          result = jerry.busCycleIdle();
+        }
         break;
       case AdvanceResult::kWriteFlag | AdvanceResult::kByteFlag:
       case AdvanceResult::kWriteFlag | AdvanceResult::kShortFlag:

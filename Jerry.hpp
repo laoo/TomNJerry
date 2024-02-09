@@ -69,24 +69,23 @@ public:
   AdvanceResult busCycleRead( uint64_t value ) override;
 
 private:
-  // returns true for external access
   void storeByte( uint32_t address, uint8_t data );
-  // returns true for external access
   void storeWord( uint32_t address, uint16_t data );
-  // returns true for external access
   void storeLong( uint32_t address, uint32_t data );
 
-  void loadByte( uint32_t address );
-  void loadWord( uint32_t address );
-  void loadLong( uint32_t address );
+  void loadByte( uint32_t address, uint32_t reg );
+  void loadWord( uint32_t address, uint32_t reg );
+  void loadLong( uint32_t address, uint32_t reg );
 
   bool testCondition( uint32_t condition ) const;
 
   void ackWrite();
-  void ackRead();
+  void ackRead( uint8_t data );
+  void ackRead( uint16_t data );
+  void ackRead( uint32_t data );
 
 
-  AdvanceResult advance();
+  AdvanceResult advance( bool skipIO );
 
   void io();
   void stageWrite();

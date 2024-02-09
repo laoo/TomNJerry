@@ -56,9 +56,12 @@ void Jerry::debugWrite( uint32_t address, std::span<uint32_t const> data )
   std::copy( data.begin(), data.end(), mLocalRAM.begin() + ( address - RAM_BASE ) / sizeof( uint32_t ) );
 }
 
-AdvanceResult Jerry::advance()
+AdvanceResult Jerry::advance( bool skipIO )
 {
-  io();
+  if ( !skipIO )
+  {
+    io();
+  }
   stageWrite();
   compute();
   stageRead();
@@ -80,7 +83,7 @@ AdvanceResult Jerry::busCycleIdle()
   if ( ( mCtrl.value & CTRL::DSPGO ) == 0 )
     return AdvanceResult::nop();
 
-  return advance();
+  return advance( false );
 }
 
 AdvanceResult Jerry::busCycleWrite()
@@ -89,49 +92,115 @@ AdvanceResult Jerry::busCycleWrite()
     return AdvanceResult::nop();
 
   ackWrite();
-  return advance();
+  return advance( true );
 }
 
 AdvanceResult Jerry::busCycleRead( uint8_t value )
 {
   assert( mBusGate.front.getOperation() > 0 );
-  assert( mBusGate.front.getSize() == AdvanceResult::kByteFlag );
+  assert( mBusGate.front.getSize() == 1 );
 
   if ( !mCtrl.go() )
     return AdvanceResult::nop();
 
-  ackRead();
-  return advance();
+  ackRead( value );
+  return advance( true );
 }
 
 AdvanceResult Jerry::busCycleRead( uint16_t value )
 {
   assert( mBusGate.front.getOperation() > 0 );
-  assert( mBusGate.front.getSize() == AdvanceResult::kShortFlag );
+  assert( mBusGate.front.getSize() == 2 );
 
   if ( !mCtrl.go() )
     return AdvanceResult::nop();
 
-  ackRead();
-  return advance();
+  ackRead( value );
+  return advance( true );
 }
 
 AdvanceResult Jerry::busCycleRead( uint32_t value )
 {
   assert( mBusGate.front.getOperation() > 0 );
-  assert( mBusGate.front.getSize() == AdvanceResult::kLongFlag );
+  assert( mBusGate.front.getSize() == 4 );
 
   if ( !mCtrl.go() )
     return AdvanceResult::nop();
 
-  ackRead();
-  return advance();
+  ackRead( value );
+  return advance( true );
 }
 
 AdvanceResult Jerry::busCycleRead( uint64_t value )
 {
   throw Ex{ "Jerry::busCycleRead: Unhandled size " };
 }
+
+void Jerry::ackWrite()
+{
+  auto const& busGate = mBusGate.front;
+
+  assert( busGate );
+
+  switch ( busGate.getSize() )
+  {
+  case 1:
+    mLog->storeByte( busGate.getAddress(), busGate.getValue() );
+    break;
+  case 2:
+    mLog->storeWord( busGate.getAddress(), busGate.getValue() );
+    break;
+  case 4:
+    mLog->storeLong( busGate.getAddress(), busGate.getValue() );
+    break;
+  default:
+    throw Ex{ "Jerry::ackWrite: Unhandled size " };
+  }
+  busGatePop();
+}
+
+void Jerry::ackRead( uint32_t value )
+{
+  auto const& busGate = mBusGate.front;
+
+  assert( busGate );
+
+  assert( busGate.getSize() == 4 );
+
+  mStageWrite.regFlags.reg = busGate.getReg();
+  mStageWrite.data = value;
+  mLog->loadLong( busGate.getAddress(), mStageWrite.data );
+  busGatePop();
+}
+
+void Jerry::ackRead( uint16_t value )
+{
+  auto const& busGate = mBusGate.front;
+
+  assert( busGate );
+
+  assert( busGate.getSize() == 2 );
+
+  mStageWrite.regFlags.reg = busGate.getReg();
+  mStageWrite.data = value;
+  mLog->loadWord( busGate.getAddress(), mStageWrite.data );
+  busGatePop();
+}
+
+void Jerry::ackRead( uint8_t value )
+{
+  auto const& busGate = mBusGate.front;
+
+  assert( busGate );
+
+  assert( busGate.getSize() == 1 );
+
+  mStageWrite.regFlags.reg = busGate.getReg();
+  mStageWrite.data = value;
+  mLog->loadByte( busGate.getAddress(), mStageWrite.data );
+  busGatePop();
+}
+
 
 void Jerry::storeByte( uint32_t address, uint8_t data )
 {
@@ -209,27 +278,32 @@ void Jerry::storeLong( uint32_t address, uint32_t data )
   }
 }
 
-void Jerry::loadByte( uint32_t address )
+void Jerry::loadByte( uint32_t address, uint32_t reg )
 {
-  if ( address > JERRY_BASE || address < JERRY_BASE + JERRY_SIZE )
-    throw Ex{ "Jerry::readByte: Unhandled address " } << std::hex << address;
+  if ( address > JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+    throw EmulationViolation{ "Loading a byte from internal memory" };
 
-  busGatePush( AdvanceResult::readByte( address ) );
+  busGatePush( AdvanceResult::readByte( address, reg ) );
 }
 
-void Jerry::loadWord( uint32_t address )
+void Jerry::loadWord( uint32_t address, uint32_t reg )
 {
-  if ( address > JERRY_BASE || address < JERRY_BASE + JERRY_SIZE )
-    throw Ex{ "Jerry::readWord: Unhandled address " } << std::hex << address;
+  if ( address > JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+    throw EmulationViolation{ "Loading a word from internal memory" };
 
-  busGatePush( AdvanceResult::readShort( address ) );
+  busGatePush( AdvanceResult::readShort( address, reg ) );
 }
 
-void Jerry::loadLong( uint32_t address )
+void Jerry::loadLong( uint32_t address, uint32_t reg )
 {
-  if ( address > JERRY_BASE || address < JERRY_BASE + JERRY_SIZE )
+  if ( address > JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
   {
-    switch ( address )
+    mStageWrite.regFlags.reg = reg;
+    if ( address > RAM_BASE && address < RAM_BASE + RAM_SIZE )
+    {
+      mStageWrite.data = mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )];
+    }
+    else switch ( address )
     {
     case D_FLAGS:
       throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
@@ -260,10 +334,13 @@ void Jerry::loadLong( uint32_t address )
     default:
       throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
     }
+
+    mLastLocalRAMAccessCycle = mCycle;
+    mLog->loadLong( address, mStageWrite.data );
   }
   else
   {
-    busGatePush( AdvanceResult::readLong( address ) );
+    busGatePush( AdvanceResult::readLong( address, reg ) );
   }
 }
 
@@ -308,34 +385,6 @@ bool Jerry::testCondition( uint32_t condition ) const
   }
 }
 
-void Jerry::ackWrite()
-{
-  auto const& busGate = mBusGate.front;
-
-  assert( busGate );
-
-  switch ( busGate.getSize() )
-  {
-  case 1:
-    mLog->storeByte( busGate.getAddress(), busGate.getValue() );
-    break;
-  case 2:
-    mLog->storeWord( busGate.getAddress(), busGate.getValue() );
-    break;
-  case 4:
-    mLog->storeLong( busGate.getAddress(), busGate.getValue() );
-    break;
-  default:
-    throw Ex{ "Jerry::ackWrite: Unhandled size " };
-  }
-  busGatePop();
-}
-
-void Jerry::ackRead()
-{
-  busGatePop();
-}
-
 void Jerry::io()
 {
   switch ( mStageStore.state )
@@ -351,6 +400,24 @@ void Jerry::io()
     case StageStore::STORE_LONG:
       storeLong( mStageStore.address, mStageStore.data );
       mStageStore.state = StageStore::IDLE;
+      break;
+    default:
+      break;
+  }
+
+  switch ( mStageLoad.state )
+  {
+    case StageLoad::LOAD_BYTE:
+      loadByte( mStageLoad.address, mStageLoad.reg );
+      mStageLoad.state = StageLoad::IDLE;
+      break;
+    case StageLoad::LOAD_WORD:
+      loadWord( mStageLoad.address, mStageLoad.reg );
+      mStageLoad.state = StageLoad::IDLE;
+      break;
+    case StageLoad::LOAD_LONG:
+      loadLong( mStageLoad.address, mStageLoad.reg );
+      mStageLoad.state = StageLoad::IDLE;
       break;
     default:
       break;
@@ -707,9 +774,18 @@ void Jerry::compute()
   case DSPI::SAT32S:
     throw Ex{ "NYI" };
   case DSPI::LOAD14N:
-    throw Ex{ "NYI" };
   case DSPI::LOAD15N:
-    throw Ex{ "NYI" };
+  case DSPI::LOAD14R:
+  case DSPI::LOAD15R:
+    if ( mBusGate )
+    {
+      mStageCompute.instruction = DSPI::EMPTY;
+      mStageLoad.state = StageLoad::LOAD_LONG;
+      mStageLoad.address = mStageCompute.dataSrc + mStageCompute.regDst;
+      mStageLoad.reg = mStageCompute.regSrc;
+      mLog->computeIndex();
+    }
+    break;
   case DSPI::MIRROR:
     throw Ex{ "NYI" };
   case DSPI::STORE14N:
@@ -752,10 +828,6 @@ void Jerry::compute()
     throw Ex{ "NYI" };
   case DSPI::NORMI:
     throw Ex{ "NYI" };
-  case DSPI::LOAD14R:
-    throw Ex{ "NYI" };
-  case DSPI::LOAD15R:
-    throw Ex{ "NYI" };
   case DSPI::ADDQMOD:
     throw Ex{ "NYI" };
     break;
@@ -766,8 +838,6 @@ void Jerry::compute()
 
 void Jerry::stageRead()
 {
-  static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31 };
-
   if ( mStageCompute.instruction != DSPI::EMPTY )
     return;
 
@@ -1060,15 +1130,40 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOADB:
-    throw Ex{ "LOAD NYI" };
+    if ( mBusGate && portReadSrc( mStageRead.regSrc ) )
+    {
+      dualPortCommit();
+      mRegStatus[mStageRead.regDst] = LOCKED;
+      mStageRead.instruction = DSPI::EMPTY;
+      mStageLoad.state = StageLoad::LOAD_BYTE;
+      mStageLoad.address = mStageRead.dataSrc;
+      mStageLoad.reg = mStageRead.regDst;
+    }
+    else
+    {
+      dualPortCommit();
+    }
     break;
   case DSPI::LOADW:
-    throw Ex{ "LOAD NYI" };
+    if ( mBusGate && portReadSrc( mStageRead.regSrc ) )
+    {
+      dualPortCommit();
+      mRegStatus[mStageRead.regDst] = LOCKED;
+      mStageRead.instruction = DSPI::EMPTY;
+      mStageLoad.state = StageLoad::LOAD_WORD;
+      mStageLoad.address = mStageRead.dataSrc;
+      mStageLoad.reg = mStageRead.regDst;
+    }
+    else
+    {
+      dualPortCommit();
+    }
     break;
   case DSPI::LOAD:
     if ( mBusGate && portReadSrc( mStageRead.regSrc ) )
     {
       dualPortCommit();
+      mRegStatus[mStageRead.regDst] = LOCKED;
       mStageRead.instruction = DSPI::EMPTY;
       mStageLoad.state = StageLoad::LOAD_LONG;
       mStageLoad.address = mStageRead.dataSrc;
@@ -1080,19 +1175,67 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOAD14R:
-    throw Ex{ "LOAD NYI" };
+    if ( portReadBoth( 14, mStageRead.regSrc ) )
+    {
+      dualPortCommit();
+      mRegStatus[mStageRead.regDst] = LOCKED;
+      std::swap( mStageRead.instruction, mStageCompute.instruction );
+      mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
+      mStageCompute.regSrc = mStageRead.regDst;     //register to store to
+      mStageCompute.regDst = mStageRead.dataDst;    //offset
+    }
+    else
+    {
+      dualPortCommit();
+    }
     break;
   case DSPI::LOAD15R:
-    throw Ex{ "LOAD NYI" };
+    if ( portReadBoth( 15, mStageRead.regSrc ) )
+    {
+      dualPortCommit();
+      mRegStatus[mStageRead.regDst] = LOCKED;
+      std::swap( mStageRead.instruction, mStageCompute.instruction );
+      mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
+      mStageCompute.regSrc = mStageRead.regDst;     //register to store to
+      mStageCompute.regDst = mStageRead.dataDst;    //offset
+    }
+    else
+    {
+      dualPortCommit();
+    }
     break;
   case DSPI::LOAD14N:
-    throw Ex{ "LOAD NYI" };
+    if ( portReadSrc( 14 ) )
+    {
+      dualPortCommit();
+      mRegStatus[mStageRead.regDst] = LOCKED;
+      std::swap( mStageRead.instruction, mStageCompute.instruction );
+      mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
+      mStageCompute.regSrc = mStageRead.regDst;     //register to store
+      mStageCompute.regDst = tabAddSubQ[mStageRead.regSrc] * 4;     //offset
+    }
+    else
+    {
+      dualPortCommit();
+    }
     break;
   case DSPI::LOAD15N:
-    throw Ex{ "LOAD NYI" };
+    if ( portReadSrc( 15 ) )
+    {
+      dualPortCommit();
+      mRegStatus[mStageRead.regDst] = LOCKED;
+      std::swap( mStageRead.instruction, mStageCompute.instruction );
+      mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
+      mStageCompute.regSrc = mStageRead.regDst;     //register to store
+      mStageCompute.regDst = tabAddSubQ[mStageRead.regSrc] * 4;     //offset
+    }
+    else
+    {
+      dualPortCommit();
+    }
     break;
   case DSPI::STOREB:
-    if ( mBusGate && portReadBoth( mStageRead.regDst, mStageRead.regSrc ) )
+    if ( mBusGate && mStageStore.state == StageStore::IDLE && portReadBoth( mStageRead.regDst, mStageRead.regSrc ) )
     {
       dualPortCommit();
       mStageRead.instruction = DSPI::EMPTY;
@@ -1106,7 +1249,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STOREW:
-    if ( mBusGate && portReadBoth( mStageRead.regDst, mStageRead.regSrc ) )
+    if ( mBusGate && mStageStore.state == StageStore::IDLE && portReadBoth( mStageRead.regDst, mStageRead.regSrc ) )
     {
       dualPortCommit();
       mStageRead.instruction = DSPI::EMPTY;
@@ -1120,7 +1263,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STORE:
-    if ( mBusGate && portReadBoth( mStageRead.regDst, mStageRead.regSrc ) )
+    if ( mBusGate && mStageStore.state == StageStore::IDLE && portReadBoth( mStageRead.regDst, mStageRead.regSrc ) )
     {
       dualPortCommit();
       mStageRead.instruction = DSPI::EMPTY;
@@ -1168,7 +1311,7 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
       mStageCompute.regSrc = mStageRead.regDst;     //register to store
-      mStageCompute.regDst = ( mStageRead.regSrc + 1 ) * 4;     //offset
+      mStageCompute.regDst = tabAddSubQ[mStageRead.regSrc] * 4;     //offset
     }
     else
     {
@@ -1182,7 +1325,7 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
       mStageCompute.regSrc = mStageRead.regDst;     //register to store
-      mStageCompute.regDst = ( mStageRead.regSrc + 1 ) * 4;     //offset
+      mStageCompute.regDst = tabAddSubQ[mStageRead.regSrc] * 4;     //offset
     }
     else
     {
@@ -1337,14 +1480,25 @@ void Jerry::portReadDstAndHiddenCommit( uint32_t regDst )
   assert( mPortReadDstReg < 0 );
   assert( regDst >= 0 );
 
-  if ( mRegStatus[regDst] != FREE && mPortWriteDstReg != regDst )
+  if ( mRegStatus[regDst] != FREE )
   {
-    throw EmulationViolation{ "Indexed store of data from a long latency instruction" };
+    if ( mPortWriteDstReg != regDst )
+    {
+      throw EmulationViolation{ "Indexed store of data from a long latency instruction" };
+    }
+    else
+    {
+      //a hack for indexed addressing done in compute stage
+      mStageCompute.dataDst = mPortWriteDstData;
+    }
+  }
+  else
+  {
+    //a hack for indexed addressing done in compute stage
+    mStageCompute.dataDst = mRegs[mRegisterFile + mPortReadDstReg];
   }
 
   mPortReadDstReg = regDst;
-  //a hack for indexed addressing done in compute stage
-  mStageCompute.dataDst = mRegs[mRegisterFile + mPortReadDstReg];
 }
 
 bool Jerry::portReadBoth( uint32_t regSrc, uint32_t regDst )

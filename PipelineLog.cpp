@@ -278,10 +278,10 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "sat32s        r%02d", reg2 )] = ' ';
     break;
   case DSPI::LOAD14N:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "load    (r14+#%02x),r%02d", ( reg1 + 1 ) * 4, reg2)] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "load    (r14+#%02x),r%02d", tabAddSubQ[reg1] * 4, reg2)] = ' ';
     break;
   case DSPI::LOAD15N:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "load    (r15+#%02x),r%02d", ( reg1 + 1 ) * 4, reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "load    (r15+#%02x),r%02d", tabAddSubQ[reg1], reg2 )] = ' ';
     break;
   case DSPI::STOREB:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "storeb  r%02d,(r%02d)", reg2, reg1 )] = ' ';
@@ -296,10 +296,10 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "mirror        r%02d", reg2 )] = ' ';
     break;
   case DSPI::STORE14N:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r14+#%02x)", reg2, ( reg1 + 1 ) * 4 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r14+#%02x)", reg2, tabAddSubQ[reg1] * 4 )] = ' ';
     break;
   case DSPI::STORE15N:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r15+#%02x)", reg2, ( reg1 + 1 ) * 4 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r15+#%02x)", reg2, tabAddSubQ[reg1] * 4 )] = ' ';
     break;
   case DSPI::MOVEPC:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "move    pc,r%02d",       reg2 )] = ' ';
@@ -456,6 +456,30 @@ void PipelineLog::storeByte( uint32_t address, uint8_t value )
   mBuffer[0x66 + sprintf( mBuffer + 0x66, "S(%06x)=%02x", address, value )] = ' ';
 }
 
+void PipelineLog::loadLong( uint32_t address, uint32_t value )
+{
+  //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
+  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567 | L(123456):12345678
+  mBuffer[0x66 + sprintf( mBuffer + 0x66, "L(%06x):%08x", address, value )] = ' ';
+}
+
+void PipelineLog::loadWord( uint32_t address, uint16_t value )
+{
+  //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
+  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567 | L(123456):12345678
+  mBuffer[0x66 + sprintf( mBuffer + 0x66, "L(%06x):%04x", address, value )] = ' ';
+}
+
+void PipelineLog::loadByte( uint32_t address, uint8_t value )
+{
+  //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
+  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567 | L(123456):12345678
+  mBuffer[0x66 + sprintf( mBuffer + 0x66, "L(%06x):%02x", address, value )] = ' ';
+}
+
 void PipelineLog::flush()
 {
   std::cout << mBuffer;
@@ -464,7 +488,7 @@ void PipelineLog::flush()
 
 void PipelineLog::init()
 {
-  sprintf( mBuffer, "                       |                       |                           |         |              |                      \n" );
+  sprintf( mBuffer, "                       |                       |                           |         |              |                     \n" );
 }
 
 char const* PipelineLog::prefetchDSPMapper( uint32_t code )
