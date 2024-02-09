@@ -318,6 +318,7 @@ void Jerry::loadLong( uint32_t address, uint32_t reg )
       throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
     }
 
+    mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
     mLog->loadLong( address, mStageWrite.data );
   }
