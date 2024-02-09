@@ -59,7 +59,7 @@ void Jerry::debugWrite( uint32_t address, std::span<uint32_t const> data )
 AdvanceResult Jerry::advance()
 {
   io();
-  stageWrite();
+    stageWrite();
   compute();
   stageRead();
   decode();
@@ -159,8 +159,7 @@ void Jerry::ackRead( uint32_t value )
   assert( mBusGate );
   assert( mBusGate.getSize() == 4 );
 
-  mStageWrite.regFlags.reg = mBusGate.getReg();
-  mStageWrite.data = value;
+  portWriteDst( mBusGate.getReg(), value );
   mLog->loadLong( mBusGate.getAddress(), mStageWrite.data );
   busGatePop();
 }
@@ -170,8 +169,7 @@ void Jerry::ackRead( uint16_t value )
   assert( mBusGate );
   assert( mBusGate.getSize() == 2 );
 
-  mStageWrite.regFlags.reg = mBusGate.getReg();
-  mStageWrite.data = value;
+  portWriteDst( mBusGate.getReg(), value );
   mLog->loadWord( mBusGate.getAddress(), mStageWrite.data );
   busGatePop();
 }
@@ -181,8 +179,7 @@ void Jerry::ackRead( uint8_t value )
   assert( mBusGate );
   assert( mBusGate.getSize() == 1 );
 
-  mStageWrite.regFlags.reg = mBusGate.getReg();
-  mStageWrite.data = value;
+  portWriteDst( mBusGate.getReg(), value );
   mLog->loadByte( mBusGate.getAddress(), mStageWrite.data );
   busGatePop();
 }
@@ -737,14 +734,6 @@ void Jerry::compute()
     throw Ex{ "NYI" };
   case DSPI::SAT16S:
     throw Ex{ "NYI" };
-  case DSPI::MOVEI:
-    throw Ex{ "NYI" };
-  case DSPI::LOADB:
-    throw Ex{ "NYI" };
-  case DSPI::LOADW:
-    throw Ex{ "NYI" };
-  case DSPI::LOAD:
-    throw Ex{ "NYI" };
   case DSPI::SAT32S:
     throw Ex{ "NYI" };
   case DSPI::LOAD14N:
@@ -777,8 +766,6 @@ void Jerry::compute()
       mLog->computeIndex();
     }
     break;
-  case DSPI::MOVEPC:
-    throw Ex{ "NYI" };
   case DSPI::JUMP:
     if ( testCondition( mStageCompute.regDst ) )
     {
