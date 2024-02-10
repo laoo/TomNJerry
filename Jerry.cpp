@@ -58,21 +58,20 @@ void Jerry::debugWrite( uint32_t address, std::span<uint32_t const> data )
 
 AdvanceResult Jerry::advance()
 {
-  io();
-    stageWrite();
-  compute();
-  stageRead();
-  decode();
-  prefetch();
+  halfCycle();
+  halfCycle();
 
+  return mBusGate;
+}
+
+void Jerry::halfCycle()
+{
   io();
   stageWrite();
   compute();
   stageRead();
   decode();
   prefetch();
-
-  return mBusGate;
 }
 
 AdvanceResult Jerry::busCycleIdle()
@@ -159,7 +158,7 @@ void Jerry::ackRead( uint32_t value )
   assert( mBusGate );
   assert( mBusGate.getSize() == 4 );
 
-  portWriteDst( mBusGate.getReg(), value );
+  portWriteDst( mBusGate.getReg(), std::byteswap( value ) );
   mLog->loadLong( mBusGate.getAddress(), mStageWrite.data );
   busGatePop();
 }
@@ -169,7 +168,7 @@ void Jerry::ackRead( uint16_t value )
   assert( mBusGate );
   assert( mBusGate.getSize() == 2 );
 
-  portWriteDst( mBusGate.getReg(), value );
+  portWriteDst( mBusGate.getReg(), std::byteswap( (uint32_t)value ) );
   mLog->loadWord( mBusGate.getAddress(), mStageWrite.data );
   busGatePop();
 }
@@ -179,7 +178,7 @@ void Jerry::ackRead( uint8_t value )
   assert( mBusGate );
   assert( mBusGate.getSize() == 1 );
 
-  portWriteDst( mBusGate.getReg(), value );
+  portWriteDst( mBusGate.getReg(), std::byteswap( ( uint32_t )value ) );
   mLog->loadByte( mBusGate.getAddress(), mStageWrite.data );
   busGatePop();
 }
@@ -187,35 +186,35 @@ void Jerry::ackRead( uint8_t value )
 
 void Jerry::storeByte( uint32_t address, uint8_t data )
 {
-  if ( address > JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
   {
     throw EmulationViolation{ "Writing a byte to internal memory" };
   }
   else
   {
-    busGatePush( AdvanceResult::writeByte( address, data ) );
+    busGatePush( AdvanceResult::writeByte( address, std::byteswap( ( uint32_t )data ) ) );
   }
 }
 
 void Jerry::storeWord( uint32_t address, uint16_t data )
 {
-  if ( address > JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
   {
     throw EmulationViolation{ "Writing a word to internal memory" };
   }
   else
   {
-    busGatePush( AdvanceResult::writeWord( address, data ) );
+    busGatePush( AdvanceResult::writeWord( address, std::byteswap( ( uint32_t )data ) ) );
   }
 }
 
 void Jerry::storeLong( uint32_t address, uint32_t data )
 {
-  if ( address > JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
   {
-    if ( address > RAM_BASE && address < RAM_BASE + RAM_SIZE )
+    if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
     {
-      mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )] = data;
+      mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )] = std::byteswap( data );
       mLastLocalRAMAccessCycle = mCycle;
       mLog->storeLong( address, data );
     }
@@ -257,13 +256,13 @@ void Jerry::storeLong( uint32_t address, uint32_t data )
   }
   else
   {
-    busGatePush( AdvanceResult::writeLong( address, data ) );
+    busGatePush( AdvanceResult::writeLong( address, std::byteswap( data ) ) );
   }
 }
 
 void Jerry::loadByte( uint32_t address, uint32_t reg )
 {
-  if ( address > JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
     throw EmulationViolation{ "Loading a byte from internal memory" };
 
   busGatePush( AdvanceResult::readByte( address, reg ) );
@@ -271,7 +270,7 @@ void Jerry::loadByte( uint32_t address, uint32_t reg )
 
 void Jerry::loadWord( uint32_t address, uint32_t reg )
 {
-  if ( address > JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
     throw EmulationViolation{ "Loading a word from internal memory" };
 
   busGatePush( AdvanceResult::readShort( address, reg ) );
@@ -279,12 +278,12 @@ void Jerry::loadWord( uint32_t address, uint32_t reg )
 
 void Jerry::loadLong( uint32_t address, uint32_t reg )
 {
-  if ( address > JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
   {
     mStageWrite.regFlags.reg = reg;
-    if ( address > RAM_BASE && address < RAM_BASE + RAM_SIZE )
+    if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
     {
-      mStageWrite.data = mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )];
+      mStageWrite.data = std::byteswap( mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )] );
     }
     else switch ( address )
     {
@@ -365,7 +364,7 @@ bool Jerry::testCondition( uint32_t condition ) const
   case 0x1f:
     return false;
   default:
-    throw Ex{ "Illegal condition code " } << std::hex << condition;
+    throw EmulationViolation{ "Illegal condition code " } << std::hex << condition;
   }
 }
 
@@ -488,7 +487,7 @@ void Jerry::compute()
       uint64_t res = (uint64_t)mStageCompute.dataDst + (uint64_t)( mStageCompute.dataSrc ^ 0xffffffff ) + (uint64_t)( ( mFlags.value & ( FLAGS::CARRY_FLAG >> 1 ) ) ^ 1 );
       mStageWrite.data = (uint32_t)res;
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
-      mStageWrite.regFlags.c = ( ( res >> 32 ) & 1 ) ? 0 : 1;
+      mStageWrite.regFlags.c = ( ( res >> 32 ) & 1 ) ^ 1;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateFlags = true;
       mStageCompute.instruction = DSPI::EMPTY;
@@ -641,11 +640,7 @@ void Jerry::compute()
     break;
   case DSPI::IMACN:
     mMulatiplyAccumulator += ( int16_t )mStageCompute.dataSrc * ( int16_t )mStageCompute.dataDst;
-    mStageWrite.regFlags.z = mMulatiplyAccumulator == 0 ? 1 : 0;
-    mStageWrite.regFlags.n = mStageWrite.data >> 31;
-    mStageWrite.updateFlags = true;
     mStageCompute.instruction = DSPI::EMPTY;
-    mLog->computeFlags( mStageWrite.regFlags );
     break;
   case DSPI::DIV:
     throw Ex{ "NYI" };
@@ -720,9 +715,23 @@ void Jerry::compute()
   case DSPI::RORQ:
     throw Ex{ "NYI" };
   case DSPI::CMP:
-  case DSPI::CMPQ:
     {
       uint32_t data = mStageCompute.dataDst - mStageCompute.dataSrc;
+      mStageWrite.regFlags.z = data == 0 ? 1 : 0;
+      mStageWrite.regFlags.c = (int32_t)mStageCompute.dataSrc < ( int32_t )mStageCompute.dataDst ? 1 : 0;
+      mStageWrite.regFlags.n = data >> 31;
+      mStageWrite.updateFlags = true;
+      mStageCompute.instruction = DSPI::EMPTY;
+      mLog->computeFlags( mStageWrite.regFlags );
+    }
+    break;
+  case DSPI::CMPQ:
+    {
+      auto i0 = ( int8_t )( mStageCompute.dataSrc << 3 );
+      auto i1 = ( int64_t )i0;
+      auto i2 = i1 >> 3;
+      auto i3 = ( uint32_t )i2;
+      uint32_t data = mStageCompute.dataDst - i3;
       mStageWrite.regFlags.z = data == 0 ? 1 : 0;
       mStageWrite.regFlags.c = (int32_t)mStageCompute.dataSrc < ( int32_t )mStageCompute.dataDst ? 1 : 0;
       mStageWrite.regFlags.n = data >> 31;
@@ -1084,7 +1093,6 @@ void Jerry::stageRead()
       dualPortCommit();
       mRegStatus[mStageRead.regDst] = LOCKED;
       mStageRead.instruction = DSPI::EMPTY;
-      mStageRead.decodeStage = StageRead::MOVEI1;
     }
     else
     {

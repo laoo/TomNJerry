@@ -87,6 +87,8 @@ private:
 
   AdvanceResult advance();
 
+  void halfCycle();
+
   void io();
   void stageWrite();
   void compute();
@@ -161,12 +163,6 @@ private:
 
   struct StageRead
   {
-    enum DecodeStage
-    {
-      NORMAL,
-      MOVEI1,
-      MOVEI2
-    } decodeStage = NORMAL;
     DSPI instruction = DSPI::EMPTY;
     uint32_t dataSrc = 0;
     uint32_t dataDst = 0;
