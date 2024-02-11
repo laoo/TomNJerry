@@ -157,7 +157,7 @@ private:
   uint32_t mPC = 0;
   CTRL mCtrl = {};
   uint32_t mMod = 0;
-  uint32_t mRemain = 0;
+  int32_t mRemain = 0;
   uint32_t mDivCtrl = 0;
   uint32_t mMachi = 0;
 
@@ -220,6 +220,16 @@ private:
     uint32_t cnt = 0;
     uint64_t addr = 0;
   } mMacStage;
+
+  struct DivideUnit
+  {
+    int32_t cycle = -1;
+    int32_t reg = -1;
+    uint32_t divisor = 0;
+    uint32_t q = 0;
+    uint32_t r = 0;
+    bool busy = false;
+  } mDivideUnit;
 
   int32_t mPortReadSrcReg = -1;
   int32_t mPortReadDstReg = -1;

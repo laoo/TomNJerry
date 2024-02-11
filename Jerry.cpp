@@ -378,6 +378,42 @@ bool Jerry::testCondition( uint32_t condition ) const
 
 void Jerry::io()
 {
+  if ( mDivideUnit.cycle >= 0 )
+  {
+    if ( mDivideUnit.cycle > 0 )
+    {
+      // taken from VJ. conceived by SCPCD
+
+      uint32_t sign = mDivideUnit.r & 0x80000000;
+      mDivideUnit.r = ( mDivideUnit.r << 1 ) | ( ( mDivideUnit.q >> 31 ) & 0x01 );
+      mDivideUnit.r += ( sign ? mDivideUnit.divisor : -mDivideUnit.divisor );
+      mDivideUnit.q = ( mDivideUnit.q << 1 ) | ( ( ( ~mDivideUnit.r ) >> 31 ) & 0x01 );
+
+      sign = mDivideUnit.r & 0x80000000;
+      mDivideUnit.r = ( mDivideUnit.r << 1 ) | ( ( mDivideUnit.q >> 31 ) & 0x01 );
+      mDivideUnit.r += ( sign ? mDivideUnit.divisor : -mDivideUnit.divisor );
+      mDivideUnit.q = ( mDivideUnit.q << 1 ) | ( ( ( ~mDivideUnit.r ) >> 31 ) & 0x01 );
+
+      mDivideUnit.cycle -= 1;
+    }
+
+    if ( mDivideUnit.cycle == 0 )
+    {
+      //holding the cycle count at 0 until successfull write to the destination register
+      if ( !mDivideUnit.busy )
+      {
+        mDivideUnit.cycle = -1;
+      }
+      else if ( mStageWrite.regFlags.reg < 0 )
+      {
+        mStageWrite.regFlags.reg = mDivideUnit.reg;
+        mStageWrite.data = mDivideUnit.q;
+        mRemain = mDivideUnit.r;
+        mDivideUnit.busy = false;
+      }
+    }
+  }
+
   switch ( mStageIO.state )
   {
     case StageIO::STORE_BYTE:
@@ -653,7 +689,19 @@ void Jerry::compute()
     mLog->computeMac();
     break;
   case DSPI::DIV:
-    throw Ex{ "NYI" };
+    mStageCompute.instruction = DSPI::EMPTY;
+    mDivideUnit.cycle = 16;
+    mDivideUnit.reg = mStageCompute.regDst;
+    mDivideUnit.divisor = mStageCompute.dataSrc;
+    mDivideUnit.q = mStageCompute.dataDst;
+    mDivideUnit.r = 0;
+    mDivideUnit.busy = true;
+    if ( mDivCtrl & 0x01 )
+    {
+      mDivideUnit.q <<= 16;
+      mDivideUnit.r = mStageCompute.dataDst >> 16;
+    }
+    break;
   case DSPI::ABS:
     if ( mStageWrite.regFlags.reg < 0 )
     {
@@ -1096,8 +1144,11 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::DIV:
-    if ( portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
+    if ( mDivideUnit.cycle <= 0 && portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
     {
+      if ( mDivideUnit.cycle == 0 && mDivideUnit.reg == mStageRead.regDst || mDivideUnit.reg == mStageRead.regSrc )
+        throw EmulationViolation{ "Two consecutive DIV instructions are too close to each other" };
+
       dualPortCommit();
       mRegStatus[mStageRead.regDst] = LOCKED;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
