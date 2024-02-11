@@ -69,6 +69,23 @@ public:
   AdvanceResult busCycleRead( uint64_t value ) override;
 
 private:
+
+  struct Prefetch
+  {
+    enum PullStatus : uint16_t
+    {
+      EMPTY,
+      OPCODE,
+      MOVEI1,
+      MOVEI2,
+      IMULTN,
+      IMACN,
+      RESMAC
+    } status = OPCODE;
+    uint64_t queue = 0;
+    size_t queueSize = 0;
+  };
+
   void storeByte( uint32_t address, uint8_t data );
   void storeWord( uint32_t address, uint16_t data );
   void storeLong( uint32_t address, uint32_t data );
@@ -102,8 +119,11 @@ private:
   void portReadDstAndHiddenCommit( uint32_t regDst ); //to be used with indexed addressing modes
   bool portReadBoth( uint32_t regSrc, uint32_t regDst );
   void dualPortCommit();
+  void dualPortCommitMMULT( bool high );
   void busGatePush( AdvanceResult result );
   void busGatePop();
+  std::pair<Prefetch::PullStatus, uint16_t> prefetchPull();
+  uint32_t prefetchPush( uint32_t value, uint32_t oddWord );
 
 
 private:
@@ -131,35 +151,22 @@ private:
     uint32_t value;
   } mFlags = {};
 
-  CTRL mCtrl = {};
 
+  uint32_t mMTXC = 0;
+  uint32_t mMTXA = 0;
   uint32_t mPC = 0;
+  CTRL mCtrl = {};
   uint32_t mMod = 0;
   uint32_t mRemain = 0;
   uint32_t mDivCtrl = 0;
   uint32_t mMachi = 0;
+
   uint32_t mRegisterFile = 0;
   uint32_t mAnotherRegisterFile = 32;
 
   uint64_t mCycle = 0;
 
-
-
-  struct Prefetch
-  {
-    enum PullStatus : uint16_t
-    {
-      EMPTY,
-      OPCODE,
-      OPERAND1,
-      OPERAND2
-    } status = OPCODE;
-    uint64_t queue = 0;
-    size_t queueSize = 0;
-
-    std::pair<PullStatus, uint16_t> pull();
-    uint32_t push( uint32_t value, uint32_t oddWord );
-  } mPrefetch = {};
+  Prefetch mPrefetch = {};
 
   struct StageRead
   {
@@ -206,6 +213,14 @@ private:
     };
   } mStageIO;
 
+  struct MACStage
+  {
+    uint64_t acc = 0;
+    uint32_t size = 0;
+    uint32_t cnt = 0;
+    uint64_t addr = 0;
+  } mMacStage;
+
   int32_t mPortReadSrcReg = -1;
   int32_t mPortReadDstReg = -1;
   int32_t mPortWriteDstReg = -1;
@@ -225,7 +240,6 @@ private:
   std::array<RegStatus, 32> mRegStatus;
   std::array<uint32_t, 64> mRegs;
   int mFlagsSemaphore = 0;
-  uint32_t mMulatiplyAccumulator = 0;
 
   std::unique_ptr<PipelineLog> mLog;
 };

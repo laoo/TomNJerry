@@ -173,7 +173,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "subqt   #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::NEG:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "neg           r%02d", reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "neg     r%02d", reg2 )] = ' ';
     break;
   case DSPI::AND:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "and     r%02d,r%02d", reg1, reg2 )] = ' ';
@@ -185,7 +185,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "xor     r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::NOT:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "not           r%02d", reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "not     r%02d", reg2 )] = ' ';
     break;
   case DSPI::BTST:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "btst    #%02x,r%02d", reg1, reg2 )] = ' ';
@@ -206,7 +206,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "imultn  r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::RESMAC:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "resmac        r%02d", reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "resmac  r%02d", reg2 )] = ' ';
     break;
   case DSPI::IMACN:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "imacn   r%02d,r%02d", reg1, reg2 )] = ' ';
@@ -215,7 +215,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "div     r%02d,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::ABS:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "abs           r%02d", reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "abs     r%02d", reg2 )] = ' ';
     break;
   case DSPI::SH:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "sh      r%02d,r%02d", reg1, reg2 )] = ' ';
@@ -248,7 +248,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "sumbmod #%02x,r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::SAT16S:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "sat16s        r%02d", reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "sat16s  r%02d", reg2 )] = ' ';
     break;
   case DSPI::MOVE:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "move    r%02d,r%02d", reg1, reg2 )] = ' ';
@@ -275,7 +275,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "load    (r%02d),r%02d", reg1, reg2 )] = ' ';
     break;
   case DSPI::SAT32S:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "sat32s        r%02d", reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "sat32s  r%02d", reg2 )] = ' ';
     break;
   case DSPI::LOAD14N:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "load    (r14+#%02x),r%02d", tabAddSubQ[reg1] * 4, reg2)] = ' ';
@@ -293,7 +293,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r%02d)", reg2, reg1 )] = ' ';
     break;
   case DSPI::MIRROR:
-    mBuffer[0x19 + sprintf( mBuffer + 0x19, "mirror        r%02d", reg2 )] = ' ';
+    mBuffer[0x19 + sprintf( mBuffer + 0x19, "mirror  r%02d", reg2 )] = ' ';
     break;
   case DSPI::STORE14N:
     mBuffer[0x19 + sprintf( mBuffer + 0x19, "store   r%02d,(r14+#%02x)", reg2, tabAddSubQ[reg1] * 4 )] = ' ';
@@ -352,6 +352,26 @@ void PipelineLog::decodeMOVEI( int stage, uint32_t data )
     mBuffer[0x22 + sprintf( mBuffer + 0x22, "%04x----", data >> 16 )] = ' ';
     mBuffer[0x38 + sprintf( mBuffer + 0x38, "#%04x", data >> 16 )] = ' ';
   }
+
+  mBuffer[0x17] = ':';
+}
+
+void PipelineLog::decodeIMULTN( uint32_t reg, int width, int count )
+{
+  mBuffer[0x19 + sprintf( mBuffer + 0x19, "imultn  r%02d%c,m+%d", reg + 32 + count / 2, count & 1 ? 'h' : 'l', width * count )] = ' ';
+  mBuffer[0x17] = ':';
+}
+
+void PipelineLog::decodeRESMAC( uint32_t reg2 )
+{
+  mBuffer[0x19 + sprintf( mBuffer + 0x19, "resmac  r%02d", reg2 )] = ' ';
+  mBuffer[0x17] = ':';
+}
+
+void PipelineLog::decodeIMACN( uint32_t reg, int width, int count )
+{
+  mBuffer[0x19 + sprintf( mBuffer + 0x19, "imacn   r%02d%c,m+%d", reg + 32 + count / 2, count & 1 ? 'h' : 'l', width * count )] = ' ';
+  mBuffer[0x17] = ':';
 }
 
 void PipelineLog::portImm( uint32_t value )
@@ -377,6 +397,14 @@ void PipelineLog::portReadSrc( uint32_t reg, uint32_t value )
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
   mBuffer[0x31 + sprintf( mBuffer + 0x31, "R%02d:%08x", reg, value )] = ' ';
+}
+
+void PipelineLog::portReadSrcMMULT( uint32_t reg, bool high, uint32_t value )
+{
+  //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
+  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
+  mBuffer[0x31 + sprintf( mBuffer + 0x31, "R%02d%c:    %04x", reg, high ? 'h':'l', value )] = ' ';
 }
 
 void PipelineLog::portReadDst( uint32_t reg, uint32_t value )
@@ -418,6 +446,28 @@ void PipelineLog::computeFlags( RegFlags flags )
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
   mBuffer[0x51 + sprintf( mBuffer + 0x51, "%c%c%c", NFlag[flags.n + 1], CFlag[flags.c + 1], ZFlag[flags.z + 1] )] = ' ';
+}
+
+void PipelineLog::computeMul()
+{
+  mBuffer[0x4d] = 'm';
+  mBuffer[0x4e] = 'u';
+  mBuffer[0x4f] = 'l';
+}
+
+void PipelineLog::computeMac()
+{
+  mBuffer[0x4d] = 'm';
+  mBuffer[0x4e] = 'a';
+  mBuffer[0x4f] = 'c';
+}
+
+void PipelineLog::computeMac( RegFlags flags )
+{
+  //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
+  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
+  mBuffer[0x4d + sprintf( mBuffer + 0x4d, "mac %c%c%c", NFlag[flags.n + 1], CFlag[flags.c + 1], ZFlag[flags.z + 1] )] = ' ';
 }
 
 void PipelineLog::computeIndex()

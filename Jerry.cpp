@@ -15,14 +15,18 @@ Jerry::~Jerry()
 
 void Jerry::debugWrite( uint32_t address, uint32_t data )
 {
-  switch ( address )
+  if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
+    mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )] = std::byteswap( data );
+  else switch ( address )
   {
   case D_FLAGS:
     throw Ex{ "Jerry::debugWrite: Unhandled address " } << std::hex << address;
   case D_MTXC:
-    throw Ex{ "Jerry::debugWrite: Unhandled address " } << std::hex << address;
+    mMTXC = data;
+    break;
   case D_MTXA:
-    throw Ex{ "Jerry::debugWrite: Unhandled address " } << std::hex << address;
+    mMTXA = data;
+    break;
   case D_END:
     throw Ex{ "Jerry::debugWrite: Unhandled address " } << std::hex << address;
   case D_PC:
@@ -35,10 +39,14 @@ void Jerry::debugWrite( uint32_t address, uint32_t data )
     //handle other bits
     break;
   case D_MOD:
-    throw Ex{ "Jerry::debugWrite: Unhandled address " } << std::hex << address;
+    mMod = data;
+    break;
   case D_DIVCTRL:
-    throw Ex{ "Jerry::debugWrite: Unhandled address " } << std::hex << address;
+    mDivCtrl = data;
+    break;
   case D_MACHI:
+    mMachi = data;
+    break;
   default:
     throw Ex{ "Jerry::debugWrite: Unhandled address " } << std::hex << address;
     break;
@@ -622,25 +630,27 @@ void Jerry::compute()
     }
     break;
   case DSPI::IMULTN:
-    mMulatiplyAccumulator = (int16_t)mStageCompute.dataSrc * (int16_t)mStageCompute.dataDst;
-    mStageWrite.regFlags.z = mMulatiplyAccumulator == 0 ? 1 : 0;
+    mMacStage.acc = (int16_t)mStageCompute.dataSrc * (int16_t)mStageCompute.dataDst;
+    mStageWrite.regFlags.z = mMacStage.acc == 0 ? 1 : 0;
     mStageWrite.regFlags.n = mStageWrite.data >> 31;
     mStageWrite.updateFlags = true;
     mStageCompute.instruction = DSPI::EMPTY;
+    mLog->computeMul();
     mLog->computeFlags( mStageWrite.regFlags );
     break;
   case DSPI::RESMAC:
     if ( mStageWrite.regFlags.reg < 0 )
     {
       mStageWrite.regFlags.reg = mStageCompute.regDst;
-      mStageWrite.data = mMulatiplyAccumulator;
+      mStageWrite.data = mMacStage.acc;
       mStageCompute.instruction = DSPI::EMPTY;
       mLog->computeReg( mStageWrite.regFlags );
     }
     break;
   case DSPI::IMACN:
-    mMulatiplyAccumulator += ( int16_t )mStageCompute.dataSrc * ( int16_t )mStageCompute.dataDst;
+    mMacStage.acc += ( int16_t )mStageCompute.dataSrc * ( int16_t )mStageCompute.dataDst;
     mStageCompute.instruction = DSPI::EMPTY;
+    mLog->computeMac();
     break;
   case DSPI::DIV:
     throw Ex{ "NYI" };
@@ -794,13 +804,34 @@ void Jerry::compute()
     mStageCompute.instruction = DSPI::EMPTY;
     break;
   case DSPI::MMULT:
-    throw Ex{ "NYI" };
+    if ( mStageIO.state != StageIO::IDLE )
+      throw EmulationViolation{ "MMULT instruction executed while IO was in progress" };
+    mStageCompute.instruction = DSPI::EMPTY;
+    break;
   case DSPI::MTOI:
     throw Ex{ "NYI" };
   case DSPI::NORMI:
     throw Ex{ "NYI" };
   case DSPI::ADDQMOD:
     throw Ex{ "NYI" };
+    break;
+  case DSPI::MM_IMULTN:
+    mMacStage.acc = ( int16_t )mStageCompute.dataSrc * ( int16_t )mStageWrite.data;
+    mStageCompute.instruction = DSPI::EMPTY;
+    mLog->computeMul();
+    break;
+  case DSPI::MM_IMACN:
+  {
+    int32_t add = ( int16_t )mStageCompute.dataSrc * ( int16_t )mStageWrite.data;
+    int32_t old = mMacStage.acc;
+    mMacStage.acc += add;
+    mStageCompute.instruction = DSPI::EMPTY;
+    mStageWrite.regFlags.z = mMacStage.acc == 0 ? 1 : 0;
+    mStageWrite.regFlags.c = ( int32_t )mMacStage.acc < ( int32_t )old ? 1 : 0;
+    mStageWrite.regFlags.n = mMacStage.acc >> 31;
+    mStageWrite.updateFlags = true;
+    mLog->computeMac( mStageWrite.regFlags );
+  }
     break;
   default:
     break;
@@ -999,7 +1030,7 @@ void Jerry::stageRead()
         throw EmulationViolation{ "RESMAC writes to a register in use" };
       dualPortCommit();
       mStageWrite.regFlags.reg = mStageRead.regDst;
-      mStageWrite.data = mMulatiplyAccumulator;
+      mStageWrite.data = (uint32_t)mMacStage.acc;
       mRegStatus[mStageRead.regDst] = LOCKED;
       mStageRead.instruction = DSPI::EMPTY;
     }
@@ -1026,13 +1057,14 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MOVEFA:
-    if ( mStageWrite.regFlags.reg < 0 )
+    if ( mStageWrite.regFlags.reg < 0 && portReadSrc( mStageRead.regSrc + 32 ) )
     {
       if ( mRegStatus[mStageRead.regDst] != FREE )
         throw EmulationViolation{ "MOVEFA writes to a register in use" };
+
       dualPortCommit();
       mStageWrite.regFlags.reg = mStageRead.regDst;
-      mStageWrite.data = mRegs[ mAnotherRegisterFile + mStageRead.regSrc];
+      mStageWrite.data = mStageRead.dataSrc;
       mRegStatus[mStageRead.regDst] = LOCKED;
       mStageRead.instruction = DSPI::EMPTY;
     }
@@ -1074,10 +1106,11 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MOVETA:
-    if ( portReadSrc( mStageRead.regSrc ) )
+    if ( mStageWrite.regFlags.reg < 0 && portReadSrc( mStageRead.regSrc ) )
     {
       dualPortCommit();
-      mRegs[mAnotherRegisterFile + mStageRead.regDst] = mStageRead.dataSrc;
+      mStageWrite.regFlags.reg = mStageRead.regDst + 32;
+      mStageWrite.data = mStageRead.dataSrc;
       mStageRead.instruction = DSPI::EMPTY;
     }
     else
@@ -1347,8 +1380,34 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MMULT:
-    throw Ex{ "MMULT NYI" };
+    dualPortCommit();
+    std::swap( mStageRead.instruction, mStageCompute.instruction );
+    mStageCompute.regSrc = mStageRead.regSrc;
+    mStageCompute.regDst = mStageRead.regDst;
     break;
+  case DSPI::MM_IMACN:
+    mFlagsSemaphore += 1;
+    [[fallthrough]];
+  case DSPI::MM_IMULTN:
+    if ( portReadSrc( mStageCompute.regSrc + ( mMacStage.cnt >> 1 ) ) )
+    {
+      dualPortCommitMMULT( ( mMacStage.cnt & 1 ) == 1 );
+      std::swap( mStageRead.instruction, mStageCompute.instruction );
+      mStageCompute.dataSrc = mStageRead.dataSrc;
+      mStageIO.state = StageIO::LOAD_LONG;
+      mStageIO.address = mMTXA + mMacStage.cnt * 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 );
+      //destination register used as a temporary register
+      mStageIO.reg = mStageCompute.regDst;
+      mMacStage.cnt += 1;
+    }
+    break;
+  case DSPI::MM_RESMAC:
+      //resetting write flag of internal memory load
+      mPortWriteDstReg = -1;
+      mStageWrite.regFlags.reg = mStageRead.regDst;
+      mStageWrite.data = ( uint32_t )mMacStage.acc;
+      mStageRead.instruction = DSPI::EMPTY;
+      break;
   }
 }
 
@@ -1357,7 +1416,7 @@ void Jerry::decode()
   if ( mStageRead.instruction != DSPI::EMPTY )
     return;
 
-  auto [pullStatus, opcode] = mPrefetch.pull();
+  auto [pullStatus, opcode] = prefetchPull();
 
   switch ( pullStatus )
   {
@@ -1367,15 +1426,27 @@ void Jerry::decode()
     mStageRead.regDst = opcode & 0x1f;
     mLog->decodeDSP( mStageRead.instruction, mStageRead.regSrc, mStageRead.regDst );
     break;
-  case Prefetch::OPERAND1:
+  case Prefetch::MOVEI1:
     mStageRead.dataSrc = ( uint16_t )opcode;
     mLog->decodeMOVEI( 0, mStageRead.dataSrc );
     break;
-  case Prefetch::OPERAND2:
+  case Prefetch::MOVEI2:
     mStageRead.dataSrc |= ( uint32_t )opcode << 16;
     mStageWrite.regFlags.reg = mStageRead.regDst;
     mStageWrite.data = mStageRead.dataSrc;
     mLog->decodeMOVEI( 1, mStageRead.dataSrc );
+    break;
+  case Prefetch::IMULTN:
+    mStageRead.instruction = DSPI::MM_IMULTN;
+    mLog->decodeIMULTN( mStageCompute.regSrc, 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 ), mMacStage.cnt );
+    break;
+  case Prefetch::IMACN:
+    mStageRead.instruction = DSPI::MM_IMACN;
+    mLog->decodeIMACN( mStageCompute.regSrc, 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 ), mMacStage.cnt );
+    break;
+  case Prefetch::RESMAC:
+    mStageRead.instruction = DSPI::MM_RESMAC;
+    mLog->decodeRESMAC( mStageCompute.regDst );
     break;
   default:
     break;
@@ -1391,7 +1462,7 @@ void Jerry::prefetch()
   {
     assert( ( mPC & 1 ) == 0 );
     uint32_t code = std::byteswap( mLocalRAM[( mPC - RAM_BASE )>>2] );
-    uint32_t off = mPrefetch.push( code, mPC & 2 );
+    uint32_t off = prefetchPush( code, mPC & 2 );
 
     if ( off )
     {
@@ -1404,6 +1475,104 @@ void Jerry::prefetch()
   mCycle += 1;
   mLog->flush();
 }
+
+std::pair<Jerry::Prefetch::PullStatus, uint16_t> Jerry::prefetchPull()
+{
+  if ( mPrefetch.queueSize > 0 )
+  {
+    uint16_t result = mPrefetch.queue & 0xffff;
+
+    switch ( mPrefetch.status )
+    {
+    case Prefetch::OPCODE:
+      switch ( ( DSPI )( result >> 10 ) )
+      {
+      case DSPI::MOVEI:
+        mPrefetch.status = Prefetch::MOVEI1;
+        break;
+      case DSPI::MMULT:
+        mPrefetch.status = Prefetch::IMULTN;
+        mMacStage.size = mMTXC & 15;
+        mMacStage.cnt = 0;
+        mMacStage.addr = mMTXA;
+        if ( mMacStage.addr < 0xf1b000 || mMacStage.addr > 0xf1bffc )
+        {
+          throw EmulationViolation{ "Invalid D_MTXA address of " } << mMacStage.addr;
+        }
+        if ( mMacStage.size < 3 )
+        {
+          throw EmulationViolation{ "MMULT with invalid size of " } << mMacStage.size;
+        }
+        break;
+      default:
+        break;
+      }
+      mPrefetch.queue >>= 16;
+      mPrefetch.queueSize -= 1;
+      return { Prefetch::OPCODE, result };
+    case Prefetch::MOVEI1:
+      mPrefetch.status = Prefetch::MOVEI2;
+      mPrefetch.queue >>= 16;
+      mPrefetch.queueSize -= 1;
+      return { Prefetch::MOVEI1, result };
+    case Prefetch::MOVEI2:
+      mPrefetch.status = Prefetch::OPCODE;
+      mPrefetch.queue >>= 16;
+      mPrefetch.queueSize -= 1;
+      return { Prefetch::MOVEI2, result };
+    case Prefetch::IMULTN:
+      mPrefetch.status = Prefetch::IMACN;
+      return { Prefetch::IMULTN, 0 };
+    case Prefetch::IMACN:
+      if ( mMacStage.cnt < mMacStage.size )
+      {
+        return { Prefetch::IMACN, 0 };
+      }
+      else
+      {
+        mPrefetch.status = Prefetch::OPCODE;
+        return { Prefetch::RESMAC, 0 };
+      }
+    default:
+      assert( false );
+      return { Prefetch::EMPTY, 0 };
+    }
+  }
+  else
+  {
+    return { Prefetch::EMPTY, 0 };
+  }
+}
+
+uint32_t Jerry::prefetchPush( uint32_t value, uint32_t oddWord )
+{
+  static constexpr std::array<uint64_t, 4> mask = {
+    0x0000000000000000,
+    0x000000000000ffff,
+    0x00000000ffffffff,
+    0x0000ffffffffffff
+  };
+
+  if ( oddWord && mPrefetch.queueSize <= 3 )
+  {
+    mPrefetch.queue &= mask[mPrefetch.queueSize];
+    mPrefetch.queue |= ( uint64_t )( value & 0xffff ) << ( mPrefetch.queueSize * 16 );
+    mPrefetch.queueSize += 1;
+    return 2;
+  }
+  else if ( mPrefetch.queueSize <= 2 )
+  {
+    mPrefetch.queue &= mask[mPrefetch.queueSize];
+    mPrefetch.queue |= ( uint64_t )( ( value >> 16 ) | ( value << 16 ) ) << ( mPrefetch.queueSize * 16 );
+    mPrefetch.queueSize += 2;
+    return 4;
+  }
+  else
+  {
+    return 0;
+  }
+}
+
 
 bool Jerry::portWriteDst( uint32_t reg, uint32_t data )
 {
@@ -1498,86 +1667,35 @@ void Jerry::dualPortCommit()
 {
   if ( mPortWriteDstReg >= 0 )
   {
-    mRegStatus[mPortWriteDstReg] = FREE;
-    mRegs[mRegisterFile + mPortWriteDstReg] = mPortWriteDstData;
-    mLog->portWriteDst( mPortWriteDstReg, mPortWriteDstData );
+    if ( mPortWriteDstReg < 0x20 )
+      mRegStatus[mPortWriteDstReg] = FREE;
+    mRegs[(mRegisterFile + mPortWriteDstReg)&63] = mPortWriteDstData;
+    mLog->portWriteDst( mRegisterFile + mPortWriteDstReg, mPortWriteDstData );
     mPortWriteDstReg = -1;
   }
 
   if ( mPortReadSrcReg >= 0 )
   {
-    mStageRead.dataSrc = mRegs[mRegisterFile + mPortReadSrcReg];
-    mLog->portReadSrc( mPortReadSrcReg, mStageRead.dataSrc );
+    mStageRead.dataSrc = mRegs[(mRegisterFile + mPortReadSrcReg)&63];
+    mLog->portReadSrc( mRegisterFile + mPortReadSrcReg, mStageRead.dataSrc );
     mPortReadSrcReg = -1;
   }
 
   if ( mPortReadDstReg >= 0 )
   {
-    mStageRead.dataDst = mRegs[mRegisterFile + mPortReadDstReg];
-    mLog->portReadDst( mPortReadDstReg, mStageRead.dataDst );
+    mStageRead.dataDst = mRegs[(mRegisterFile + mPortReadDstReg)&63];
+    mLog->portReadDst( mRegisterFile + mPortReadDstReg, mStageRead.dataDst );
     mPortReadDstReg = -1;
   }
 }
 
-std::pair<Jerry::Prefetch::PullStatus, uint16_t> Jerry::Prefetch::pull()
+void Jerry::dualPortCommitMMULT( bool high )
 {
-  if ( queueSize > 0 )
+  if ( mPortReadSrcReg >= 0 )
   {
-    uint16_t result = queue & 0xffff;
-    queue >>= 16;
-    queueSize -= 1;
-
-    switch ( status )
-    {
-    case OPCODE:
-      if ( ( DSPI )( result >> 10 ) == DSPI::MOVEI )
-      {
-        status = OPERAND1;
-      }
-      return { OPCODE, result };
-    case OPERAND1:
-      status = OPERAND2;
-      return { OPERAND1, result };
-    case OPERAND2:
-      status = OPCODE;
-      return { OPERAND2, result };
-    default:
-      assert( false );
-      return { EMPTY, 0 };
-    }
-  }
-  else
-  {
-    return { EMPTY, 0 };
-  }
-}
-
-uint32_t Jerry::Prefetch::push( uint32_t value, uint32_t oddWord )
-{
-  static constexpr std::array<uint64_t,4> mask = {
-    0x0000000000000000,
-    0x000000000000ffff,
-    0x00000000ffffffff,
-    0x0000ffffffffffff
-  };
-
-  if ( oddWord && queueSize <= 3 )
-  {
-    queue &= mask[queueSize];
-    queue |= ( uint64_t )( value & 0xffff ) << ( queueSize * 16 );
-    queueSize += 1;
-    return 2;
-  }
-  else if ( queueSize <= 2 )
-  {
-    queue &= mask[queueSize];
-    queue |= (uint64_t)( ( value >> 16 ) | ( value << 16 ) ) << ( queueSize * 16 );
-    queueSize += 2;
-    return 4;
-  }
-  else
-  {
-    return 0;
+    mStageRead.dataSrc = high ? mRegs[32 + mPortReadSrcReg] >> 16 : mRegs[32 + mPortReadSrcReg] & 0xffff;
+    mLog->portReadSrcMMULT( 32 + mPortReadSrcReg, high, mStageRead.dataSrc );
+    mPortReadSrcReg = -1;
   }
 }
 

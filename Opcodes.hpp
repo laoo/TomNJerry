@@ -65,7 +65,10 @@ enum struct DSPI
   LOAD15R = 59,
   STORE14R = 60,
   STORE15R = 61,
-  ADDQMOD = 63
+  ADDQMOD = 63,
+  MM_IMULTN = 64,
+  MM_IMACN = 65,
+  MM_RESMAC = 66
 };
 
 enum struct GPUI

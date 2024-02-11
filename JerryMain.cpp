@@ -14,6 +14,14 @@ int main( int argc, char const* argv[] )
     jerry.debugWrite( Jerry::D_PC, input.address() );
     jerry.debugWrite( input.address(), input.data() );
     jerry.debugWrite( Jerry::D_CTRL, Jerry::CTRL::DSPGO );
+    jerry.debugWrite( Jerry::D_MTXC, 4 );
+    jerry.debugWrite( Jerry::D_MTXA, 0xf1b800 );
+    jerry.debugWrite( 0xf1b800, 3 );
+    jerry.debugWrite( 0xf1b804, 5 );
+    jerry.debugWrite( 0xf1b808, 7 );
+    jerry.debugWrite( 0xf1b80c, 9 );
+
+
 
     AdvanceResult result = AdvanceResult::nop();
     for ( int i = 0; i < options.cycles(); ++i )
