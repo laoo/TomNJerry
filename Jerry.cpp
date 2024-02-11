@@ -395,6 +395,7 @@ void Jerry::io()
       mDivideUnit.q = ( mDivideUnit.q << 1 ) | ( ( ( ~mDivideUnit.r ) >> 31 ) & 0x01 );
 
       mDivideUnit.cycle -= 1;
+      mLog->div( mDivideUnit.cycle );
     }
 
     if ( mDivideUnit.cycle == 0 )
@@ -687,20 +688,6 @@ void Jerry::compute()
     mMacStage.acc += ( int16_t )mStageCompute.dataSrc * ( int16_t )mStageCompute.dataDst;
     mStageCompute.instruction = DSPI::EMPTY;
     mLog->computeMac();
-    break;
-  case DSPI::DIV:
-    mStageCompute.instruction = DSPI::EMPTY;
-    mDivideUnit.cycle = 16;
-    mDivideUnit.reg = mStageCompute.regDst;
-    mDivideUnit.divisor = mStageCompute.dataSrc;
-    mDivideUnit.q = mStageCompute.dataDst;
-    mDivideUnit.r = 0;
-    mDivideUnit.busy = true;
-    if ( mDivCtrl & 0x01 )
-    {
-      mDivideUnit.q <<= 16;
-      mDivideUnit.r = mStageCompute.dataDst >> 16;
-    }
     break;
   case DSPI::ABS:
     if ( mStageWrite.regFlags.reg < 0 )
@@ -1151,10 +1138,18 @@ void Jerry::stageRead()
 
       dualPortCommit();
       mRegStatus[mStageRead.regDst] = LOCKED;
-      std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.regDst = mStageRead.regDst;
-      mStageCompute.dataSrc = mStageRead.dataSrc;
-      mStageCompute.dataDst = mStageRead.dataDst;
+      mStageRead.instruction = DSPI::EMPTY;
+      mDivideUnit.cycle = 16;
+      mDivideUnit.reg = mStageRead.regDst;
+      mDivideUnit.divisor = mStageRead.dataSrc;
+      mDivideUnit.q = mStageRead.dataDst;
+      mDivideUnit.r = 0;
+      mDivideUnit.busy = true;
+      if ( mDivCtrl & 0x01 )
+      {
+        mDivideUnit.q <<= 16;
+        mDivideUnit.r = mStageCompute.dataDst >> 16;
+      }
     }
     else
     {

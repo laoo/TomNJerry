@@ -28,6 +28,7 @@ public:
   void computeMac();
   void computeMac( RegFlags regFlags );
   void computeIndex();
+  void div( int cycle );
   void storeLong( uint32_t address, uint32_t value );
   void storeWord( uint32_t address, uint16_t value );
   void storeByte( uint32_t address, uint8_t value );

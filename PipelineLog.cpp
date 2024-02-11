@@ -482,6 +482,11 @@ void PipelineLog::computeIndex()
   mBuffer[0x52] = 'x';
 }
 
+void PipelineLog::div( int cycle )
+{
+  mBuffer[0x4b + sprintf( mBuffer + 0x4b, "%x", cycle )] = ' ';
+}
+
 void PipelineLog::storeLong( uint32_t address, uint32_t value )
 {
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
