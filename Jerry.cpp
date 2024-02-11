@@ -770,7 +770,29 @@ void Jerry::compute()
     }
     break;
   case DSPI::MIRROR:
-    throw Ex{ "NYI" };
+    if ( mStageWrite.regFlags.reg < 0 )
+    {
+      mStageWrite.regFlags.reg = mStageCompute.regDst;
+
+      uint8_t b0 = mStageCompute.dataDst & 0xff;
+      uint8_t b1 = ( mStageCompute.dataDst >> 8 ) & 0xff;
+      uint8_t b2 = ( mStageCompute.dataDst >> 16 ) & 0xff;
+      uint8_t b3 = ( mStageCompute.dataDst >> 24 ) & 0xff;
+
+      //https://graphics.stanford.edu/~seander/bithacks.html#ReverseByteWith64Bits
+      uint8_t m0 = ( ( b0 * 0x80200802ULL ) & 0x0884422110ULL ) * 0x0101010101ULL >> 32;
+      uint8_t m1 = ( ( b1 * 0x80200802ULL ) & 0x0884422110ULL ) * 0x0101010101ULL >> 32;
+      uint8_t m2 = ( ( b2 * 0x80200802ULL ) & 0x0884422110ULL ) * 0x0101010101ULL >> 32;
+      uint8_t m3 = ( ( b3 * 0x80200802ULL ) & 0x0884422110ULL ) * 0x0101010101ULL >> 32;
+
+      mStageWrite.data = ( m0 << 24 ) | ( m1 << 16 ) | ( m2 << 8 ) | m3;
+      mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
+      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.updateFlags = true;
+      mStageCompute.instruction = DSPI::EMPTY;
+      mLog->computeRegFlags( mStageWrite.regFlags );
+    }
+    break;
   case DSPI::STORE14N:
   case DSPI::STORE15N:
   case DSPI::STORE14R:
