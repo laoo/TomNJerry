@@ -1,6 +1,8 @@
 #include "Jerry.hpp"
 #include "ProgramOptions.hpp" 
 #include "BS94.hpp"
+#include "DSPRaw.hpp"
+#include "RAM.hpp"
 
 int main( int argc, char const* argv[] )
 {
@@ -8,30 +10,38 @@ int main( int argc, char const* argv[] )
   {
     ProgramOptions options{ "Jerry", "DSP pipeline symulator", argc, argv};
 
-    BS94 input{ options.input() };
+    //BS94 input{ options.input() };
+    DSPRaw input{ "d:\\home\\yarc_reloaded\\lsp_v15.bin" };
+
+    RAM ram;
+    uint32_t musicAddr = 65536;
+    uint32_t bankAddr = musicAddr + ram.load( "d:\\home\\yarc_reloaded\\mod\\my.lsmusic", musicAddr );
+    bankAddr = ( bankAddr + 3 ) & ~3;
+    ram.load( "d:\\home\\yarc_reloaded\\mod\\my.lsbank", bankAddr );
+
+    ram.l( 0x20 - 8, std::byteswap( musicAddr ) );
+    ram.l( 0x20 - 4, std::byteswap( bankAddr ) );
 
     Jerry jerry;
-    jerry.debugWrite( Jerry::D_PC, input.address() );
+
+    static constexpr uint64_t LATENCY = 3;
+    
+
     jerry.debugWrite( input.address(), input.data() );
+    jerry.debugWrite( Jerry::D_PC, input.address() );
     jerry.debugWrite( Jerry::D_CTRL, Jerry::CTRL::DSPGO );
-    jerry.debugWrite( Jerry::D_MTXC, 4 );
-    jerry.debugWrite( Jerry::D_MTXA, 0xf1b800 );
-    jerry.debugWrite( 0xf1b800, 3 );
-    jerry.debugWrite( 0xf1b804, 5 );
-    jerry.debugWrite( 0xf1b808, 7 );
-    jerry.debugWrite( 0xf1b80c, 9 );
 
-
+    const uint64_t cycles = options.cycles();
 
     AdvanceResult result = AdvanceResult::nop();
-    for ( int i = 0; i < options.cycles(); ++i )
+    for ( uint64_t i = 0; i < cycles; ++i )
     {
       switch ( result.getOperation() )
       {
       case AdvanceResult::kByteFlag:
-        if ( i % 6 == 0 )
+        if ( ( i & LATENCY ) == 0 )
         {
-          result = jerry.busCycleRead( (uint8_t)0x42 );
+          result = jerry.busCycleRead( ram.b( result.getAddress() ) );
         }
         else
         {
@@ -39,9 +49,11 @@ int main( int argc, char const* argv[] )
         }
         break;
       case AdvanceResult::kShortFlag:
-        if ( i % 6 == 0 )
+        if ( ( i & LATENCY ) == 0 )
         {
-          result = jerry.busCycleRead( ( uint16_t )0x4242 );
+          uint32_t addr = result.getAddress();
+          uint16_t value = ram.w( addr );
+          result = jerry.busCycleRead( value );
         }
         else
         {
@@ -49,9 +61,9 @@ int main( int argc, char const* argv[] )
         }
         break;
       case AdvanceResult::kLongFlag:
-        if ( i % 6 == 0 )
+        if ( ( i & LATENCY ) == 0 )
         {
-          result = jerry.busCycleRead( ( uint32_t )0x42424242 );
+          result = jerry.busCycleRead( ram.l( result.getAddress() ) );
         }
         else
         {
@@ -59,10 +71,31 @@ int main( int argc, char const* argv[] )
         }
         break;
       case AdvanceResult::kWriteFlag | AdvanceResult::kByteFlag:
-      case AdvanceResult::kWriteFlag | AdvanceResult::kShortFlag:
-      case AdvanceResult::kWriteFlag | AdvanceResult::kLongFlag:
-        if ( i % 6 == 0 )
+        if ( ( i & LATENCY ) == 0 )
         {
+          ram.b()[result.getAddress()] = (uint8_t)result.getValue();
+          result = jerry.busCycleWrite();
+        }
+        else
+        {
+          result = jerry.busCycleIdle();
+        }
+        break;
+      case AdvanceResult::kWriteFlag | AdvanceResult::kShortFlag:
+        if ( ( i & LATENCY ) == 0 )
+        {
+          ram.w()[result.getAddress() >> 1] = ( uint16_t )result.getValue();
+          result = jerry.busCycleWrite();
+        }
+        else
+        {
+          result = jerry.busCycleIdle();
+        }
+        break;
+      case AdvanceResult::kWriteFlag | AdvanceResult::kLongFlag:
+        if ( ( i & LATENCY ) == 0 )
+        {
+          ram.l()[result.getAddress() >> 2] = result.getValue();
           result = jerry.busCycleWrite();
         }
         else

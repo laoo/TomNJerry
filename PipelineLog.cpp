@@ -535,6 +535,11 @@ void PipelineLog::loadByte( uint32_t address, uint8_t value )
   mBuffer[0x66 + sprintf( mBuffer + 0x66, "L(%06x):%02x", address, value )] = ' ';
 }
 
+void PipelineLog::warnMemoryAccess()
+{
+  mBuffer[0x2f] = '!';
+}
+
 void PipelineLog::flush()
 {
   std::cout << mBuffer;

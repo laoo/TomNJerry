@@ -165,30 +165,54 @@ void Jerry::ackRead( uint32_t value )
 {
   assert( mBusGate );
   assert( mBusGate.getSize() == 4 );
+  assert( mBusGate.getAddress() <= 0xffffff );
+  assert( mBusGate.getReg() <= 0x1f );
 
-  portWriteDst( mBusGate.getReg(), std::byteswap( value ) );
-  mLog->loadLong( mBusGate.getAddress(), mStageWrite.data );
-  busGatePop();
+  if ( portWriteDst( mBusGate.getReg(), std::byteswap( value ) ) )
+  {
+    mLog->loadLong( mBusGate.getAddress(), mPortWriteDstData );
+    busGatePop();
+  }
+  else
+  {
+    throw Ex{} << "Jerry::io: Unhandled read ack";
+  }
 }
 
 void Jerry::ackRead( uint16_t value )
 {
   assert( mBusGate );
   assert( mBusGate.getSize() == 2 );
+  assert( mBusGate.getAddress() <= 0xffffff );
+  assert( mBusGate.getReg() <= 0x1f );
 
-  portWriteDst( mBusGate.getReg(), std::byteswap( (uint32_t)value ) );
-  mLog->loadWord( mBusGate.getAddress(), mStageWrite.data );
-  busGatePop();
+  if ( portWriteDst( mBusGate.getReg(), std::byteswap( value ) ) )
+  {
+    mLog->loadWord( mBusGate.getAddress(), mPortWriteDstData );
+    busGatePop();
+  }
+  else
+  {
+    throw Ex{} << "Jerry::io: Unhandled read ack";
+  }
 }
 
 void Jerry::ackRead( uint8_t value )
 {
   assert( mBusGate );
   assert( mBusGate.getSize() == 1 );
+  assert( mBusGate.getAddress() <= 0xffffff );
+  assert( mBusGate.getReg() <= 0x1f );
 
-  portWriteDst( mBusGate.getReg(), std::byteswap( ( uint32_t )value ) );
-  mLog->loadByte( mBusGate.getAddress(), mStageWrite.data );
-  busGatePop();
+  if ( portWriteDst( mBusGate.getReg(), value ) ) 
+  {
+    mLog->loadLong( mBusGate.getAddress(), mPortWriteDstData );
+    busGatePop();
+  }
+  else
+  {
+    throw Ex{} << "Jerry::io: Unhandled read ack";
+  }
 }
 
 
@@ -223,8 +247,6 @@ void Jerry::storeLong( uint32_t address, uint32_t data )
     if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
     {
       mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )] = std::byteswap( data );
-      mLastLocalRAMAccessCycle = mCycle;
-      mLog->storeLong( address, data );
     }
     else switch ( address )
     {
@@ -260,6 +282,9 @@ void Jerry::storeLong( uint32_t address, uint32_t data )
     default:
       throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
     }
+    mStageIO.state = StageIO::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    mLog->storeLong( address, data );
   }
   else
   {
@@ -270,7 +295,10 @@ void Jerry::storeLong( uint32_t address, uint32_t data )
 void Jerry::loadByte( uint32_t address, uint32_t reg )
 {
   if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
-    throw EmulationViolation{ "Loading a byte from internal memory" };
+  {
+    mLog->warnMemoryAccess();
+    return loadLong( address, reg );
+  }
 
   busGatePush( AdvanceResult::readByte( address, reg ) );
 }
@@ -278,7 +306,10 @@ void Jerry::loadByte( uint32_t address, uint32_t reg )
 void Jerry::loadWord( uint32_t address, uint32_t reg )
 {
   if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
-    throw EmulationViolation{ "Loading a word from internal memory" };
+  {
+    mLog->warnMemoryAccess();
+    return loadLong( address, reg );
+  }
 
   busGatePush( AdvanceResult::readShort( address, reg ) );
 }
@@ -898,7 +929,7 @@ void Jerry::compute()
   case DSPI::JUMP:
     if ( testCondition( mStageCompute.regDst ) )
     {
-      mPC = mStageCompute.dataSrc;
+      mPC = mStageCompute.dataDst;
       mPrefetch.queueSize = 0;
     }
     mStageCompute.instruction = DSPI::EMPTY;
@@ -1000,7 +1031,10 @@ void Jerry::compute()
 void Jerry::stageRead()
 {
   if ( mStageCompute.instruction != DSPI::EMPTY )
+  {
+    dualPortCommit();
     return;
+  }
 
   switch ( mStageRead.instruction )
   {
@@ -1541,7 +1575,7 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mLog->portCond( mStageRead.regDst );
       mStageCompute.regDst = mStageRead.regDst;
-      mStageCompute.dataSrc = mStageRead.dataSrc;
+      mStageCompute.dataDst = mStageRead.dataDst;
     }
     else
     {

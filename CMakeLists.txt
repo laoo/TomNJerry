@@ -8,15 +8,18 @@ add_executable( Tom
   Tom.cpp
   TomMain.cpp
   Log.cpp
+  RAM.cpp
 )
 
 add_executable( Jerry
   BS94.cpp
+  DSPRaw.cpp
   Jerry.cpp
   JerryMain.cpp
   Log.cpp
   PipelineLog.cpp
   ProgramOptions.cpp
+  RAM.cpp
 )
 
 target_precompile_headers( Tom PRIVATE
@@ -35,6 +38,7 @@ target_precompile_headers( Tom PRIVATE
   <functional>
   <iostream>
   <memory>
+  <span>
   <string>
   <thread>
   <vector>

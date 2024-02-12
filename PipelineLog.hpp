@@ -35,6 +35,7 @@ public:
   void loadLong( uint32_t address, uint32_t value );
   void loadWord( uint32_t address, uint16_t value );
   void loadByte( uint32_t address, uint8_t value );
+  void warnMemoryAccess();
   void flush();
 
 private:
