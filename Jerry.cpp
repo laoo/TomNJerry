@@ -232,32 +232,31 @@ void Jerry::storeLong( uint32_t address, uint32_t data )
       throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
       break;
     case D_MTXC:
-      throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
+      mMTXC = data;
       break;
     case D_MTXA:
-      throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
+      mMTXA = data;
       break;
     case D_END:
-      throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
+      if ( ( data & 1 ) == 0 )
+        throw Ex{ "DSP I/O set to unsupported little endian" };
+      if ( ( data & 4 ) == 0 )
+        throw Ex{ "DSP instruction fetch set to unsupported little endian" };
       break;
     case D_PC:
-      throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
+      mPC = data;
+      break;
     case D_CTRL:
-      throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
       mCtrl.value = data;
       break;
     case D_MOD:
-      throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
       mMod = data;
       break;
     case D_DIVCTRL:
-      throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
       mDivCtrl = data;
       break;
     case D_MACHI:
-      throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
-      mMachi = data;
-      break;
+      throw EmulationViolation{ "Writing RO register D_MACHI" };
     default:
       throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
     }
@@ -807,7 +806,18 @@ void Jerry::compute()
     }
     break;
   case DSPI::SUBQMOD:
-    throw Ex{ "NYI" };
+    if ( mStageWrite.regFlags.reg < 0 )
+    {
+      mStageWrite.regFlags.reg = mStageCompute.regDst;
+      mStageWrite.data = ( mStageCompute.dataDst & mMod ) | ( ( mStageCompute.dataDst - mStageCompute.dataSrc ) & ( ~mMod ) );
+      mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
+      mStageWrite.regFlags.c = mStageCompute.dataSrc < mStageCompute.dataDst ? 1 : 0;
+      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.updateFlags = true;
+      mStageCompute.instruction = DSPI::EMPTY;
+      mLog->computeRegFlags( mStageWrite.regFlags );
+    }
+    break;
   case DSPI::SAT16S:
     if ( mStageWrite.regFlags.reg < 0 )
     {
@@ -896,7 +906,7 @@ void Jerry::compute()
   case DSPI::JR:
     if ( testCondition( mStageCompute.regDst ) )
     {
-      int32_t off = ( (int8_t)( mStageCompute.dataSrc << 3 ) / 8 );
+      int32_t off = ( (int8_t)( mStageCompute.dataSrc << 3 ) >> 3 );
       mPC = mPC + ( off - mPrefetch.queueSize - 1 ) * 2;
       mPrefetch.queueSize = 0;
     }
@@ -952,7 +962,17 @@ void Jerry::compute()
     }
     break;
   case DSPI::ADDQMOD:
-    throw Ex{ "NYI" };
+    if ( mStageWrite.regFlags.reg < 0 )
+    {
+      mStageWrite.regFlags.reg = mStageCompute.regDst;
+      mStageWrite.data = ( mStageCompute.dataDst & mMod ) | ( ( mStageCompute.dataSrc + mStageCompute.dataDst ) & ( ~mMod ) );
+      mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
+      mStageWrite.regFlags.c = mStageWrite.data < mStageCompute.dataSrc ? 1 : 0;
+      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.updateFlags = true;
+      mStageCompute.instruction = DSPI::EMPTY;
+      mLog->computeRegFlags( mStageWrite.regFlags );
+    }
     break;
   case DSPI::MM_IMULTN:
     mMacStage.acc = ( int16_t )mStageCompute.dataSrc * ( int16_t )mStageWrite.data;

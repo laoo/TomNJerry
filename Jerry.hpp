@@ -156,7 +156,7 @@ private:
   uint32_t mMTXA = 0;
   uint32_t mPC = 0;
   CTRL mCtrl = {};
-  uint32_t mMod = 0;
+  uint32_t mMod = ~0;
   int32_t mRemain = 0;
   uint32_t mDivCtrl = 0;
   uint32_t mMachi = 0;
