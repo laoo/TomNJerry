@@ -754,11 +754,32 @@ void Jerry::compute()
     }
     break;
   case DSPI::SHARQ:
-    throw Ex{ "NYI" };
+    if ( mStageWrite.regFlags.reg < 0 )
+    {
+      mStageWrite.regFlags.reg = mStageCompute.regDst;
+      mStageWrite.data = (uint32_t)( (int32_t)mStageCompute.dataDst >> mStageCompute.dataSrc );
+      mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
+      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.regFlags.c = mStageCompute.dataDst & 1;
+      mStageWrite.updateFlags = true;
+      mStageCompute.instruction = DSPI::EMPTY;
+      mLog->computeRegFlags( mStageWrite.regFlags );
+    }
+    break;
   case DSPI::ROR:
-    throw Ex{ "NYI" };
   case DSPI::RORQ:
-    throw Ex{ "NYI" };
+    if ( mStageWrite.regFlags.reg < 0 )
+    {
+      mStageWrite.regFlags.reg = mStageCompute.regDst;
+      mStageWrite.data = std::rotr( mStageCompute.dataDst, mStageCompute.dataSrc );
+      mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
+      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.regFlags.c = mStageCompute.dataDst >> 31;
+      mStageWrite.updateFlags = true;
+      mStageCompute.instruction = DSPI::EMPTY;
+      mLog->computeRegFlags( mStageWrite.regFlags );
+    }
+    break;
   case DSPI::CMP:
     {
       uint32_t data = mStageCompute.dataDst - mStageCompute.dataSrc;
