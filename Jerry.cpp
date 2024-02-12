@@ -866,9 +866,49 @@ void Jerry::compute()
     mStageCompute.instruction = DSPI::EMPTY;
     break;
   case DSPI::MTOI:
-    throw Ex{ "NYI" };
+    if ( mStageWrite.regFlags.reg < 0 )
+    {
+      if ( mRegStatus[mStageCompute.regDst] != FREE )
+        throw EmulationViolation{ "MTOI writes to a register in use" };
+
+      mStageWrite.regFlags.reg = mStageCompute.regDst;
+      mStageWrite.data = ( ( ( int32_t )mStageCompute.dataSrc >> 8 ) & 0xFF800000 ) | ( mStageCompute.dataSrc & 0x007FFFFF );
+      mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
+      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.updateFlags = true;
+      mStageCompute.instruction = DSPI::EMPTY;
+      mLog->computeRegFlags( mStageWrite.regFlags );
+    }
+    break;
   case DSPI::NORMI:
-    throw Ex{ "NYI" };
+    if ( mStageWrite.regFlags.reg < 0 )
+    {
+      if ( mRegStatus[mStageCompute.regDst] != FREE )
+        throw EmulationViolation{ "NORMI writes to a register in use" };
+
+      mStageWrite.regFlags.reg = mStageCompute.regDst;
+      mStageWrite.data = 0;
+
+      if ( mStageCompute.dataSrc )
+      {
+        while ( ( mStageCompute.dataSrc & 0xffc00000 ) == 0 )
+        {
+          mStageCompute.dataSrc <<= 1;
+          mStageWrite.data--;
+        }
+        while ( ( mStageCompute.dataSrc & 0xff800000 ) != 0 )
+        {
+          mStageCompute.dataSrc >>= 1;
+          mStageWrite.data++;
+        }
+      }
+      mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
+      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.updateFlags = true;
+      mStageCompute.instruction = DSPI::EMPTY;
+      mLog->computeRegFlags( mStageWrite.regFlags );
+    }
+    break;
   case DSPI::ADDQMOD:
     throw Ex{ "NYI" };
     break;
@@ -919,7 +959,6 @@ void Jerry::stageRead()
   case DSPI::SH:
   case DSPI::SHA:
   case DSPI::ROR:
-  case DSPI::MTOI:
     if ( portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
     {
       dualPortCommit();
@@ -1016,7 +1055,6 @@ void Jerry::stageRead()
   case DSPI::SAT16S:
   case DSPI::SAT32S:
   case DSPI::MIRROR:
-  case DSPI::NORMI:
     if ( portReadDst( mStageRead.regDst ) )
     {
       dualPortCommit();
@@ -1074,6 +1112,21 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;
       mStageCompute.dataDst = mStageRead.dataDst;
+    }
+    else
+    {
+      dualPortCommit();
+    }
+    break;
+  case DSPI::MTOI:
+  case DSPI::NORMI:
+    if ( portReadSrc( mStageRead.regSrc ) )
+    {
+      dualPortCommit();
+      mFlagsSemaphore += 1;
+      std::swap( mStageRead.instruction, mStageCompute.instruction );
+      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.dataSrc = mStageRead.dataSrc;
     }
     else
     {
