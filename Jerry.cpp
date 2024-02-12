@@ -809,9 +809,30 @@ void Jerry::compute()
   case DSPI::SUBQMOD:
     throw Ex{ "NYI" };
   case DSPI::SAT16S:
-    throw Ex{ "NYI" };
+    if ( mStageWrite.regFlags.reg < 0 )
+    {
+      mStageWrite.regFlags.reg = mStageCompute.regDst;
+      mStageWrite.data = ( ( int32_t )mStageCompute.dataDst < -32768 ) ? -32768 : ( ( int32_t )mStageCompute.dataDst > 32767 ) ? 32767 : ( int32_t )mStageCompute.dataDst;
+      mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
+      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.updateFlags = true;
+      mStageCompute.instruction = DSPI::EMPTY;
+      mLog->computeRegFlags( mStageWrite.regFlags );
+    }
+    break;
   case DSPI::SAT32S:
-    throw Ex{ "NYI" };
+    if ( mStageWrite.regFlags.reg < 0 )
+    {
+      mStageWrite.regFlags.reg = mStageCompute.regDst;
+      int32_t temp = mMacStage.acc >> 32;
+      mStageWrite.data = ( temp < -1 ) ? ( int32_t )0x80000000 : ( temp > 0 ) ? ( int32_t )0x7FFFFFFF : mStageCompute.dataDst;
+      mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
+      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.updateFlags = true;
+      mStageCompute.instruction = DSPI::EMPTY;
+      mLog->computeRegFlags( mStageWrite.regFlags );
+    }
+    break;
   case DSPI::LOAD14N:
   case DSPI::LOAD15N:
   case DSPI::LOAD14R:
