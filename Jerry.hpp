@@ -225,6 +225,8 @@ private:
   void decode();
   void prefetch();
 
+  bool stageWriteReg();
+  void stageWriteFlags();
   bool portWriteDst( uint32_t reg, uint32_t data );
   bool portReadSrc( uint32_t regSrc );
   bool portReadDst( uint32_t regDst );
@@ -277,9 +279,17 @@ private:
 
   struct StageWrite 
   {
-    bool updateFlags = false;
+    static const uint32_t UPDATE_NONE   = 0x00;
+    static const uint32_t UPDATE_REG    = 0x01;
+    static const uint32_t UPDATE_FLAGS  = 0x02;
+
+    uint32_t updateMask = UPDATE_NONE;
     RegFlags regFlags = {};
     uint32_t data = 0;
+
+    void updateReg( uint32_t reg, uint32_t data );
+    bool canUpdateReg() const;
+
   } mStageWrite = {};
 
   struct StageIO
