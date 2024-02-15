@@ -1,22 +1,22 @@
 #pragma once
-#include "IChip.hpp"
+#include "AdvanceResult.hpp"
 
-class Tom : public IChip
+class Tom
 {
 public:
   Tom() = default;
-  ~Tom() override = default;
+  ~Tom() = default;
 
-  void debugWrite( uint32_t address, uint32_t data ) override;
-  void debugWrite( uint32_t address, std::span<uint32_t const> data ) override;
+  void debugWrite( uint32_t address, uint32_t data );
+  void debugWrite( uint32_t address, std::span<uint32_t const> data );
 
 
-  AdvanceResult busCycleIdle() override;
-  AdvanceResult busCycleWrite() override;
-  AdvanceResult busCycleRead( uint8_t value ) override;
-  AdvanceResult busCycleRead( uint16_t value ) override;
-  AdvanceResult busCycleRead( uint32_t value ) override;
-  AdvanceResult busCycleRead( uint64_t value ) override;
+  AdvanceResult busCycleIdle();
+  AdvanceResult busCycleWrite();
+  AdvanceResult busCycleRead( uint8_t value );
+  AdvanceResult busCycleRead( uint16_t value );
+  AdvanceResult busCycleRead( uint32_t value );
+  AdvanceResult busCycleRead( uint64_t value );
 
 private:
 

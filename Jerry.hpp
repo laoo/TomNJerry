@@ -1,74 +1,187 @@
 #pragma once
-#include "IChip.hpp"
+#include "AdvanceResult.hpp"
 #include "Opcodes.hpp"
 #include "RegFlags.hpp"
 
 class PipelineLog;
 
-class Jerry : public IChip
+class Jerry
 {
 public:
 
-  static constexpr uint32_t D_FLAGS = 0xf1a100; //DSP Flags
-  static constexpr uint32_t D_MTXC = 0xf1a104; //DSP Matrix Control
-  static constexpr uint32_t D_MTXA = 0xf1a108; //DSP Matrix Address
-  static constexpr uint32_t D_END = 0xf1a10c; //DSP Data Organization
-  static constexpr uint32_t D_PC = 0xf1a110; //DSP Program Counter
-  static constexpr uint32_t D_CTRL = 0xf1a114; //DSP Operation Control / Status
-  static constexpr uint32_t D_MOD = 0xf1a118; //DSP Modulo Instruction Mask
-  static constexpr uint32_t D_REMAIN = 0xf1a11c; //DSP Division Remainder
-  static constexpr uint32_t D_DIVCTRL = 0xf1a11c; //DSP Divider control
-  static constexpr uint32_t D_MACHI = 0xf1a120; //DSP Hi byte of MAC operations
+  static constexpr uint32_t JPIT1     = 0xF10000;   //Timer 1 Pre - Scaler
+  static constexpr uint32_t JPIT2     = 0xF10002;   //Timer 1 Divider
+  static constexpr uint32_t JPIT3     = 0xF10004;   //Timer 2 Pre - Scaler
+  static constexpr uint32_t JPIT4     = 0xF10006;   //Timer 2 Divider
 
-  static constexpr uint32_t JERRY_BASE = 0xf10000;
-  static constexpr uint32_t DSP_BASE = 0xf1a100;
-  static constexpr uint32_t ROM_TABLE = 0xf1d000;
-  static constexpr uint32_t JERRY_SIZE = 0x10000;
+  static constexpr uint32_t J_INT     = 0xF10020;   //Jerry Interrupt control( to TOM )
 
-  static constexpr uint32_t RAM_BASE = 0xf1b000;
-  static constexpr uint32_t RAM_SIZE = 0x2000;
+  static constexpr uint32_t JOYSTICK  = 0xF14000;   //Joystick register and mute
+  static constexpr uint32_t JOYBUTS   = 0xF14002;   //Joystick register
+  static constexpr uint32_t CONFIG    = 0xF14002;   //Also has NTSC / PAL
+
+  static constexpr uint32_t SCLK      = 0xF1A150;   //SSI Clock Frequency
+  static constexpr uint32_t SMODE     = 0xF1A154;   //SSI Control
+
+  static constexpr uint32_t L_I2S     = 0xF1A148;   //I2S Serial Interface
+  static constexpr uint32_t R_I2S     = 0xF1A14C;   //I2S Serial Interface
+
+  static constexpr uint32_t ASICLK    = 0xF10034;   //Asynchronous Clock Register
+  static constexpr uint32_t ASICTRL   = 0xF10032;   //Asynchronous Control Register
+  static constexpr uint32_t ASISTAT   = 0xF10032;   //Asynchronous Status Register
+  static constexpr uint32_t ASIDATA   = 0xF10030;   //Asynchronous Data Register
+
+  static constexpr uint32_t D_FLAGS   = 0xF1A100;   //DSP Flags
+  static constexpr uint32_t D_MTXC    = 0xF1A104;   //DSP Matrix Control
+  static constexpr uint32_t D_MTXA    = 0xF1A108;   //DSP Matrix Address
+  static constexpr uint32_t D_END     = 0xF1A10C;   //DSP Data Organization
+  static constexpr uint32_t D_PC      = 0xF1A110;   //DSP Program Counter
+  static constexpr uint32_t D_CTRL    = 0xF1A114;   //DSP Operation Control / Status
+  static constexpr uint32_t D_MOD     = 0xF1A118;   //DSP Modulo Instruction Mask
+  static constexpr uint32_t D_REMAIN  = 0xF1A11C;   //DSP Division Remainder
+  static constexpr uint32_t D_DIVCTRL = 0xF1A11C;   //DSP Divider control
+  static constexpr uint32_t D_MACHI   = 0xF1A120;   //DSP Hi byte of MAC operations
+
+  static constexpr uint32_t DSP_BASE  = 0xf1a000;
+  static constexpr uint32_t CTR_BASE  = 0xf1a100;
+  static constexpr uint32_t RAM_BASE  = 0xf1b000;
+  static constexpr uint32_t ROM_BASE  = 0xf1d000;
+  static constexpr uint32_t RAM_SIZE  = 0x002000;
+  static constexpr uint32_t ROM_SIZE  = 0x001000;
+
+  struct JINTCTRL
+  {
+    static constexpr uint16_t J_EXTENA  = 0x0001; //Enable external interrupts
+    static constexpr uint16_t J_DSPENA  = 0x0002; //Enable DSP interrupts
+    static constexpr uint16_t J_TIM1ENA = 0x0004; //Enable Timer 1 interrupts
+    static constexpr uint16_t J_TIM2ENA = 0x0008; //Enable Timer 2 interrupts
+    static constexpr uint16_t J_ASYNENA = 0x0010; //Enable Asyncronous Serial interrupts
+    static constexpr uint16_t J_SYNENA  = 0x0020; //Enable Syncronous Serial interrupts
+
+    static constexpr uint16_t J_EXTCLR  = 0x0100; //Clear pending external interrupts
+    static constexpr uint16_t J_DSPCLR  = 0x0200; //Clear pending DSP interrupts
+    static constexpr uint16_t J_TIM1CLR = 0x0400; //Clear pending Timer 1 interrupts
+    static constexpr uint16_t J_TIM2CLR = 0x0800; //Clear pending Timer 2 interrupts
+    static constexpr uint16_t J_ASYNCLR = 0x1000; //Clear pending Asynch.Serial interrupts
+    static constexpr uint16_t J_SYNCLR  = 0x2000; //Clear pending Synch.Serial interrupts
+
+    uint16_t get() const;
+    void set( uint16_t value );
+
+    bool extena = false;
+    bool dspena = false;
+    bool tim1ena = false;
+    bool tim2ena = false;
+    bool asynena = false;
+    bool synena = false;
+
+    bool extpend = false;
+    bool dsppend = false;
+    bool tim1pend = false;
+    bool tim2pend = false;
+    bool asynpend = false;
+    bool synpend = false;
+  };
 
   struct CTRL
   {
-    static constexpr uint32_t DSPGO = 0b0000'0000'0000'0000'0000'0000'0000'0001;
-    static constexpr uint32_t CPUINT = 0b0000'0000'0000'0000'0000'0000'0000'0010;
-    static constexpr uint32_t FORCEINT0 = 0b0000'0000'0000'0000'0000'0000'0000'0100;
+    static constexpr uint32_t DSPGO       = 0b0000'0000'0000'0000'0000'0000'0000'0001;
+    static constexpr uint32_t CPUINT      = 0b0000'0000'0000'0000'0000'0000'0000'0010;
+    static constexpr uint32_t FORCEINT0   = 0b0000'0000'0000'0000'0000'0000'0000'0100;
     static constexpr uint32_t SINGLE_STEP = 0b0000'0000'0000'0000'0000'0000'0000'1000;
-    static constexpr uint32_t SINGLE_GO = 0b0000'0000'0000'0000'0000'0000'0001'0000;
-    static constexpr uint32_t D_CPULAT = 0b0000'0000'0000'0000'0000'0000'0100'0000;
-    static constexpr uint32_t D_I2SLAT = 0b0000'0000'0000'0000'0000'0000'1000'0000;
-    static constexpr uint32_t D_TIM1LAT = 0b0000'0000'0000'0000'0000'0001'0000'0000;
-    static constexpr uint32_t D_TIM2LAT = 0b0000'0000'0000'0000'0000'0010'0000'0000;
-    static constexpr uint32_t D_EXT0LAT = 0b0000'0000'0000'0000'0000'0100'0000'0000;
-    static constexpr uint32_t BUS_HOG = 0b0000'0000'0000'0000'0000'1000'0000'0000;
-    static constexpr uint32_t VERSION = 0b0000'0000'0000'0000'1111'0000'0000'0000;
-    static constexpr uint32_t D_EXT1LAT = 0b0000'0000'0000'0001'0000'0000'0000'0000;
+    static constexpr uint32_t SINGLE_GO   = 0b0000'0000'0000'0000'0000'0000'0001'0000;
+    static constexpr uint32_t D_CPULAT    = 0b0000'0000'0000'0000'0000'0000'0100'0000;
+    static constexpr uint32_t D_I2SLAT    = 0b0000'0000'0000'0000'0000'0000'1000'0000;
+    static constexpr uint32_t D_TIM1LAT   = 0b0000'0000'0000'0000'0000'0001'0000'0000;
+    static constexpr uint32_t D_TIM2LAT   = 0b0000'0000'0000'0000'0000'0010'0000'0000;
+    static constexpr uint32_t D_EXT0LAT   = 0b0000'0000'0000'0000'0000'0100'0000'0000;
+    static constexpr uint32_t BUS_HOG     = 0b0000'0000'0000'0000'0000'1000'0000'0000;
+    static constexpr uint32_t VERSION     = 0b0000'0000'0000'0000'1111'0000'0000'0000;
+    static constexpr uint32_t D_EXT1LAT   = 0b0000'0000'0000'0001'0000'0000'0000'0000;
 
-    uint32_t value;
+    uint16_t get() const;
 
-    bool go() const
-    {
-      return ( value & DSPGO ) != 0;
-    }
+    bool dspgo = false;
+    bool cpulat = false;
+    bool i2slat = false;
+    bool tim1lat = false;
+    bool tim2lat = false;
+    bool ext0lat = false;
+    bool ext1lat = false;
+  };
 
+  struct FLAGS
+  {
+    static constexpr uint32_t ZERO_FLAG    = 0b0000'0000'0000'0000'0000'0000'0000'0001;
+    static constexpr uint32_t CARRY_FLAG   = 0b0000'0000'0000'0000'0000'0000'0000'0010;
+    static constexpr uint32_t NEGA_FLAG    = 0b0000'0000'0000'0000'0000'0000'0000'0100;
+    static constexpr uint32_t IMASK        = 0b0000'0000'0000'0000'0000'0000'0000'1000;
+    static constexpr uint32_t D_CPUENA     = 0b0000'0000'0000'0000'0000'0000'0001'0000;
+    static constexpr uint32_t D_I2SENA     = 0b0000'0000'0000'0000'0000'0000'0010'0000;
+    static constexpr uint32_t D_TIM1ENA    = 0b0000'0000'0000'0000'0000'0000'0100'0000;
+    static constexpr uint32_t D_TIM2ENA    = 0b0000'0000'0000'0000'0000'0000'1000'0000;
+    static constexpr uint32_t D_EXT0ENA    = 0b0000'0000'0000'0000'0000'0001'0000'0000;
+    static constexpr uint32_t D_CPUCLR     = 0b0000'0000'0000'0000'0000'0010'0000'0000;
+    static constexpr uint32_t D_I2SCLR     = 0b0000'0000'0000'0000'0000'0100'0000'0000;
+    static constexpr uint32_t D_TIM1CLR    = 0b0000'0000'0000'0000'0000'1000'0000'0000;
+    static constexpr uint32_t D_TIM2CLR    = 0b0000'0000'0000'0000'0001'0000'0000'0000;
+    static constexpr uint32_t D_EXT0CLR    = 0b0000'0000'0000'0000'0010'0000'0000'0000;
+    static constexpr uint32_t REGPAGE      = 0b0000'0000'0000'0000'0100'0000'0000'0000;
+    static constexpr uint32_t DMAEN        = 0b0000'0000'0000'0000'1000'0000'0000'0000;
+    static constexpr uint32_t D_EXT1ENA    = 0b0000'0000'0000'0001'0000'0000'0000'0000;
+    static constexpr uint32_t D_EXT1CLR    = 0b0000'0000'0000'0010'0000'0000'0000'0000;
+
+    uint16_t get() const;
+
+    bool z = false;
+    bool c = false;
+    bool n = false;
+    bool imask = false;
+    bool cpuena = false;
+    bool i2sena = false;
+    bool tim1ena = false;
+    bool tim2ena = false;
+    bool ext0ena = false;
+    bool ext1ena = false;
+    bool regpage = false;
   };
 
 
-
   Jerry();
-  ~Jerry() override;
+  ~Jerry();
 
-  void debugWrite( uint32_t address, uint32_t data ) override;
-  void debugWrite( uint32_t address, std::span<uint32_t const> data ) override;
+  void debugWrite( uint32_t address, std::span<uint32_t const> data );
 
-  AdvanceResult busCycleIdle() override;
-  AdvanceResult busCycleWrite() override;
-  AdvanceResult busCycleRead( uint8_t value ) override;
-  AdvanceResult busCycleRead( uint16_t value ) override;
-  AdvanceResult busCycleRead( uint32_t value ) override;
-  AdvanceResult busCycleRead( uint64_t value ) override;
+  void busCycleIdle();
+
+  AdvanceResult busCycleGetRequest();
+  uint16_t busCycleRequestReadWord( uint32_t address );
+  uint32_t busCycleRequestReadLong( uint32_t address );
+  void busCycleRequestWriteWord( uint32_t address, uint16_t data );
+  void busCycleRequestWriteLong( uint32_t address, uint32_t data );
+
+  void busCycleAckReadByteRequest( uint8_t value );
+  void busCycleAckReadWordRequest( uint16_t value );
+  void busCycleAckReadLongRequest( uint32_t value );
 
 private:
+
+  uint16_t readWord( uint32_t address ) const;
+  uint32_t readLong( uint32_t address ) const;
+  //must write little endian word
+  void writeWord( uint32_t address, uint16_t data );
+  //must write little endian long
+  void writeLong( uint32_t address, uint32_t data );
+
+  void ctrlSet( uint16_t value );
+  void flagsSet( uint16_t value );
+
+  bool doInt( uint32_t mask );
+
+  void cpuint();
+  void forceint0();
+
+
 
   struct Prefetch
   {
@@ -101,7 +214,6 @@ private:
   void ackRead( uint16_t data );
   void ackRead( uint32_t data );
 
-
   AdvanceResult advance();
 
   void halfCycle();
@@ -127,43 +239,20 @@ private:
 
 
 private:
-  struct FLAGS
-  {
-    static constexpr uint32_t ZERO_FLAG    = 0b0000'0000'0000'0000'0000'0000'0000'0001;
-    static constexpr uint32_t CARRY_FLAG   = 0b0000'0000'0000'0000'0000'0000'0000'0010;
-    static constexpr uint32_t NEGA_FLAG    = 0b0000'0000'0000'0000'0000'0000'0000'0100;
-    static constexpr uint32_t IMASK        = 0b0000'0000'0000'0000'0000'0000'0000'1000;
-    static constexpr uint32_t D_CPUENA     = 0b0000'0000'0000'0000'0000'0000'0001'0000;
-    static constexpr uint32_t D_I2SENA     = 0b0000'0000'0000'0000'0000'0000'0010'0000;
-    static constexpr uint32_t D_TIM1ENA    = 0b0000'0000'0000'0000'0000'0000'0100'0000;
-    static constexpr uint32_t D_IIM2ENA    = 0b0000'0000'0000'0000'0000'0000'1000'0000;
-    static constexpr uint32_t D_EXT0ENA    = 0b0000'0000'0000'0000'0000'0001'0000'0000;
-    static constexpr uint32_t D_CPUCLR     = 0b0000'0000'0000'0000'0000'0010'0000'0000;
-    static constexpr uint32_t D_I2SCLR     = 0b0000'0000'0000'0000'0000'0100'0000'0000;
-    static constexpr uint32_t D_TIM1CLR    = 0b0000'0000'0000'0000'0000'1000'0000'0000;
-    static constexpr uint32_t D_IIM2CLR    = 0b0000'0000'0000'0000'0001'0000'0000'0000;
-    static constexpr uint32_t D_EXT0CLR    = 0b0000'0000'0000'0000'0010'0000'0000'0000;
-    static constexpr uint32_t REGPAGE      = 0b0000'0000'0000'0000'0100'0000'0000'0000;
-    static constexpr uint32_t DMAEN        = 0b0000'0000'0000'0000'1000'0000'0000'0000;
-    static constexpr uint32_t D_EXT1ENA    = 0b0000'0000'0000'0001'0000'0000'0000'0000;
-    static constexpr uint32_t D_EXT1CLR    = 0b0000'0000'0000'0010'0000'0000'0000'0000;
 
-    uint32_t value;
-  } mFlags = {};
-
+  JINTCTRL mJIntCtrl = {};
 
   uint32_t mMTXC = 0;
   uint32_t mMTXA = 0;
   uint32_t mPC = 0;
   CTRL mCtrl = {};
+  FLAGS mFlags = {};
   uint32_t mMod = ~0;
   int32_t mRemain = 0;
   uint32_t mDivCtrl = 0;
   uint32_t mMachi = 0;
 
   uint32_t mRegisterFile = 0;
-  uint32_t mAnotherRegisterFile = 32;
-
   uint64_t mCycle = 0;
 
   Prefetch mPrefetch = {};

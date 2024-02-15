@@ -57,29 +57,3 @@ private:
   AdvanceResult( uint64_t data ) : mData( data ) {}
   uint64_t mData;
 };
-
-class IChip
-{
-public:
-  virtual ~IChip() = default;
-
-  virtual void debugWrite( uint32_t address, uint32_t data ) = 0;
-  virtual void debugWrite( uint32_t address, std::span<uint32_t const> data ) = 0;
-
-  // No I/O operation in this bus cycle
-  virtual AdvanceResult busCycleIdle() = 0;
-  // Write request succeeded
-  virtual AdvanceResult busCycleWrite() = 0;
-  // Read request succeeded with a byte
-  virtual AdvanceResult busCycleRead( uint8_t value ) = 0;
-  // Read request succeeded with a short
-  virtual AdvanceResult busCycleRead( uint16_t value ) = 0;
-  // Read request succeeded with a long
-  virtual AdvanceResult busCycleRead( uint32_t value ) = 0;
-  // Read request succeeded with a phrase
-  virtual AdvanceResult busCycleRead( uint64_t value ) = 0;
-
-
-
-
-};

@@ -13,46 +13,6 @@ Jerry::~Jerry()
 {
 }
 
-void Jerry::debugWrite( uint32_t address, uint32_t data )
-{
-  if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
-    mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )] = std::byteswap( data );
-  else switch ( address )
-  {
-  case D_FLAGS:
-    throw Ex{ "Jerry::debugWrite: Unhandled address " } << std::hex << address;
-  case D_MTXC:
-    mMTXC = data;
-    break;
-  case D_MTXA:
-    mMTXA = data;
-    break;
-  case D_END:
-    throw Ex{ "Jerry::debugWrite: Unhandled address " } << std::hex << address;
-  case D_PC:
-    if ( data < RAM_BASE || data >= RAM_BASE + RAM_SIZE )
-      throw Ex{ "Jerry unsupported PC " } << std::hex << data;
-    mPC = data;
-    break;
-  case D_CTRL:
-    mCtrl.value = data;
-    //handle other bits
-    break;
-  case D_MOD:
-    mMod = data;
-    break;
-  case D_DIVCTRL:
-    mDivCtrl = data;
-    break;
-  case D_MACHI:
-    mMachi = data;
-    break;
-  default:
-    throw Ex{ "Jerry::debugWrite: Unhandled address " } << std::hex << address;
-    break;
-  }
-}
-
 void Jerry::debugWrite( uint32_t address, std::span<uint32_t const> data )
 {
   if ( address & 3 )
@@ -64,80 +24,120 @@ void Jerry::debugWrite( uint32_t address, std::span<uint32_t const> data )
   std::copy( data.begin(), data.end(), mLocalRAM.begin() + ( address - RAM_BASE ) / sizeof( uint32_t ) );
 }
 
-AdvanceResult Jerry::advance()
+void Jerry::busCycleIdle()
 {
-  halfCycle();
-  halfCycle();
-
-  return mBusGate;
+  if ( mCtrl.dspgo )
+  {
+    halfCycle();
+    halfCycle();
+  }
 }
 
-void Jerry::halfCycle()
+AdvanceResult Jerry::busCycleGetRequest()
 {
-  io();
-  stageWrite();
-  compute();
-  stageRead();
-  decode();
-  prefetch();
+  busCycleIdle();
+
+  if ( mBusGate.getOperation() < 0 )
+  {
+    auto result = mBusGate;
+    ackWrite();
+    return result;
+  }
+  else
+  {
+    return mBusGate;
+  }
 }
 
-AdvanceResult Jerry::busCycleIdle()
+uint16_t Jerry::busCycleRequestReadWord( uint32_t address )
 {
-  if ( ( mCtrl.value & CTRL::DSPGO ) == 0 )
-    return AdvanceResult::nop();
+  busCycleIdle();
 
-  return advance();
+  return readWord( address );
 }
 
-AdvanceResult Jerry::busCycleWrite()
+uint32_t Jerry::busCycleRequestReadLong( uint32_t address )
 {
-  if ( !mCtrl.go() )
-    return AdvanceResult::nop();
+  busCycleIdle();
 
-  ackWrite();
-  return advance();
+  return readLong( address );
 }
 
-AdvanceResult Jerry::busCycleRead( uint8_t value )
+void Jerry::busCycleRequestWriteWord( uint32_t address, uint16_t data )
 {
+  busCycleIdle();
+
+  writeWord( address, data );
+}
+
+void Jerry::busCycleRequestWriteLong( uint32_t address, uint32_t data )
+{
+  busCycleIdle();
+
+  writeLong( address, data );
+}
+
+void Jerry::busCycleAckReadByteRequest( uint8_t value )
+{
+  assert( mBusGate );
   assert( mBusGate.getOperation() > 0 );
   assert( mBusGate.getSize() == 1 );
+  assert( mBusGate.getAddress() <= 0xf10000 );
+  assert( mBusGate.getReg() <= 0x1f );
 
-  if ( !mCtrl.go() )
-    return AdvanceResult::nop();
+  if ( portWriteDst( mBusGate.getReg(), value ) )
+  {
+    mLog->loadLong( mBusGate.getAddress(), mPortWriteDstData );
+    busGatePop();
+  }
+  else
+  {
+    throw Ex{} << "Jerry::io: Unhandled read ack";
+  }
 
-  ackRead( value );
-  return advance();
+  busCycleIdle();
 }
 
-AdvanceResult Jerry::busCycleRead( uint16_t value )
+void Jerry::busCycleAckReadWordRequest( uint16_t value )
 {
+  assert( mBusGate );
   assert( mBusGate.getOperation() > 0 );
   assert( mBusGate.getSize() == 2 );
+  assert( mBusGate.getAddress() <= 0xf10000 );
+  assert( mBusGate.getReg() <= 0x1f );
 
-  if ( !mCtrl.go() )
-    return AdvanceResult::nop();
+  if ( portWriteDst( mBusGate.getReg(), std::byteswap( value ) ) )
+  {
+    mLog->loadWord( mBusGate.getAddress(), mPortWriteDstData );
+    busGatePop();
+  }
+  else
+  {
+    throw Ex{} << "Jerry::io: Unhandled read ack";
+  }
 
-  ackRead( value );
-  return advance();
+  busCycleIdle();
 }
 
-AdvanceResult Jerry::busCycleRead( uint32_t value )
+void Jerry::busCycleAckReadLongRequest( uint32_t value )
 {
+  assert( mBusGate );
   assert( mBusGate.getOperation() > 0 );
   assert( mBusGate.getSize() == 4 );
+  assert( mBusGate.getAddress() <= 0xf10000 );
+  assert( mBusGate.getReg() <= 0x1f );
 
-  if ( !mCtrl.go() )
-    return AdvanceResult::nop();
+  if ( portWriteDst( mBusGate.getReg(), std::byteswap( value ) ) )
+  {
+    mLog->loadLong( mBusGate.getAddress(), mPortWriteDstData );
+    busGatePop();
+  }
+  else
+  {
+    throw Ex{} << "Jerry::io: Unhandled read ack";
+  }
 
-  ackRead( value );
-  return advance();
-}
-
-AdvanceResult Jerry::busCycleRead( uint64_t value )
-{
-  throw Ex{ "Jerry::busCycleRead: Unhandled size " };
+  busCycleIdle();
 }
 
 void Jerry::ackWrite()
@@ -161,208 +161,374 @@ void Jerry::ackWrite()
   busGatePop();
 }
 
-void Jerry::ackRead( uint32_t value )
+uint16_t Jerry::readWord( uint32_t address ) const
 {
-  assert( mBusGate );
-  assert( mBusGate.getSize() == 4 );
-  assert( mBusGate.getAddress() <= 0xffffff );
-  assert( mBusGate.getReg() <= 0x1f );
+  assert( ( address & 0xff0000 ) == 0xf10000 );
+  assert( ( address & 1 ) == 0 );
 
-  if ( portWriteDst( mBusGate.getReg(), std::byteswap( value ) ) )
+  switch ( address )
   {
-    mLog->loadLong( mBusGate.getAddress(), mPortWriteDstData );
-    busGatePop();
+  case JPIT1:
+    break;
+  case JPIT2:
+    break;
+  case JPIT3:
+    break;
+  case JPIT4:
+    break;
+  case J_INT:
+    return mJIntCtrl.get();
+  case J_INT + 2:
+    return 0;
+  case JOYSTICK:
+    break;
+  case JOYBUTS:
+    break;
+  case SCLK:
+    break;
+  case SMODE:
+    break;
+  case L_I2S:
+    break;
+  case R_I2S:
+    break;
+  case ASICLK:
+    break;
+  case ASICTRL:
+    break;
+  case ASIDATA:
+    break;
+  case D_FLAGS:
+  case D_MTXC:
+  case D_MTXA:
+  case D_END:
+  case D_PC:
+  case D_CTRL:
+  case D_MOD:
+  case D_DIVCTRL:
+  case D_MACHI:
+    throw EmulationViolation{ "Reading word from DSP register" };
+  default:
+    if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
+    {
+      throw EmulationViolation{ "Reading word from DSP RAM" };
+    }
+    else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
+    {
+      throw EmulationViolation{ "Reading word from DSP ROM" };
+    }
+    else
+    {
+      throw Ex{ "Jerry::writeLongExternal: Unhandled address " } << std::hex << address;
+    }
+    break;
   }
-  else
+
+  return 0;
+}
+
+uint32_t Jerry::readLong( uint32_t address ) const
+{
+  assert( ( address & 0xff0000 ) == 0xf10000 );
+  assert( ( address & 3 ) == 0 );
+
+  switch ( address )
   {
-    throw Ex{} << "Jerry::io: Unhandled read ack";
+  case JPIT1:
+  case JPIT3:
+  case J_INT:
+  case JOYSTICK:
+  case SCLK:
+  case SMODE:
+  case L_I2S:
+  case R_I2S:
+  case ASICLK:
+  case ASICTRL:
+  case ASIDATA:
+    return ( (uint32_t)readWord( address ) << 16 ) | readWord( address + 2 );
+  case D_FLAGS:
+    mFlags.get();
+    break;
+  case D_MTXC:
+    return mMTXC;
+  case D_MTXA:
+    return mMTXA;
+  case D_END:
+    throw EmulationViolation{ "Reading D_END" };
+  case D_PC:
+    return mPC;
+  case D_CTRL:
+    return mCtrl.get();
+  case D_MOD:
+    return mMod;
+  case D_REMAIN:
+    return mRemain;
+  case D_MACHI:
+    return mMachi;
+  default:
+    if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
+    {
+      return std::byteswap( mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )] );
+    }
+    else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
+    {
+      throw Ex{ "TODO: Suppy DSP ROM" };
+    }
+    else
+    {
+      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
+    }
+    break;
+  }
+
+  return 0;
+}
+
+void Jerry::writeWord( uint32_t address, uint16_t data )
+{
+  assert( ( address & 0xff0000 ) == 0xf10000 );
+  assert( ( address & 1 ) == 0 );
+
+  switch ( address )
+  {
+  case JPIT1:
+    break;
+  case JPIT2:
+    break;
+  case JPIT3:
+    break;
+  case JPIT4:
+    break;
+  case J_INT:
+    mJIntCtrl.set( data );
+    break;
+  case J_INT + 2:
+    break;
+  case JOYSTICK:
+    break;
+  case JOYBUTS:
+    break;
+  case SCLK:
+    break;
+  case SMODE:
+    break;
+  case L_I2S:
+    break;
+  case R_I2S:
+    break;
+  case ASICLK:
+    break;
+  case ASICTRL:
+    break;
+  case ASIDATA:
+    break;
+  case D_FLAGS:
+  case D_MTXC:
+  case D_MTXA:
+  case D_END:
+  case D_PC:
+  case D_CTRL:
+  case D_MOD:
+  case D_DIVCTRL:
+  case D_MACHI:
+    throw EmulationViolation{ "Writing word to DSP register" };
+  default:
+    if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
+    {
+      throw EmulationViolation{ "Writing word to DSP RAM" };
+    }
+    else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
+    {
+      throw EmulationViolation{ "Writing to DSP ROM" };
+    }
+    else
+    {
+      throw Ex{ "Jerry::writeLongExternal: Unhandled address " } << std::hex << address;
+    }
+    break;
   }
 }
 
-void Jerry::ackRead( uint16_t value )
+void Jerry::writeLong( uint32_t address, uint32_t data )
 {
-  assert( mBusGate );
-  assert( mBusGate.getSize() == 2 );
-  assert( mBusGate.getAddress() <= 0xffffff );
-  assert( mBusGate.getReg() <= 0x1f );
+  assert( ( address & 0xff0000 ) == 0xf10000 );
+  assert( ( address & 3 ) == 0 );
 
-  if ( portWriteDst( mBusGate.getReg(), std::byteswap( value ) ) )
+  switch ( address )
   {
-    mLog->loadWord( mBusGate.getAddress(), mPortWriteDstData );
-    busGatePop();
-  }
-  else
-  {
-    throw Ex{} << "Jerry::io: Unhandled read ack";
+  case JPIT1:
+  case JPIT3:
+  case J_INT:
+  case JOYSTICK:
+  case SCLK:
+  case SMODE:
+  case L_I2S:
+  case R_I2S:
+  case ASICLK:
+  case ASICTRL:
+  case ASIDATA:
+    writeWord( address, data >> 16 );
+    writeWord( address + 2, data & 0xffff );
+    break;
+  case D_FLAGS:
+    flagsSet( data );
+    break;
+  case D_MTXC:
+    mMTXC = data;
+    break;
+  case D_MTXA:
+    mMTXA = data;
+    break;
+  case D_END:
+    if ( ( data & 1 ) == 0 )
+      throw Ex{ "DSP I/O set to unsupported little endian" };
+    if ( ( data & 4 ) == 0 )
+      throw Ex{ "DSP instruction fetch set to unsupported little endian" };
+    break;
+  case D_PC:
+    if ( data < RAM_BASE || data >= RAM_BASE + RAM_SIZE )
+      throw Ex{ "Jerry unsupported PC " } << std::hex << data;
+    mPC = data;
+    break;
+  case D_CTRL:
+    ctrlSet( data );
+    break;
+  case D_MOD:
+    mMod = data;
+    break;
+  case D_DIVCTRL:
+    mDivCtrl = data;
+    break;
+  case D_MACHI:
+    throw EmulationViolation{ "Writing RO DSP D_MACHI register" };
+  default:
+    if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
+    {
+      mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )] = std::byteswap( data );
+    }
+    else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
+    {
+      throw EmulationViolation{ "Writing to DSP rom" };
+    }
+    else
+    {
+      throw Ex{ "Jerry::writeLongExternal: Unhandled address " } << std::hex << address;
+    }
+    break;
   }
 }
-
-void Jerry::ackRead( uint8_t value )
-{
-  assert( mBusGate );
-  assert( mBusGate.getSize() == 1 );
-  assert( mBusGate.getAddress() <= 0xffffff );
-  assert( mBusGate.getReg() <= 0x1f );
-
-  if ( portWriteDst( mBusGate.getReg(), value ) ) 
-  {
-    mLog->loadLong( mBusGate.getAddress(), mPortWriteDstData );
-    busGatePop();
-  }
-  else
-  {
-    throw Ex{} << "Jerry::io: Unhandled read ack";
-  }
-}
-
 
 void Jerry::storeByte( uint32_t address, uint8_t data )
 {
-  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+  if ( ( address & 0x00ff0000 ) != 0x00f10000 )
   {
-    throw EmulationViolation{ "Writing a byte to internal memory" };
+    busGatePush( AdvanceResult::writeByte( address, data ) );
   }
   else
   {
-    busGatePush( AdvanceResult::writeByte( address, std::byteswap( ( uint32_t )data ) ) );
+    mLog->warnMemoryAccess();
+    int shift = ( 3 - ( address & 3 ) ) * 8;
+    writeLong( address & 0xfffffc, data << shift );
+    mStageIO.state = StageIO::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    mLog->storeLong( address, data );
   }
 }
 
 void Jerry::storeWord( uint32_t address, uint16_t data )
 {
-  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+  if ( ( address & 0x00ff0000 ) != 0x00f10000 )
   {
-    throw EmulationViolation{ "Writing a word to internal memory" };
+    busGatePush( AdvanceResult::writeWord( address, data ) );
   }
   else
   {
-    busGatePush( AdvanceResult::writeWord( address, std::byteswap( ( uint32_t )data ) ) );
+    mLog->warnMemoryAccess();
+    int shift = ( ( address & 1 ) ^ 1 ) * 16;
+    writeLong( address & 0xfffffc, data << shift );
+    mStageIO.state = StageIO::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    mLog->storeLong( address, data );
   }
 }
 
 void Jerry::storeLong( uint32_t address, uint32_t data )
 {
-  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+  if ( ( address & 0x00ff0000 ) != 0x00f10000 )
   {
-    if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
-    {
-      mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )] = std::byteswap( data );
-    }
-    else switch ( address )
-    {
-    case D_FLAGS:
-      throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
-      break;
-    case D_MTXC:
-      mMTXC = data;
-      break;
-    case D_MTXA:
-      mMTXA = data;
-      break;
-    case D_END:
-      if ( ( data & 1 ) == 0 )
-        throw Ex{ "DSP I/O set to unsupported little endian" };
-      if ( ( data & 4 ) == 0 )
-        throw Ex{ "DSP instruction fetch set to unsupported little endian" };
-      break;
-    case D_PC:
-      mPC = data;
-      break;
-    case D_CTRL:
-      mCtrl.value = data;
-      break;
-    case D_MOD:
-      mMod = data;
-      break;
-    case D_DIVCTRL:
-      mDivCtrl = data;
-      break;
-    case D_MACHI:
-      throw EmulationViolation{ "Writing RO register D_MACHI" };
-    default:
-      throw Ex{ "Jerry::writeLong: Unhandled address " } << std::hex << address;
-    }
-    mStageIO.state = StageIO::IDLE;
-    mLastLocalRAMAccessCycle = mCycle;
-    mLog->storeLong( address, data );
+    busGatePush( AdvanceResult::writeLong( address, data ) );
   }
   else
   {
-    busGatePush( AdvanceResult::writeLong( address, std::byteswap( data ) ) );
+    writeLong( address, data );
+    mStageIO.state = StageIO::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    mLog->storeLong( address, data );
   }
 }
 
 void Jerry::loadByte( uint32_t address, uint32_t reg )
 {
-  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
+  if ( ( address & 0x00ff0000 ) != 0x00f10000 )
+  {
+    busGatePush( AdvanceResult::readByte( address, reg ) );
+  }
+  else
   {
     mLog->warnMemoryAccess();
-    return loadLong( address, reg );
-  }
+    int shift = ( 3 - ( address & 3 ) ) * 8;
 
-  busGatePush( AdvanceResult::readByte( address, reg ) );
-}
-
-void Jerry::loadWord( uint32_t address, uint32_t reg )
-{
-  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
-  {
-    mLog->warnMemoryAccess();
-    return loadLong( address, reg );
-  }
-
-  busGatePush( AdvanceResult::readShort( address, reg ) );
-}
-
-void Jerry::loadLong( uint32_t address, uint32_t reg )
-{
-  if ( address >= JERRY_BASE && address < JERRY_BASE + JERRY_SIZE )
-  {
     mStageWrite.regFlags.reg = reg;
-    if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
-    {
-      mStageWrite.data = std::byteswap( mLocalRAM[( address - RAM_BASE ) / sizeof( uint32_t )] );
-    }
-    else switch ( address )
-    {
-    case D_FLAGS:
-      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
-      break;
-    case D_MTXC:
-      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
-      break;
-    case D_MTXA:
-      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
-      break;
-    case D_END:
-      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
-      break;
-    case D_PC:
-      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
-    case D_CTRL:
-      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
-      break;
-    case D_MOD:
-      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
-      break;
-    case D_DIVCTRL:
-      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
-      break;
-    case D_MACHI:
-      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
-      break;
-    default:
-      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
-    }
-
+    mStageWrite.data = readLong( address & 0xfffffc ) << shift;
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
     mLog->loadLong( address, mStageWrite.data );
   }
+}
+
+void Jerry::loadWord( uint32_t address, uint32_t reg )
+{
+  if ( ( address & 0x00ff0000 ) != 0x00f10000 )
+  {
+    busGatePush( AdvanceResult::readShort( address, reg ) );
+  }
   else
+  {
+    mLog->warnMemoryAccess();
+    int shift = ( ( address & 1 ) ^ 1 ) * 16;
+
+    mStageWrite.regFlags.reg = reg;
+    mStageWrite.data = readLong( address & 0xfffffc ) << shift;
+    mStageIO.state = StageIO::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    mLog->loadLong( address, mStageWrite.data );
+  }
+}
+
+void Jerry::loadLong( uint32_t address, uint32_t reg )
+{
+  if ( ( address & 0x00ff0000 ) != 0x00f10000 )
   {
     busGatePush( AdvanceResult::readLong( address, reg ) );
   }
+  else
+  {
+    mStageWrite.regFlags.reg = reg;
+    mStageWrite.data = readLong( address );
+    mStageIO.state = StageIO::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    mLog->loadLong( address, mStageWrite.data );
+  }
+}
+
+void Jerry::halfCycle()
+{
+  io();
+  stageWrite();
+  compute();
+  stageRead();
+  decode();
+  prefetch();
 }
 
 bool Jerry::testCondition( uint32_t condition ) const
@@ -372,33 +538,33 @@ bool Jerry::testCondition( uint32_t condition ) const
   case 0x00:
     return true;
   case 0x01:
-    return ( mFlags.value & FLAGS::ZERO_FLAG ) == 0;
+    return !mFlags.z;
   case 0x02:
-    return ( mFlags.value & FLAGS::ZERO_FLAG ) == FLAGS::ZERO_FLAG;
+    return mFlags.z;
   case 0x04:
-    return ( mFlags.value & FLAGS::CARRY_FLAG ) == 0;
+    return !mFlags.c;
   case 0x05:
-    return ( mFlags.value & ( FLAGS::CARRY_FLAG | FLAGS::ZERO_FLAG ) ) == 0;
+    return !mFlags.c && !mFlags.z;
   case 0x06:
-    return ( mFlags.value & ( FLAGS::CARRY_FLAG | FLAGS::ZERO_FLAG ) ) == FLAGS::ZERO_FLAG;
+    return !mFlags.c && mFlags.z;
   case 0x08:
-    return ( mFlags.value & FLAGS::CARRY_FLAG ) == FLAGS::CARRY_FLAG;
+    return mFlags.c;
   case 0x09:
-    return ( mFlags.value & ( FLAGS::CARRY_FLAG | FLAGS::ZERO_FLAG ) ) == FLAGS::CARRY_FLAG;
+    return mFlags.c && !mFlags.z;
   case 0x0a:
-    return ( mFlags.value & ( FLAGS::CARRY_FLAG | FLAGS::ZERO_FLAG ) ) == ( FLAGS::CARRY_FLAG | FLAGS::ZERO_FLAG );
+    return mFlags.c && mFlags.z;
   case 0x14:
-    return ( mFlags.value & FLAGS::NEGA_FLAG ) == 0;
+    return !mFlags.n;
   case 0x15:
-    return ( mFlags.value & ( FLAGS::NEGA_FLAG | FLAGS::ZERO_FLAG ) ) == 0;
+    return !mFlags.n && !mFlags.z;
   case 0x16:
-    return ( mFlags.value & ( FLAGS::NEGA_FLAG | FLAGS::ZERO_FLAG ) ) == FLAGS::ZERO_FLAG;
+    return !mFlags.c && mFlags.z;
   case 0x18:
-    return ( mFlags.value & FLAGS::NEGA_FLAG ) == FLAGS::NEGA_FLAG;
+    return mFlags.n;
   case 0x19:
-    return ( mFlags.value & ( FLAGS::NEGA_FLAG | FLAGS::ZERO_FLAG ) ) == FLAGS::NEGA_FLAG;
+    return mFlags.n && !mFlags.z;
   case 0x1a:
-    return ( mFlags.value & ( FLAGS::NEGA_FLAG | FLAGS::ZERO_FLAG ) ) == ( FLAGS::NEGA_FLAG | FLAGS::ZERO_FLAG );
+    return mFlags.n && mFlags.z;
   case 0x1f:
     return false;
   default:
@@ -482,17 +648,20 @@ void Jerry::stageWrite()
 
   if ( mStageWrite.updateFlags )
   {
-    const uint32_t maskOut = ( mStageWrite.regFlags.z >= 0 ? ( FLAGS::ZERO_FLAG ) : 0 ) |
-      ( mStageWrite.regFlags.c >= 0 ? ( FLAGS::CARRY_FLAG ) : 0 ) |
-      ( mStageWrite.regFlags.n >= 0 ? ( FLAGS::NEGA_FLAG ) : 0 );
+    if ( mStageWrite.regFlags.z >= 0 )
+    {
+      mFlags.z = mStageWrite.regFlags.z > 0;
+    }
 
-    mFlags.value &= ~maskOut;
+    if ( mStageWrite.regFlags.c >= 0 )
+    {
+      mFlags.c = mStageWrite.regFlags.c > 0;
+    }
 
-    const uint32_t maskIn = ( mStageWrite.regFlags.z > 0 ? ( FLAGS::ZERO_FLAG ) : 0 ) |
-      ( mStageWrite.regFlags.c > 0 ? ( FLAGS::CARRY_FLAG ) : 0 ) |
-      ( mStageWrite.regFlags.n > 0 ? ( FLAGS::NEGA_FLAG ) : 0 );
-
-    mFlags.value |= maskIn;
+    if ( mStageWrite.regFlags.n >= 0 )
+    {
+      mFlags.n = mStageWrite.regFlags.n > 0;
+    }
 
     mStageWrite.regFlags = RegFlags();
     mStageWrite.updateFlags = false;
@@ -523,7 +692,7 @@ void Jerry::compute()
     if ( mStageWrite.regFlags.reg < 0 )
     {
       mStageWrite.regFlags.reg = mStageCompute.regDst;
-      mStageWrite.data = mStageCompute.dataSrc + mStageCompute.dataDst + ( mFlags.value & ( FLAGS::CARRY_FLAG >> 1 ) );
+      mStageWrite.data = mStageCompute.dataSrc + mStageCompute.dataDst + ( mFlags.c ? 1 : 0 );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.c = mStageWrite.data < mStageCompute.dataSrc ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
@@ -559,7 +728,7 @@ void Jerry::compute()
     if ( mStageWrite.regFlags.reg < 0 )
     {
       mStageWrite.regFlags.reg = mStageCompute.regDst;
-      uint64_t res = (uint64_t)mStageCompute.dataDst + (uint64_t)( mStageCompute.dataSrc ^ 0xffffffff ) + (uint64_t)( ( mFlags.value & ( FLAGS::CARRY_FLAG >> 1 ) ) ^ 1 );
+      uint64_t res = (uint64_t)mStageCompute.dataDst + (uint64_t)( mStageCompute.dataSrc ^ 0xffffffff ) + (uint64_t)( mFlags.c ? 0 : 1 );
       mStageWrite.data = (uint32_t)res;
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.c = ( ( res >> 32 ) & 1 ) ^ 1;
@@ -1673,7 +1842,7 @@ void Jerry::decode()
 void Jerry::prefetch()
 {
   //Only local RAM for now
-  assert( mPC >= RAM_BASE && mPC < RAM_BASE + RAM_SIZE );
+  assert( ( mPC >= RAM_BASE ) && ( mPC < RAM_BASE + RAM_SIZE ) );
 
   if ( mLastLocalRAMAccessCycle != mCycle )
   {
@@ -1928,4 +2097,153 @@ void Jerry::busGatePop()
 {
   mBusGate = AdvanceResult::nop();
   mStageIO.state = StageIO::IDLE;
+}
+
+uint16_t Jerry::JINTCTRL::get() const
+{
+  return
+    extpend ? J_EXTENA : 0 |
+    dsppend ? J_DSPENA : 0 |
+    tim1pend ? J_TIM1ENA : 0 |
+    tim2pend ? J_TIM2ENA : 0 |
+    asynpend ? J_ASYNENA : 0 |
+    synpend ? J_SYNENA : 0;
+}
+
+void Jerry::JINTCTRL::set( uint16_t value )
+{
+  extena = ( value & J_EXTENA ) != 0;
+  dspena = ( value & J_DSPENA ) != 0;
+  tim1ena = ( value & J_TIM1ENA ) != 0;
+  tim2ena = ( value & J_TIM2ENA ) != 0;
+  asynena = ( value & J_ASYNENA ) != 0;
+  synena = ( value & J_SYNENA ) != 0;
+  extpend &= ( value & J_EXTCLR ) == 0;
+  dsppend &= ( value & J_DSPCLR ) == 0;
+  tim1pend &= ( value & J_TIM1CLR ) == 0;
+  tim2pend &= ( value & J_TIM2CLR ) == 0;
+  asynpend &= ( value & J_ASYNCLR ) == 0;
+  synpend &= ( value & J_SYNCLR ) == 0;
+}
+
+uint16_t Jerry::CTRL::get() const
+{
+  return
+    0x00002000 |  //version
+    ( dspgo ? DSPGO : 0 ) |
+    ( cpulat ? D_CPULAT : 0 ) |
+    ( i2slat ? D_I2SLAT : 0 ) |
+    ( tim1lat ? D_TIM1LAT : 0 ) |
+    ( tim2lat ? D_TIM2LAT : 0 ) |
+    ( ext0lat ? D_EXT0LAT : 0 ) |
+    ( ext1lat ? D_EXT1LAT : 0 );
+}
+
+void Jerry::ctrlSet( uint16_t value )
+{
+  mCtrl.dspgo = ( value & CTRL::DSPGO ) != 0;
+
+  if ( value & CTRL::CPUINT )
+    cpuint();
+
+  if ( value & CTRL::FORCEINT0 )
+    forceint0();
+
+  if ( value & ( CTRL::SINGLE_STEP | CTRL::SINGLE_GO ) )
+    throw Ex{ "Single step not implemented" };
+
+  if ( value & CTRL::BUS_HOG )
+    throw EmulationViolation{ "DSP Bus hog triggered" };
+}
+
+void Jerry::flagsSet( uint16_t value )
+{
+  mFlags.z = ( value & FLAGS::ZERO_FLAG ) != 0;
+  mFlags.c = ( value & FLAGS::CARRY_FLAG ) != 0;
+  mFlags.n = ( value & FLAGS::NEGA_FLAG ) != 0;
+  mFlags.imask &= ( value & FLAGS::IMASK ) == 0;
+  mFlags.cpuena = ( value & FLAGS::D_CPUENA ) != 0;
+  mFlags.i2sena = ( value & FLAGS::D_I2SENA ) != 0;
+  mFlags.tim1ena = ( value & FLAGS::D_TIM1ENA ) != 0;
+  mFlags.tim2ena = ( value & FLAGS::D_TIM2ENA ) != 0;
+  mFlags.ext0ena = ( value & FLAGS::D_EXT0ENA ) != 0;
+  mFlags.ext1ena = ( value & FLAGS::D_EXT1ENA ) != 0;
+  mCtrl.cpulat &= ( value & FLAGS::D_CPUCLR ) == 0;
+  mCtrl.i2slat &= ( value & FLAGS::D_I2SCLR ) == 0;
+  mCtrl.tim1lat &= ( value & FLAGS::D_TIM1CLR ) == 0;
+  mCtrl.tim2lat &= ( value & FLAGS::D_TIM2CLR ) == 0;
+  mCtrl.ext0lat &= ( value & FLAGS::D_EXT0CLR ) == 0;
+  mCtrl.ext1lat &= ( value & FLAGS::D_EXT1CLR ) == 0;
+  mFlags.regpage = ( value & FLAGS::REGPAGE ) != 0;
+
+  if ( value & FLAGS::DMAEN )
+    throw EmulationViolation{ "DSP DMAEN triggered" };
+
+  mRegisterFile = ( mFlags.regpage && !mFlags.imask ) ? 32 : 0;
+}
+
+bool Jerry::doInt( uint32_t mask )
+{
+  assert( std::has_single_bit( mask ) );
+
+  if ( ( mask & FLAGS::D_I2SENA ) != 0 && !mFlags.i2sena )
+    return false;
+  else
+    mCtrl.i2slat = true;
+
+  if ( ( mask & FLAGS::D_TIM1ENA ) != 0 && !mFlags.tim1ena )
+    return false;
+  else
+    mCtrl.tim1lat = true;
+
+  if ( ( mask & FLAGS::D_TIM2ENA ) != 0 && !mFlags.tim2ena )
+    return false;
+  else
+    mCtrl.tim2lat = true;
+
+  if ( ( mask & FLAGS::D_CPUENA ) != 0 && !mFlags.cpuena )
+    return false;
+  else
+    mCtrl.cpulat = true;
+
+  if ( ( mask & FLAGS::D_EXT0ENA ) != 0 && !mFlags.ext0ena )
+    return false;
+  else
+    mCtrl.ext0lat = true;
+
+  if ( ( mask & FLAGS::D_EXT1ENA ) != 0 && !mFlags.ext1ena )
+    return false;
+  else
+    mCtrl.ext1lat = true;
+
+  mFlags.imask = true;
+  mRegisterFile = 0;
+
+  return true;
+}
+
+void Jerry::cpuint()
+{
+  throw Ex{ "No CPU at the moment" };
+}
+
+void Jerry::forceint0()
+{
+  doInt( FLAGS::D_CPUENA );
+}
+
+uint16_t Jerry::FLAGS::get() const
+{
+  return
+    z ? ZERO_FLAG : 0 |
+    c ? CARRY_FLAG : 0 |
+    n ? NEGA_FLAG : 0 |
+    imask ? IMASK : 0 |
+    cpuena ? D_CPUENA : 0 |
+    i2sena ? D_I2SENA : 0 |
+    tim1ena ? D_TIM1ENA : 0 |
+    tim2ena ? D_TIM2ENA : 0 |
+    ext0ena ? D_EXT0ENA : 0 |
+    ext1ena ? D_EXT1ENA : 0 |
+    regpage ? REGPAGE : 0;
 }

@@ -548,7 +548,7 @@ void PipelineLog::flush()
 
 void PipelineLog::init()
 {
-  sprintf( mBuffer, "                       |                       |                           |         |              |                    \n" );
+  sprintf( mBuffer, "                       |                       |                           |         |              |                     \n" );
 }
 
 char const* PipelineLog::prefetchDSPMapper( uint32_t code )

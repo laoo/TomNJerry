@@ -28,83 +28,51 @@ int main( int argc, char const* argv[] )
     
 
     jerry.debugWrite( input.address(), input.data() );
-    jerry.debugWrite( Jerry::D_PC, input.address() );
-    jerry.debugWrite( Jerry::D_CTRL, Jerry::CTRL::DSPGO );
+    jerry.busCycleRequestWriteLong( Jerry::D_PC, input.address() );
+    jerry.busCycleRequestWriteLong( Jerry::D_CTRL, Jerry::CTRL::DSPGO );
 
     const uint64_t cycles = options.cycles();
 
-    AdvanceResult result = AdvanceResult::nop();
+    AdvanceResult req = AdvanceResult::nop();
     for ( uint64_t i = 0; i < cycles; ++i )
     {
-      switch ( result.getOperation() )
+      switch ( i & 0x3 )
       {
-      case AdvanceResult::kByteFlag:
-        if ( ( i & LATENCY ) == 0 )
-        {
-          result = jerry.busCycleRead( ram.b( result.getAddress() ) );
-        }
-        else
-        {
-          result = jerry.busCycleIdle();
-        }
+      case 1:
+        req = jerry.busCycleGetRequest();
         break;
-      case AdvanceResult::kShortFlag:
-        if ( ( i & LATENCY ) == 0 )
+      case 3:
+        switch ( req.getOperation() )
         {
-          uint32_t addr = result.getAddress();
-          uint16_t value = ram.w( addr );
-          result = jerry.busCycleRead( value );
-        }
-        else
-        {
-          result = jerry.busCycleIdle();
-        }
-        break;
-      case AdvanceResult::kLongFlag:
-        if ( ( i & LATENCY ) == 0 )
-        {
-          result = jerry.busCycleRead( ram.l( result.getAddress() ) );
-        }
-        else
-        {
-          result = jerry.busCycleIdle();
-        }
-        break;
-      case AdvanceResult::kWriteFlag | AdvanceResult::kByteFlag:
-        if ( ( i & LATENCY ) == 0 )
-        {
-          ram.b()[result.getAddress()] = (uint8_t)result.getValue();
-          result = jerry.busCycleWrite();
-        }
-        else
-        {
-          result = jerry.busCycleIdle();
-        }
-        break;
-      case AdvanceResult::kWriteFlag | AdvanceResult::kShortFlag:
-        if ( ( i & LATENCY ) == 0 )
-        {
-          ram.w()[result.getAddress() >> 1] = ( uint16_t )result.getValue();
-          result = jerry.busCycleWrite();
-        }
-        else
-        {
-          result = jerry.busCycleIdle();
-        }
-        break;
-      case AdvanceResult::kWriteFlag | AdvanceResult::kLongFlag:
-        if ( ( i & LATENCY ) == 0 )
-        {
-          ram.l()[result.getAddress() >> 2] = result.getValue();
-          result = jerry.busCycleWrite();
-        }
-        else
-        {
-          result = jerry.busCycleIdle();
+        case AdvanceResult::kByteFlag:
+          jerry.busCycleAckReadByteRequest( ram.b( req.getAddress() ) );
+          break;
+        case AdvanceResult::kShortFlag:
+          {
+            uint32_t addr = req.getAddress();
+            uint16_t value = ram.w( addr );
+            jerry.busCycleAckReadWordRequest( value );
+          }
+          break;
+        case AdvanceResult::kLongFlag:
+          jerry.busCycleAckReadLongRequest( ram.l( req.getAddress() ) );
+          break;
+        case AdvanceResult::kWriteFlag | AdvanceResult::kByteFlag:
+          ram.b()[req.getAddress()] = ( uint8_t )req.getValue();
+          jerry.busCycleIdle();
+          break;
+        case AdvanceResult::kWriteFlag | AdvanceResult::kShortFlag:
+          ram.w()[req.getAddress() >> 1] = ( uint16_t )req.getValue();
+          jerry.busCycleIdle();
+          break;
+        case AdvanceResult::kWriteFlag | AdvanceResult::kLongFlag:
+          ram.l()[req.getAddress() >> 2] = req.getValue();
+          jerry.busCycleIdle();
+          break;
         }
         break;
       default:
-        result = jerry.busCycleIdle();
+        jerry.busCycleIdle();
         break;
       }
     }
