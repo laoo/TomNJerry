@@ -2,7 +2,7 @@
 #include "PipelineLog.hpp"
 #include "Ex.hpp"
 
-Jerry::Jerry() : mLog{ std::make_unique<PipelineLog>() }
+Jerry::Jerry( bool isNTSC, std::filesystem::path wavOut ) : mLog{ std::make_unique<PipelineLog>() }, mNTSC{ isNTSC }, mClock{ isNTSC ? 26590906u : 26593900u }, mWavOut{ wavOut }
 {
   std::ranges::fill( mRegStatus, FREE );
   std::ranges::fill( mRegs, 0 );
@@ -11,6 +11,11 @@ Jerry::Jerry() : mLog{ std::make_unique<PipelineLog>() }
 
 Jerry::~Jerry()
 {
+  if ( mWav )
+  {
+    wav_close( mWav );
+    mWav = nullptr;
+  }
 }
 
 void Jerry::debugWrite( uint32_t address, std::span<uint32_t const> data )
@@ -187,15 +192,15 @@ uint16_t Jerry::readWord( uint32_t address ) const
   case JOYSTICK:
     break;
   case JOYBUTS:
-    break;
+    return mNTSC ? 16 : 0;
   case SCLK:
-    break;
+    return 0;
   case SMODE:
-    break;
+    return 0;
   case L_I2S:
-    break;
+    return 0;
   case R_I2S:
-    break;
+    return 0;
   case ASICLK:
     break;
   case ASICTRL:
@@ -309,16 +314,27 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
   case J_INT + 2:
     break;
   case JOYSTICK:
+    mAudioEnabled = ( data & 0x100 ) != 0;
     break;
   case JOYBUTS:
     break;
   case SCLK:
     break;
+  case SCLK + 2:
+    mSCLK = data & 0xff;
+    reconfigureDAC();
+    break;
   case SMODE:
     break;
+  case SMODE + 2:
+    smodeSet( data );
+    reconfigureDAC();
+    break;
   case L_I2S:
+    mI2S.left = data;
     break;
   case R_I2S:
+    mI2S.right = data;
     break;
   case ASICLK:
     break;
@@ -633,6 +649,11 @@ void Jerry::io()
       break;
     default:
       break;
+  }
+
+  if ( mNextSampleCycle == mCycle && mAudioEnabled )
+  {
+    sample();
   }
 }
 
@@ -1449,7 +1470,7 @@ void Jerry::stageRead()
   case DSPI::DIV:
     if ( mDivideUnit.cycle <= 0 && portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
     {
-      if ( mDivideUnit.cycle == 0 && mDivideUnit.reg == mStageRead.regDst || mDivideUnit.reg == mStageRead.regSrc )
+      if ( mDivideUnit.cycle == 0 && ( mDivideUnit.reg == mStageRead.regDst || mDivideUnit.reg == mStageRead.regSrc ) )
         throw EmulationViolation{ "Two consecutive DIV instructions are too close to each other" };
 
       dualPortCommit();
@@ -1913,6 +1934,17 @@ std::pair<Jerry::Prefetch::PullStatus, uint16_t> Jerry::prefetchPull()
         mPrefetch.status = Prefetch::OPCODE;
         return { Prefetch::RESMAC, 0 };
       }
+    case Prefetch::INT0:
+      mPrefetch.status = Prefetch::INT1;
+      return { Prefetch::OPCODE, ( (uint16_t)DSPI::MOVEPC << 10 ) | 30 };
+    case Prefetch::INT1:
+      mPrefetch.status = Prefetch::INT2;
+      return { Prefetch::OPCODE, ( ( uint16_t )DSPI::SUBQ << 10 ) | ( 4 << 5 ) | 31 };
+    case Prefetch::INT2:
+      mPrefetch.status = Prefetch::OPCODE;
+      mPrefetch.queueSize = 0;
+      mPC = mInterruptVector;
+      return { Prefetch::OPCODE, ( ( uint16_t )DSPI::STORE << 10 ) | ( 31 << 5 ) | 30 };
     default:
       assert( false );
       return { Prefetch::EMPTY, 0 };
@@ -2125,12 +2157,7 @@ uint16_t Jerry::CTRL::get() const
   return
     0x00002000 |  //version
     ( dspgo ? DSPGO : 0 ) |
-    ( cpulat ? D_CPULAT : 0 ) |
-    ( i2slat ? D_I2SLAT : 0 ) |
-    ( tim1lat ? D_TIM1LAT : 0 ) |
-    ( tim2lat ? D_TIM2LAT : 0 ) |
-    ( ext0lat ? D_EXT0LAT : 0 ) |
-    ( ext1lat ? D_EXT1LAT : 0 );
+    intLatches;
 }
 
 void Jerry::ctrlSet( uint16_t value )
@@ -2162,58 +2189,101 @@ void Jerry::flagsSet( uint16_t value )
   mFlags.tim2ena = ( value & FLAGS::D_TIM2ENA ) != 0;
   mFlags.ext0ena = ( value & FLAGS::D_EXT0ENA ) != 0;
   mFlags.ext1ena = ( value & FLAGS::D_EXT1ENA ) != 0;
-  mCtrl.cpulat &= ( value & FLAGS::D_CPUCLR ) == 0;
-  mCtrl.i2slat &= ( value & FLAGS::D_I2SCLR ) == 0;
-  mCtrl.tim1lat &= ( value & FLAGS::D_TIM1CLR ) == 0;
-  mCtrl.tim2lat &= ( value & FLAGS::D_TIM2CLR ) == 0;
-  mCtrl.ext0lat &= ( value & FLAGS::D_EXT0CLR ) == 0;
-  mCtrl.ext1lat &= ( value & FLAGS::D_EXT1CLR ) == 0;
+  mCtrl.intLatches &= ( value & FLAGS::D_CPUCLR ) != 0 ? ~CTRL::D_CPULAT : 0xffff;
+  mCtrl.intLatches &= ( value & FLAGS::D_I2SCLR ) != 0 ? ~CTRL::D_I2SLAT : 0xffff;
+  mCtrl.intLatches &= ( value & FLAGS::D_TIM1CLR ) != 0 ? ~CTRL::D_TIM1LAT : 0xffff;
+  mCtrl.intLatches &= ( value & FLAGS::D_TIM2CLR ) != 0 ? ~CTRL::D_TIM2LAT : 0xffff;
+  mCtrl.intLatches &= ( value & FLAGS::D_EXT0CLR ) != 0 ? ~CTRL::D_EXT0LAT : 0xffff;
+  mCtrl.intLatches &= ( value & FLAGS::D_EXT1CLR ) != 0 ? ~CTRL::D_EXT1LAT : 0xffff;
   mFlags.regpage = ( value & FLAGS::REGPAGE ) != 0;
 
   if ( value & FLAGS::DMAEN )
     throw EmulationViolation{ "DSP DMAEN triggered" };
 
-  mRegisterFile = ( mFlags.regpage && !mFlags.imask ) ? 32 : 0;
+  mRegisterFile = mFlags.regpage ? 32 : 0;
+
+  if ( !mFlags.imask )
+    assertInt();
 }
 
-bool Jerry::doInt( uint32_t mask )
+void Jerry::smodeSet( uint16_t value )
 {
-  assert( std::has_single_bit( mask ) );
+  mSMODE.internal = ( value & StructSMODE::INTERNAL ) != 0;
+  mSMODE.wsen = ( value & StructSMODE::WSEN ) != 0;
+  mSMODE.rising = ( value & StructSMODE::RISING ) != 0;
+  mSMODE.falling = ( value & StructSMODE::FALLING ) != 0;
+  mSMODE.everyword = ( value & StructSMODE::EVERYWORD ) != 0;
+}
 
-  if ( ( mask & FLAGS::D_I2SENA ) != 0 && !mFlags.i2sena )
-    return false;
-  else
-    mCtrl.i2slat = true;
+void Jerry::doInt( uint32_t mask )
+{
+  if ( ( mask & FLAGS::D_I2SENA ) != 0 && mFlags.i2sena )
+    mCtrl.intLatches |= CTRL::D_I2SLAT;
 
-  if ( ( mask & FLAGS::D_TIM1ENA ) != 0 && !mFlags.tim1ena )
-    return false;
-  else
-    mCtrl.tim1lat = true;
+  if ( ( mask & FLAGS::D_TIM1ENA ) != 0 && mFlags.tim1ena )
+    mCtrl.intLatches |= CTRL::D_TIM1LAT;
 
-  if ( ( mask & FLAGS::D_TIM2ENA ) != 0 && !mFlags.tim2ena )
-    return false;
-  else
-    mCtrl.tim2lat = true;
+  if ( ( mask & FLAGS::D_TIM2ENA ) != 0 && mFlags.tim2ena )
+    mCtrl.intLatches |= CTRL::D_TIM2LAT;
 
-  if ( ( mask & FLAGS::D_CPUENA ) != 0 && !mFlags.cpuena )
-    return false;
-  else
-    mCtrl.cpulat = true;
+  if ( ( mask & FLAGS::D_CPUENA ) != 0 && mFlags.cpuena )
+    mCtrl.intLatches |= CTRL::D_CPULAT;
 
-  if ( ( mask & FLAGS::D_EXT0ENA ) != 0 && !mFlags.ext0ena )
-    return false;
-  else
-    mCtrl.ext0lat = true;
+  if ( ( mask & FLAGS::D_EXT0ENA ) != 0 && mFlags.ext0ena )
+    mCtrl.intLatches |= CTRL::D_EXT0LAT;
 
-  if ( ( mask & FLAGS::D_EXT1ENA ) != 0 && !mFlags.ext1ena )
-    return false;
+  if ( ( mask & FLAGS::D_EXT1ENA ) != 0 && mFlags.ext1ena )
+    mCtrl.intLatches |= CTRL::D_EXT1LAT;
+
+  if ( !mFlags.imask )
+    assertInt();
+}
+
+void Jerry::assertInt()
+{
+  if ( mCtrl.intLatches == 0 )
+    return;
+
+
+  if ( mCtrl.intLatches & CTRL::D_EXT1LAT )
+  {
+    mInterruptVector = RAM_BASE + 5 * 16;
+    mPrefetch.status = Prefetch::INT0;
+  }
+  else if ( mCtrl.intLatches & CTRL::D_EXT0LAT )
+  {
+    mInterruptVector = RAM_BASE + 4 * 16;
+    mPrefetch.status = Prefetch::INT0;
+  }
+  else if ( mCtrl.intLatches & CTRL::D_TIM2LAT )
+  {
+    mInterruptVector = RAM_BASE + 3 * 16;
+    mPrefetch.status = Prefetch::INT0;
+  }
+  else if ( mCtrl.intLatches & CTRL::D_TIM1LAT )
+  {
+    mInterruptVector = RAM_BASE + 2 * 16;
+    mPrefetch.status = Prefetch::INT0;
+  }
+  else if ( mCtrl.intLatches & CTRL::D_I2SLAT )
+  {
+    mInterruptVector = RAM_BASE + 1 * 16;
+    mPrefetch.status = Prefetch::INT0;
+  }
+  else if ( mCtrl.intLatches & CTRL::D_CPULAT )
+  {
+    mInterruptVector = RAM_BASE + 0 * 16;
+    mPrefetch.status = Prefetch::INT0;
+  }
   else
-    mCtrl.ext1lat = true;
+  {
+    assert( false );
+    mCtrl.intLatches = 0;
+    return;
+  }
 
   mFlags.imask = true;
   mRegisterFile = 0;
-
-  return true;
 }
 
 void Jerry::cpuint()
@@ -2224,6 +2294,43 @@ void Jerry::cpuint()
 void Jerry::forceint0()
 {
   doInt( FLAGS::D_CPUENA );
+}
+
+void Jerry::reconfigureDAC()
+{
+  if ( !mSMODE.internal || !mSMODE.wsen || mWavOut.empty() )
+    return;
+
+  if ( !mSMODE.rising || mSMODE.everyword || mSMODE.falling )
+    throw Ex{ "Only SMODE RISING supported" };
+
+  if ( mWav )
+  {
+    wav_close( mWav );
+  }
+
+  mWav = wav_open( mWavOut.string().c_str(), WAV_OPEN_WRITE );
+  if ( !mWav )
+  {
+    throw Ex{ "Failed to open " } << mWavOut;
+  }
+
+  mClocksPerSample = ( 64 * ( mSCLK + 1 ) );
+  mNextSampleCycle = mCycle + mClocksPerSample - mCycle % mClocksPerSample;
+
+  int serialClockFrequency = mClock / mClocksPerSample;
+
+  wav_set_format( mWav, WAV_FORMAT_PCM );
+  wav_set_num_channels( mWav, 2 );
+  wav_set_valid_bits_per_sample( mWav, 16 );
+  wav_set_sample_rate( mWav, serialClockFrequency );
+}
+
+void Jerry::sample()
+{
+  wav_write( mWav, &mI2S, 1 );
+  mNextSampleCycle += mClocksPerSample;
+  doInt( FLAGS::D_I2SENA );
 }
 
 uint16_t Jerry::FLAGS::get() const

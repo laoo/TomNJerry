@@ -7,7 +7,9 @@ ProgramOptions::ProgramOptions( char const* name, char const* desc, int argc, ch
   mOpt->add_options()
     ( "h,help", "produce help message" )
     ( "i,input", "input file, first implicit agrument", cxxopts::value<std::string>(), "input" )
+    ( "w,wav", "wave output file", cxxopts::value<std::string>(), "wav" )
     ( "c,cycles", "number of bus cycles to analyze", cxxopts::value<int>() )
+    ( "system", "PAL or NTSC", cxxopts::value<std::string>()->default_value("PAL") )
     ;
 
   mOpt->
@@ -45,7 +47,20 @@ ProgramOptions::ProgramOptions( char const* name, char const* desc, int argc, ch
     throw Ex{} << "Input file does not exist.\n";
   }
 
+  if ( mRes->count( "wav" ) )
+  {
+    mWavOut = std::filesystem::absolute( ( *mRes )["wav"].as<std::string>() );
+  }
+
   mInput = std::filesystem::absolute( input );
+
+  {
+    std::string const system = ( *mRes )["system"].as<std::string>();
+    if ( system != "PAL" && system != "NTSC" )
+    {
+      throw Ex{} << "Invalid system: " << system << "\n";
+    }
+  }
 }
 
 std::filesystem::path ProgramOptions::input() const
@@ -53,12 +68,17 @@ std::filesystem::path ProgramOptions::input() const
   return mInput;
 }
 
-std::filesystem::path ProgramOptions::output() const
+std::filesystem::path ProgramOptions::wavOut() const
 {
-  return mOutput;
+  return mWavOut;
 }
 
 int ProgramOptions::cycles() const
 {
   return mCycles;
+}
+
+bool ProgramOptions::isNTSC() const
+{
+  return ( *mRes )["system"].as<std::string>() == "NTSC";
 }

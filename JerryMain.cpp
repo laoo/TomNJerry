@@ -22,12 +22,13 @@ int main( int argc, char const* argv[] )
     ram.l( 0x20 - 8, std::byteswap( musicAddr ) );
     ram.l( 0x20 - 4, std::byteswap( bankAddr ) );
 
-    Jerry jerry;
+    Jerry jerry{ options.isNTSC(), options.wavOut() };
 
     static constexpr uint64_t LATENCY = 3;
     
 
     jerry.debugWrite( input.address(), input.data() );
+    jerry.busCycleRequestWriteLong( Jerry::JOYSTICK, 0x1000000 );
     jerry.busCycleRequestWriteLong( Jerry::D_PC, input.address() );
     jerry.busCycleRequestWriteLong( Jerry::D_CTRL, Jerry::CTRL::DSPGO );
 

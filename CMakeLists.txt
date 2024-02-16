@@ -20,6 +20,12 @@ add_executable( Jerry
   PipelineLog.cpp
   ProgramOptions.cpp
   RAM.cpp
+  wav.c
+)
+
+set_source_files_properties(wav.c PROPERTIES
+  SKIP_PRECOMPILE_HEADERS ON
+  COMPILE_DEFINITIONS "__LITTLE_ENDIAN__"
 )
 
 target_precompile_headers( Tom PRIVATE

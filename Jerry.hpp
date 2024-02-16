@@ -2,6 +2,7 @@
 #include "AdvanceResult.hpp"
 #include "Opcodes.hpp"
 #include "RegFlags.hpp"
+#include "wav.h"
 
 class PipelineLog;
 
@@ -101,13 +102,8 @@ public:
 
     uint16_t get() const;
 
+    uint32_t intLatches = 0;
     bool dspgo = false;
-    bool cpulat = false;
-    bool i2slat = false;
-    bool tim1lat = false;
-    bool tim2lat = false;
-    bool ext0lat = false;
-    bool ext1lat = false;
   };
 
   struct FLAGS
@@ -146,8 +142,24 @@ public:
     bool regpage = false;
   };
 
+  struct StructSMODE
+  {
+    static constexpr uint16_t INTERNAL  = 0b000001;
+    static constexpr uint16_t RESERVED  = 0b000010;
+    static constexpr uint16_t WSEN      = 0b000100;
+    static constexpr uint16_t RISING    = 0b001000;
+    static constexpr uint16_t FALLING   = 0b010000;
+    static constexpr uint16_t EVERYWORD = 0b100000;
 
-  Jerry();
+    bool internal = false;
+    bool wsen = false;
+    bool rising = false;
+    bool falling = false;
+    bool everyword = false;
+  };
+
+
+  Jerry( bool isNTSC, std::filesystem::path wavOut );
   ~Jerry();
 
   void debugWrite( uint32_t address, std::span<uint32_t const> data );
@@ -175,11 +187,16 @@ private:
 
   void ctrlSet( uint16_t value );
   void flagsSet( uint16_t value );
+  void smodeSet( uint16_t value );
 
-  bool doInt( uint32_t mask );
+  void doInt( uint32_t mask );
+  void assertInt();
 
   void cpuint();
   void forceint0();
+
+  void reconfigureDAC();
+  void sample();
 
 
 
@@ -193,7 +210,10 @@ private:
       MOVEI2,
       IMULTN,
       IMACN,
-      RESMAC
+      RESMAC,
+      INT0,
+      INT1,
+      INT2
     } status = OPCODE;
     uint64_t queue = 0;
     size_t queueSize = 0;
@@ -243,6 +263,16 @@ private:
 private:
 
   JINTCTRL mJIntCtrl = {};
+  uint16_t mSCLK = 0xffff;
+  StructSMODE mSMODE = {};
+
+  struct
+  {
+    uint16_t left = 0;
+    uint16_t right = 0;
+  } mI2S = {};
+
+  bool mAudioEnabled = false;
 
   uint32_t mMTXC = 0;
   uint32_t mMTXA = 0;
@@ -256,6 +286,7 @@ private:
 
   uint32_t mRegisterFile = 0;
   uint64_t mCycle = 0;
+  uint64_t mNextSampleCycle = ~0;
 
   Prefetch mPrefetch = {};
 
@@ -351,4 +382,10 @@ private:
   int mFlagsSemaphore = 0;
 
   std::unique_ptr<PipelineLog> mLog;
+  WavFile * mWav = nullptr;
+  bool mNTSC = false;
+  std::filesystem::path mWavOut;
+  uint32_t mClock = 0;
+  uint32_t mClocksPerSample = 0;
+  uint32_t mInterruptVector = 0;
 };

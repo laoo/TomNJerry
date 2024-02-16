@@ -16,14 +16,15 @@ public:
   ProgramOptions& operator=( ProgramOptions const& ) = delete;
 
   std::filesystem::path input() const;
-  std::filesystem::path output() const;
+  std::filesystem::path wavOut() const;
   int cycles() const;
+  bool isNTSC() const;
 
 private:
   std::shared_ptr<cxxopts::Options> mOpt;
   std::shared_ptr<cxxopts::ParseResult> mRes;
 
   std::filesystem::path mInput = {};
-  std::filesystem::path mOutput = {};
+  std::filesystem::path mWavOut = {};
   int mCycles = 0;
 };
