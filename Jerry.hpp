@@ -190,11 +190,15 @@ private:
   void smodeSet( uint16_t value );
 
   void doInt( uint32_t mask );
-  void assertInt();
+  void prioritizeInt();
+  void launchInt( int priority );
 
   void cpuint();
   void forceint0();
-
+  void checkInterrupt();
+  void setI2S( uint32_t period );
+  void setTimer1( uint32_t period );
+  void setTimer2( uint32_t period );
   void reconfigureDAC();
   void sample();
 
@@ -249,6 +253,7 @@ private:
   void stageWriteFlags();
   bool portWriteDst( uint32_t reg, uint32_t data );
   bool portReadSrc( uint32_t regSrc );
+  bool portReadSrcAlt( uint32_t regSrc );
   bool portReadDst( uint32_t regDst );
   void portReadDstAndHiddenCommit( uint32_t regDst ); //to be used with indexed addressing modes
   bool portReadBoth( uint32_t regSrc, uint32_t regDst );
@@ -286,7 +291,6 @@ private:
 
   uint32_t mRegisterFile = 0;
   uint64_t mCycle = 0;
-  uint64_t mNextSampleCycle = ~0;
 
   Prefetch mPrefetch = {};
 
@@ -342,6 +346,17 @@ private:
       uint32_t reg;
     };
   } mStageIO;
+
+  struct Interruptor
+  {
+    uint64_t cycleI2S = ~0;
+    uint64_t cycleTimer1 = ~0;
+    uint64_t cycleTimer2 = ~0;
+    uint64_t cycleMin = ~0;
+    uint32_t periodI2S = 0;
+    uint32_t periodTimer1 = 0;
+    uint32_t periodTimer2 = 0;
+  } mInterruptor;
 
   struct MACStage
   {

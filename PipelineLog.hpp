@@ -36,6 +36,7 @@ public:
   void loadWord( uint32_t address, uint16_t value );
   void loadByte( uint32_t address, uint8_t value );
   void warnMemoryAccess();
+  void tagUninterruptibleSequence();
   void flush();
 
 private:

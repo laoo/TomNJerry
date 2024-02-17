@@ -353,25 +353,25 @@ void PipelineLog::decodeMOVEI( int stage, uint32_t data )
     mBuffer[0x38 + sprintf( mBuffer + 0x38, "#%04x", data >> 16 )] = ' ';
   }
 
-  mBuffer[0x17] = ':';
+  tagUninterruptibleSequence();
 }
 
 void PipelineLog::decodeIMULTN( uint32_t reg, int width, int count )
 {
   mBuffer[0x19 + sprintf( mBuffer + 0x19, "imultn  r%02d%c,m+%d", reg + 32 + count / 2, count & 1 ? 'h' : 'l', width * count )] = ' ';
-  mBuffer[0x17] = ':';
+  tagUninterruptibleSequence();
 }
 
 void PipelineLog::decodeRESMAC( uint32_t reg2 )
 {
   mBuffer[0x19 + sprintf( mBuffer + 0x19, "resmac  r%02d", reg2 )] = ' ';
-  mBuffer[0x17] = ':';
+  tagUninterruptibleSequence();
 }
 
 void PipelineLog::decodeIMACN( uint32_t reg, int width, int count )
 {
   mBuffer[0x19 + sprintf( mBuffer + 0x19, "imacn   r%02d%c,m+%d", reg + 32 + count / 2, count & 1 ? 'h' : 'l', width * count )] = ' ';
-  mBuffer[0x17] = ':';
+  tagUninterruptibleSequence();
 }
 
 void PipelineLog::portImm( uint32_t value )
@@ -538,6 +538,11 @@ void PipelineLog::loadByte( uint32_t address, uint8_t value )
 void PipelineLog::warnMemoryAccess()
 {
   mBuffer[0x2f] = '!';
+}
+
+void PipelineLog::tagUninterruptibleSequence()
+{
+  mBuffer[0x17] = ':';
 }
 
 void PipelineLog::flush()

@@ -256,8 +256,7 @@ uint32_t Jerry::readLong( uint32_t address ) const
   case ASIDATA:
     return ( (uint32_t)readWord( address ) << 16 ) | readWord( address + 2 );
   case D_FLAGS:
-    mFlags.get();
-    break;
+    return mFlags.get();
   case D_MTXC:
     return mMTXC;
   case D_MTXA:
@@ -309,9 +308,9 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
   case JPIT4:
     break;
   case J_INT:
-    mJIntCtrl.set( data );
     break;
   case J_INT + 2:
+    mJIntCtrl.set( data );
     break;
   case JOYSTICK:
     mAudioEnabled = ( data & 0x100 ) != 0;
@@ -331,9 +330,13 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
     reconfigureDAC();
     break;
   case L_I2S:
+    break;
+  case L_I2S + 2:
     mI2S.left = data;
     break;
   case R_I2S:
+    break;
+  case R_I2S + 2:
     mI2S.right = data;
     break;
   case ASICLK:
@@ -651,10 +654,7 @@ void Jerry::io()
       break;
   }
 
-  if ( mNextSampleCycle == mCycle && mAudioEnabled )
-  {
-    sample();
-  }
+  checkInterrupt();
 }
 
 bool Jerry::stageWriteReg()
@@ -1391,6 +1391,20 @@ void Jerry::stageRead()
     break;
   case DSPI::IMULTN:
   case DSPI::IMACN:
+    //TODO: make instruction after either of these atomic
+    if ( portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
+    {
+      dualPortCommit();
+      mFlagsSemaphore += 1;
+      std::swap( mStageRead.instruction, mStageCompute.instruction );
+      mStageCompute.dataSrc = mStageRead.dataSrc;
+      mStageCompute.dataDst = mStageRead.dataDst;
+    }
+    else
+    {
+      dualPortCommit();
+    }
+    break;
   case DSPI::CMP:
     if ( portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
     {
@@ -1452,7 +1466,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MOVEFA:
-    if ( mStageWrite.canUpdateReg() && portReadSrc( ( mStageRead.regSrc + mRegisterFile + 32 ) & 63 ) )
+    if ( mStageWrite.canUpdateReg() && portReadSrcAlt( mStageRead.regSrc ) )
     {
       if ( mRegStatus[mStageRead.regDst] != FREE )
         throw EmulationViolation{ "MOVEFA writes to a register in use" };
@@ -1513,7 +1527,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() && portReadSrc( mStageRead.regSrc ) )
     {
       dualPortCommit();
-      mStageWrite.updateReg( ( mStageRead.regDst + mRegisterFile + 32 ) & 63, mStageRead.dataSrc );
+      mStageWrite.updateReg( mStageRead.regDst + 32, mStageRead.dataSrc );
       mStageRead.instruction = DSPI::EMPTY;
     }
     else
@@ -1917,7 +1931,7 @@ std::pair<Jerry::Prefetch::PullStatus, uint16_t> Jerry::prefetchPull()
       mPrefetch.queueSize -= 1;
       return { Prefetch::MOVEI1, result };
     case Prefetch::MOVEI2:
-      mPrefetch.status = Prefetch::OPCODE;
+      mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
       mPrefetch.queue >>= 16;
       mPrefetch.queueSize -= 1;
       return { Prefetch::MOVEI2, result };
@@ -1931,19 +1945,23 @@ std::pair<Jerry::Prefetch::PullStatus, uint16_t> Jerry::prefetchPull()
       }
       else
       {
-        mPrefetch.status = Prefetch::OPCODE;
+        mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
         return { Prefetch::RESMAC, 0 };
       }
     case Prefetch::INT0:
       mPrefetch.status = Prefetch::INT1;
+      mLog->tagUninterruptibleSequence();
       return { Prefetch::OPCODE, ( (uint16_t)DSPI::MOVEPC << 10 ) | 30 };
     case Prefetch::INT1:
       mPrefetch.status = Prefetch::INT2;
+      mLog->tagUninterruptibleSequence();
       return { Prefetch::OPCODE, ( ( uint16_t )DSPI::SUBQ << 10 ) | ( 4 << 5 ) | 31 };
     case Prefetch::INT2:
       mPrefetch.status = Prefetch::OPCODE;
-      mPrefetch.queueSize = 0;
+      mLog->tagUninterruptibleSequence();
       mPC = mInterruptVector;
+      mInterruptVector = 0;
+      mPrefetch.queueSize = 0;
       return { Prefetch::OPCODE, ( ( uint16_t )DSPI::STORE << 10 ) | ( 31 << 5 ) | 30 };
     default:
       assert( false );
@@ -2007,6 +2025,18 @@ bool Jerry::portReadSrc( uint32_t regSrc )
     return false;
 
   mPortReadSrcReg = regSrc;
+
+  return true;
+}
+
+bool Jerry::portReadSrcAlt( uint32_t regSrc )
+{
+  assert( regSrc >= 0 );
+
+  if ( mPortReadSrcReg >= 0 )
+    return false;
+
+  mPortReadSrcReg = regSrc + 32;
 
   return true;
 }
@@ -2095,8 +2125,9 @@ void Jerry::dualPortCommit()
 
   if ( mPortReadDstReg >= 0 )
   {
-    mStageRead.dataDst = mRegs[(mRegisterFile + mPortReadDstReg)&63];
-    mLog->portReadDst( ( mRegisterFile + mPortReadDstReg ) & 63, mStageRead.dataDst );
+    assert( mPortReadDstReg < 0x20 );
+    mStageRead.dataDst = mRegs[mRegisterFile + mPortReadDstReg];
+    mLog->portReadDst( mRegisterFile + mPortReadDstReg, mStageRead.dataDst );
     mPortReadDstReg = -1;
   }
 }
@@ -2128,12 +2159,12 @@ void Jerry::busGatePop()
 uint16_t Jerry::JINTCTRL::get() const
 {
   return
-    extpend ? J_EXTENA : 0 |
-    dsppend ? J_DSPENA : 0 |
-    tim1pend ? J_TIM1ENA : 0 |
-    tim2pend ? J_TIM2ENA : 0 |
-    asynpend ? J_ASYNENA : 0 |
-    synpend ? J_SYNENA : 0;
+    ( extpend ? J_EXTENA : 0 ) |
+    ( dsppend ? J_DSPENA : 0 ) |
+    ( tim1pend ? J_TIM1ENA : 0 ) |
+    ( tim2pend ? J_TIM2ENA : 0 ) |
+    ( asynpend ? J_ASYNENA : 0 ) |
+    ( synpend ? J_SYNENA : 0 );
 }
 
 void Jerry::JINTCTRL::set( uint16_t value )
@@ -2203,7 +2234,7 @@ void Jerry::flagsSet( uint16_t value )
   mRegisterFile = mFlags.regpage ? 32 : 0;
 
   if ( !mFlags.imask )
-    assertInt();
+    prioritizeInt();
 }
 
 void Jerry::smodeSet( uint16_t value )
@@ -2236,44 +2267,37 @@ void Jerry::doInt( uint32_t mask )
     mCtrl.intLatches |= CTRL::D_EXT1LAT;
 
   if ( !mFlags.imask )
-    assertInt();
+    prioritizeInt();
 }
 
-void Jerry::assertInt()
+void Jerry::prioritizeInt()
 {
   if ( mCtrl.intLatches == 0 )
     return;
 
-
   if ( mCtrl.intLatches & CTRL::D_EXT1LAT )
   {
-    mInterruptVector = RAM_BASE + 5 * 16;
-    mPrefetch.status = Prefetch::INT0;
+    launchInt( 5 );
   }
   else if ( mCtrl.intLatches & CTRL::D_EXT0LAT )
   {
-    mInterruptVector = RAM_BASE + 4 * 16;
-    mPrefetch.status = Prefetch::INT0;
+    launchInt( 4 );
   }
   else if ( mCtrl.intLatches & CTRL::D_TIM2LAT )
   {
-    mInterruptVector = RAM_BASE + 3 * 16;
-    mPrefetch.status = Prefetch::INT0;
+    launchInt( 3 );
   }
   else if ( mCtrl.intLatches & CTRL::D_TIM1LAT )
   {
-    mInterruptVector = RAM_BASE + 2 * 16;
-    mPrefetch.status = Prefetch::INT0;
+    launchInt( 2 );
   }
   else if ( mCtrl.intLatches & CTRL::D_I2SLAT )
   {
-    mInterruptVector = RAM_BASE + 1 * 16;
-    mPrefetch.status = Prefetch::INT0;
+    launchInt( 1 );
   }
   else if ( mCtrl.intLatches & CTRL::D_CPULAT )
   {
-    mInterruptVector = RAM_BASE + 0 * 16;
-    mPrefetch.status = Prefetch::INT0;
+    launchInt( 0 );
   }
   else
   {
@@ -2286,6 +2310,15 @@ void Jerry::assertInt()
   mRegisterFile = 0;
 }
 
+void Jerry::launchInt( int priority )
+{
+  mInterruptVector = RAM_BASE + priority * 16;
+  //when status isn't OPCODE it means that we are in the middle of an uninterruptible sequence
+  //the transition to OPCODE will set it to INT0 when the interrupt vector is not 0
+  if ( mPrefetch.status == Prefetch::OPCODE )
+    mPrefetch.status = Prefetch::INT0;
+}
+
 void Jerry::cpuint()
 {
   throw Ex{ "No CPU at the moment" };
@@ -2294,6 +2327,54 @@ void Jerry::cpuint()
 void Jerry::forceint0()
 {
   doInt( FLAGS::D_CPUENA );
+}
+
+void Jerry::checkInterrupt()
+{
+  if ( mCycle < mInterruptor.cycleMin )
+    return;
+
+  if ( mInterruptor.cycleMin == mInterruptor.cycleI2S )
+  {
+    sample();
+    mInterruptor.cycleI2S += mInterruptor.periodI2S;
+  }
+  if ( mInterruptor.cycleMin == mInterruptor.cycleTimer1 )
+  {
+    doInt( FLAGS::D_TIM1ENA );
+    mInterruptor.cycleTimer1 += mInterruptor.periodTimer1;
+  }
+  if ( mInterruptor.cycleMin == mInterruptor.cycleTimer2 )
+  {
+    doInt( FLAGS::D_TIM2ENA );
+    mInterruptor.cycleTimer2 += mInterruptor.periodTimer2;
+  }
+
+  mInterruptor.cycleMin = std::min( std::min( mInterruptor.cycleI2S, mInterruptor.cycleTimer1 ), mInterruptor.cycleTimer2 );
+}
+
+void Jerry::setI2S( uint32_t period )
+{
+  mInterruptor.periodI2S = period;
+  mInterruptor.cycleI2S = mCycle + period - mCycle % period;
+  if ( mInterruptor.cycleI2S < mInterruptor.cycleMin )
+    mInterruptor.cycleMin = mInterruptor.cycleI2S;
+}
+
+void Jerry::setTimer1( uint32_t period )
+{
+  mInterruptor.periodTimer1 = period;
+  mInterruptor.cycleTimer1 = mCycle + period - mCycle % period;
+  if ( mInterruptor.cycleTimer1 < mInterruptor.cycleMin )
+    mInterruptor.cycleMin = mInterruptor.cycleTimer1;
+}
+
+void Jerry::setTimer2( uint32_t period )
+{
+  mInterruptor.periodTimer2 = period;
+  mInterruptor.cycleTimer2 = mCycle + period - mCycle % period;
+  if ( mInterruptor.cycleTimer2 < mInterruptor.cycleMin )
+    mInterruptor.cycleMin = mInterruptor.cycleTimer2;
 }
 
 void Jerry::reconfigureDAC()
@@ -2315,38 +2396,39 @@ void Jerry::reconfigureDAC()
     throw Ex{ "Failed to open " } << mWavOut;
   }
 
-  mClocksPerSample = ( 64 * ( mSCLK + 1 ) );
-  mNextSampleCycle = mCycle + mClocksPerSample - mCycle % mClocksPerSample;
+  int period  = ( 64 * ( mSCLK + 1 ) );
 
-  int serialClockFrequency = mClock / mClocksPerSample;
+  int serialClockFrequency = mClock / period;
 
   wav_set_format( mWav, WAV_FORMAT_PCM );
   wav_set_num_channels( mWav, 2 );
   wav_set_valid_bits_per_sample( mWav, 16 );
   wav_set_sample_rate( mWav, serialClockFrequency );
+
+  setI2S( period );
 }
 
 void Jerry::sample()
 {
-  wav_write( mWav, &mI2S, 1 );
-  mNextSampleCycle += mClocksPerSample;
+  if ( mAudioEnabled )
+    wav_write( mWav, &mI2S, 1 );
   doInt( FLAGS::D_I2SENA );
 }
 
 uint16_t Jerry::FLAGS::get() const
 {
   return
-    z ? ZERO_FLAG : 0 |
-    c ? CARRY_FLAG : 0 |
-    n ? NEGA_FLAG : 0 |
-    imask ? IMASK : 0 |
-    cpuena ? D_CPUENA : 0 |
-    i2sena ? D_I2SENA : 0 |
-    tim1ena ? D_TIM1ENA : 0 |
-    tim2ena ? D_TIM2ENA : 0 |
-    ext0ena ? D_EXT0ENA : 0 |
-    ext1ena ? D_EXT1ENA : 0 |
-    regpage ? REGPAGE : 0;
+    ( z ? ZERO_FLAG : 0 ) |
+    ( c ? CARRY_FLAG : 0 ) |
+    ( n ? NEGA_FLAG : 0 ) |
+    ( imask ? IMASK : 0 ) |
+    ( cpuena ? D_CPUENA : 0 ) |
+    ( i2sena ? D_I2SENA : 0 ) |
+    ( tim1ena ? D_TIM1ENA : 0 ) |
+    ( tim2ena ? D_TIM2ENA : 0 ) |
+    ( ext0ena ? D_EXT0ENA : 0 ) |
+    ( ext1ena ? D_EXT1ENA : 0 ) |
+    ( regpage ? REGPAGE : 0 );
 }
 
 void Jerry::StageWrite::updateReg( uint32_t reg, uint32_t value )
