@@ -2281,18 +2281,22 @@ void Jerry::prioritizeInt()
   }
   else if ( mCtrl.intLatches & CTRL::D_EXT0LAT )
   {
+    mJIntCtrl.extpend = mJIntCtrl.extena;
     launchInt( 4 );
   }
   else if ( mCtrl.intLatches & CTRL::D_TIM2LAT )
   {
+    mJIntCtrl.tim2pend = mJIntCtrl.tim2ena;
     launchInt( 3 );
   }
   else if ( mCtrl.intLatches & CTRL::D_TIM1LAT )
   {
+    mJIntCtrl.tim1pend = mJIntCtrl.tim1ena;
     launchInt( 2 );
   }
   else if ( mCtrl.intLatches & CTRL::D_I2SLAT )
   {
+    mJIntCtrl.synpend = mJIntCtrl.synena;
     launchInt( 1 );
   }
   else if ( mCtrl.intLatches & CTRL::D_CPULAT )
@@ -2321,6 +2325,7 @@ void Jerry::launchInt( int priority )
 
 void Jerry::cpuint()
 {
+  mJIntCtrl.dsppend = mJIntCtrl.dspena;
   throw Ex{ "No CPU at the moment" };
 }
 

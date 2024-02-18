@@ -17,6 +17,17 @@ public:
 
   static constexpr uint32_t J_INT     = 0xF10020;   //Jerry Interrupt control( to TOM )
 
+  static constexpr uint32_t ASIDATA   = 0xF10030;   //Asynchronous Data Register
+  static constexpr uint32_t ASICTRL   = 0xF10032;   //Asynchronous Control Register
+  static constexpr uint32_t ASISTAT   = 0xF10032;   //Asynchronous Status Register
+  static constexpr uint32_t ASICLK    = 0xF10034;   //Asynchronous Clock Register
+
+  static constexpr uint32_t JPIT1R    = 0xF10036;   //Timer 1 Pre - Scaler
+  static constexpr uint32_t JPIT2R    = 0xF10038;   //Timer 1 Divider
+  static constexpr uint32_t JPIT3R    = 0xF1003a;   //Timer 2 Pre - Scaler
+  static constexpr uint32_t JPIT4R    = 0xF1003c;   //Timer 2 Divider
+
+
   static constexpr uint32_t JOYSTICK  = 0xF14000;   //Joystick register and mute
   static constexpr uint32_t JOYBUTS   = 0xF14002;   //Joystick register
   static constexpr uint32_t CONFIG    = 0xF14002;   //Also has NTSC / PAL
@@ -27,10 +38,6 @@ public:
   static constexpr uint32_t L_I2S     = 0xF1A148;   //I2S Serial Interface
   static constexpr uint32_t R_I2S     = 0xF1A14C;   //I2S Serial Interface
 
-  static constexpr uint32_t ASICLK    = 0xF10034;   //Asynchronous Clock Register
-  static constexpr uint32_t ASICTRL   = 0xF10032;   //Asynchronous Control Register
-  static constexpr uint32_t ASISTAT   = 0xF10032;   //Asynchronous Status Register
-  static constexpr uint32_t ASIDATA   = 0xF10030;   //Asynchronous Data Register
 
   static constexpr uint32_t D_FLAGS   = 0xF1A100;   //DSP Flags
   static constexpr uint32_t D_MTXC    = 0xF1A104;   //DSP Matrix Control
