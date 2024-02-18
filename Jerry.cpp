@@ -303,17 +303,21 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
   switch ( address )
   {
   case JPIT1:
+    mJPIT1 = data;
     break;
   case JPIT2:
+    mJPIT2 = data;
     break;
   case JPIT3:
+    mJPIT3 = data;
     break;
   case JPIT4:
+    mJPIT4 = data;
     break;
   case J_INT:
+    mJIntCtrl.set( data );
     break;
   case J_INT + 2:
-    mJIntCtrl.set( data );
     break;
   case JOYSTICK:
     mJoystick.setJoy( data );
@@ -333,20 +337,26 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
   case SMODE + 2:
     break;
   case L_I2S:
-    break;
-  case L_I2S + 2:
     mI2S.left = data;
     break;
-  case R_I2S:
+  case L_I2S + 2:
     break;
-  case R_I2S + 2:
+  case R_I2S:
     mI2S.right = data;
     break;
-  case ASICLK:
+  case R_I2S + 2:
+    break;
+  case ASIDATA:
     break;
   case ASICTRL:
     break;
-  case ASIDATA:
+  case ASICLK:
+    break;
+  case JPIT1R:
+  case JPIT2R:
+  case JPIT3R:
+  case JPIT4R:
+    throw Ex{ "Reading PIT Not implemented yet" };
     break;
   case D_FLAGS:
   case D_MTXC:
@@ -383,18 +393,30 @@ void Jerry::writeLong( uint32_t address, uint32_t data )
   switch ( address )
   {
   case JPIT1:
+    mJPIT1 = data >> 16;
+    mJPIT2 = data & 0xffff;
+    reconfigureTimer1();
+    break;
   case JPIT3:
+    mJPIT3 = data >> 16;
+    mJPIT4 = data & 0xffff;
+    reconfigureTimer2();
+    break;
   case J_INT:
+    mJIntCtrl.set( data );
+    break;
   case L_I2S:
+    mI2S.left = data;
+    break;
   case R_I2S:
+    mI2S.right = data;
+    break;
   case ASICLK:
   case ASICTRL:
   case ASIDATA:
-    writeWord( address, data >> 16 );
-    writeWord( address + 2, data & 0xffff );
     break;
   case JOYSTICK:
-    mJIntCtrl.set( data );
+    mJoystick.set( data );
     break;
   case SCLK:
     mSCLK = data & 0xff;
@@ -512,7 +534,7 @@ void Jerry::loadByte( uint32_t address, uint32_t reg )
     mLog->warnMemoryAccess();
     int shift = ( 3 - ( address & 3 ) ) * 8;
 
-    mStageWrite.updateReg( reg, readLong( address & 0xfffffc ) << shift );
+    mStageWrite.updateRegL( reg, readLong( address & 0xfffffc ) << shift );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
     mLog->loadLong( address, mStageWrite.data );
@@ -530,7 +552,7 @@ void Jerry::loadWord( uint32_t address, uint32_t reg )
     mLog->warnMemoryAccess();
     int shift = ( ( address & 1 ) ^ 1 ) * 16;
 
-    mStageWrite.updateReg( reg, readLong( address & 0xfffffc ) << shift );
+    mStageWrite.updateRegL( reg, readLong( address & 0xfffffc ) << shift );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
     mLog->loadLong( address, mStageWrite.data );
@@ -545,7 +567,7 @@ void Jerry::loadLong( uint32_t address, uint32_t reg )
   }
   else
   {
-    mStageWrite.updateReg( reg, readLong( address ) );
+    mStageWrite.updateRegL( reg, readLong( address ) );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
     mLog->loadLong( address, mStageWrite.data );
@@ -676,6 +698,13 @@ bool Jerry::stageWriteReg()
   return portWriteDst( mStageWrite.regFlags.reg, mStageWrite.data );
 }
 
+bool Jerry::stageWriteRegL()
+{
+  assert( mStageWrite.regL >= 0 );
+
+  return portWriteDst( mStageWrite.regL, mStageWrite.dataL );
+}
+
 void Jerry::stageWriteFlags()
 {
   if ( mStageWrite.regFlags.z >= 0 )
@@ -700,6 +729,31 @@ void Jerry::stageWriteFlags()
   assert( mFlagsSemaphore >= 0 );
 }
 
+void Jerry::stageWriteFlagsL()
+{
+  if ( mStageWrite.regFlags.z >= 0 )
+  {
+    mFlags.z = mStageWrite.regFlags.z > 0;
+  }
+
+  if ( mStageWrite.regFlags.c >= 0 )
+  {
+    mFlags.c = mStageWrite.regFlags.c > 0;
+  }
+
+  if ( mStageWrite.regFlags.n >= 0 )
+  {
+    mFlags.n = mStageWrite.regFlags.n > 0;
+  }
+
+  auto reg = mStageWrite.regFlags.reg;
+  mStageWrite.regFlags = RegFlags();
+  mStageWrite.regFlags.reg = reg;
+
+  mFlagsSemaphore -= 1;
+  assert( mFlagsSemaphore >= 0 );
+}
+
 void Jerry::stageWrite()
 {
   switch ( mStageWrite.updateMask )
@@ -714,6 +768,20 @@ void Jerry::stageWrite()
   case ( StageWrite::UPDATE_REG | StageWrite::UPDATE_FLAGS ):
     mStageWrite.updateMask = stageWriteReg() ? StageWrite::UPDATE_NONE : StageWrite::UPDATE_REG;
     stageWriteFlags();
+    break;
+  case ( StageWrite::UPDATE_REG_L ):
+    mStageWrite.updateMask = stageWriteRegL() ? StageWrite::UPDATE_NONE : StageWrite::UPDATE_REG_L;
+    break;
+  case ( StageWrite::UPDATE_REG_L | StageWrite::UPDATE_REG ):
+    mStageWrite.updateMask = stageWriteRegL() ? StageWrite::UPDATE_REG : StageWrite::UPDATE_REG_L;
+    break;
+  case ( StageWrite::UPDATE_REG_L | StageWrite::UPDATE_FLAGS ):
+    mStageWrite.updateMask = stageWriteRegL() ? StageWrite::UPDATE_NONE : StageWrite::UPDATE_REG_L;
+    stageWriteFlags();
+    break;
+  case ( StageWrite::UPDATE_REG_L | StageWrite::UPDATE_REG | StageWrite::UPDATE_FLAGS ):
+    mStageWrite.updateMask = stageWriteRegL() ? StageWrite::UPDATE_REG : StageWrite::UPDATE_REG_L;
+    stageWriteFlagsL();
     break;
   default:
     break;
@@ -1262,7 +1330,7 @@ void Jerry::stageRead()
     {
       dualPortCommit();
       mFlagsSemaphore += 1;
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
       mStageCompute.dataSrc = mStageRead.dataSrc;
@@ -1279,7 +1347,7 @@ void Jerry::stageRead()
     {
       dualPortCommit();
       mFlagsSemaphore += 1;
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
       mStageCompute.dataSrc = mStageRead.dataSrc;
@@ -1299,7 +1367,7 @@ void Jerry::stageRead()
       dualPortCommit();
       mLog->portImm( mStageRead.regSrc );
       mFlagsSemaphore += 1;
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
       mStageCompute.dataSrc = tabAddSubQ[ mStageRead.regSrc];
@@ -1320,7 +1388,7 @@ void Jerry::stageRead()
       dualPortCommit();
       mLog->portImm( mStageRead.regSrc );
       mFlagsSemaphore += 1;
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
       mStageCompute.dataSrc = mStageRead.regSrc;
@@ -1337,7 +1405,7 @@ void Jerry::stageRead()
       dualPortCommit();
       mLog->portImm( 32 - mStageRead.regSrc );
       mFlagsSemaphore += 1;
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
       mStageCompute.dataSrc = mStageRead.regSrc;
@@ -1358,7 +1426,7 @@ void Jerry::stageRead()
     {
       dualPortCommit();
       mFlagsSemaphore += 1;
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
       mStageCompute.dataDst = mStageRead.dataDst;
@@ -1374,7 +1442,7 @@ void Jerry::stageRead()
     {
       dualPortCommit();
       mLog->portImm( mStageRead.regSrc );
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
       mStageCompute.dataSrc = tabAddSubQ[mStageRead.regSrc];
@@ -1453,7 +1521,7 @@ void Jerry::stageRead()
         throw EmulationViolation{ "RESMAC writes to a register in use" };
       dualPortCommit();
       mStageWrite.updateReg( mStageRead.regDst, ( uint32_t )mMacStage.acc );
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
     }
     else
@@ -1469,7 +1537,7 @@ void Jerry::stageRead()
       dualPortCommit();
       mLog->portImm( mStageRead.regSrc );
       mStageWrite.updateReg( mStageRead.regDst, mStageRead.regSrc );
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
     }
     else
@@ -1485,7 +1553,7 @@ void Jerry::stageRead()
 
       dualPortCommit();
       mStageWrite.updateReg( mStageRead.regDst, mStageRead.dataSrc );
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
     }
     else
@@ -1500,7 +1568,7 @@ void Jerry::stageRead()
         throw EmulationViolation{ "Two consecutive DIV instructions are too close to each other" };
 
       dualPortCommit();
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
       mDivideUnit.cycle = 16;
       mDivideUnit.reg = mStageRead.regDst;
@@ -1527,7 +1595,7 @@ void Jerry::stageRead()
 
       dualPortCommit();
       mStageWrite.updateReg( mStageRead.regDst, mStageRead.dataSrc );
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
     }
     else
@@ -1553,7 +1621,7 @@ void Jerry::stageRead()
       if ( mRegStatus[mStageRead.regDst] != FREE )
         throw EmulationViolation{ "MOVEI writes to a register in use" };
       dualPortCommit();
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
     }
     else
@@ -1565,7 +1633,7 @@ void Jerry::stageRead()
     if ( mStageIO.state == StageIO::IDLE && portReadSrc( mStageRead.regSrc ) )
     {
       dualPortCommit();
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
       mStageIO.state = StageIO::LOAD_BYTE;
       mStageIO.address = mStageRead.dataSrc;
@@ -1580,7 +1648,7 @@ void Jerry::stageRead()
     if ( mStageIO.state == StageIO::IDLE && portReadSrc( mStageRead.regSrc ) )
     {
       dualPortCommit();
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
       mStageIO.state = StageIO::LOAD_WORD;
       mStageIO.address = mStageRead.dataSrc;
@@ -1595,7 +1663,7 @@ void Jerry::stageRead()
     if ( mStageIO.state == StageIO::IDLE && portReadSrc( mStageRead.regSrc ) )
     {
       dualPortCommit();
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
       mStageIO.state = StageIO::LOAD_LONG;
       mStageIO.address = mStageRead.dataSrc;
@@ -1610,7 +1678,7 @@ void Jerry::stageRead()
     if ( portReadBoth( 14, mStageRead.regSrc ) )
     {
       dualPortCommit();
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
       mStageCompute.regSrc = mStageRead.regDst;     //register to store to
@@ -1625,7 +1693,7 @@ void Jerry::stageRead()
     if ( portReadBoth( 15, mStageRead.regSrc ) )
     {
       dualPortCommit();
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
       mStageCompute.regSrc = mStageRead.regDst;     //register to store to
@@ -1640,7 +1708,7 @@ void Jerry::stageRead()
     if ( portReadSrc( 14 ) )
     {
       dualPortCommit();
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
       mStageCompute.regSrc = mStageRead.regDst;     //register to store
@@ -1655,7 +1723,7 @@ void Jerry::stageRead()
     if ( portReadSrc( 15 ) )
     {
       dualPortCommit();
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
       mStageCompute.regSrc = mStageRead.regDst;     //register to store
@@ -1771,7 +1839,7 @@ void Jerry::stageRead()
         throw EmulationViolation{ "MOVE PC writes to a register in use" };
       dualPortCommit();
       mStageWrite.updateReg( mStageRead.regDst, mPC - ( mPrefetch.queueSize + 1 ) * 2 );
-      mRegStatus[mStageRead.regDst] = LOCKED;
+      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
     }
     else
@@ -1941,11 +2009,13 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
       mPrefetch.status = Prefetch::MOVEI2;
       mPrefetch.queue <<= 16;
       mPrefetch.queueSize -= 1;
+      mPrefetch.queuedAddress += 2;
       return { Prefetch::MOVEI1, 0, result };
     case Prefetch::MOVEI2:
       mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
       mPrefetch.queue <<= 16;
       mPrefetch.queueSize -= 1;
+      mPrefetch.queuedAddress += 2;
       return { Prefetch::MOVEI2, 0, result };
     case Prefetch::IMULTN:
       mPrefetch.status = Prefetch::IMACN;
@@ -1963,18 +2033,18 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
     case Prefetch::INT0:
       mPrefetch.status = Prefetch::INT1;
       mLog->tagUninterruptibleSequence();
-      return { Prefetch::OPCODE, ( mPrefetch.queuedAddress += 2 ) - 2, ( (uint16_t)DSPI::MOVEPC << 10 ) | 30 };
+      return { Prefetch::OPCODE, 0, ( (uint16_t)DSPI::MOVEPC << 10 ) | 30 };
     case Prefetch::INT1:
       mPrefetch.status = Prefetch::INT2;
       mLog->tagUninterruptibleSequence();
-      return { Prefetch::OPCODE, ( mPrefetch.queuedAddress += 2 ) - 2, ( ( uint16_t )DSPI::SUBQ << 10 ) | ( 4 << 5 ) | 31 };
+      return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::SUBQ << 10 ) | ( 4 << 5 ) | 31 };
     case Prefetch::INT2:
       mPrefetch.status = Prefetch::OPCODE;
       mLog->tagUninterruptibleSequence();
       mPC = mInterruptVector;
       mInterruptVector = 0;
       mPrefetch.queueSize = 0;
-      return { Prefetch::OPCODE, ( mPrefetch.queuedAddress += 2 ) - 2, ( ( uint16_t )DSPI::STORE << 10 ) | ( 31 << 5 ) | 30 };
+      return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::STORE << 10 ) | ( 31 << 5 ) | 30 };
     default:
       assert( false );
       return { Prefetch::EMPTY, 0, 0 };
@@ -2134,6 +2204,10 @@ void Jerry::dualPortCommit()
 {
   if ( mPortWriteDstReg >= 0 )
   {
+    if ( mPortWriteDstReg == 18 )
+    {
+      int k = 0;
+    }
     if ( mPortWriteDstReg < 0x20 )
       mRegStatus[mPortWriteDstReg] = FREE;
     mRegs[(mRegisterFile + mPortWriteDstReg)&63] = mPortWriteDstData;
@@ -2155,6 +2229,21 @@ void Jerry::dualPortCommit()
     mLog->portReadDst( mRegisterFile + mPortReadDstReg, mStageRead.dataDst );
     mPortReadDstReg = -1;
   }
+}
+
+void Jerry::lockReg( uint32_t reg )
+{
+  static int cnt = 0;
+  assert( mRegStatus[reg] == FREE );
+  if ( reg == 18 )
+  {
+    cnt += 1;
+    if ( cnt == 7 )
+    {
+      int k = 0;
+    }
+  }
+  mRegStatus[reg] = LOCKED;
 }
 
 void Jerry::dualPortCommitMMULT( bool high )
@@ -2238,7 +2327,7 @@ void Jerry::flagsSet( uint16_t value )
   mFlags.z = ( value & FLAGS::ZERO_FLAG ) != 0;
   mFlags.c = ( value & FLAGS::CARRY_FLAG ) != 0;
   mFlags.n = ( value & FLAGS::NEGA_FLAG ) != 0;
-  mFlags.imask &= ( value & FLAGS::IMASK ) == 0;
+  mFlags.imask &= ( value & FLAGS::IMASK ) != 0;
   mFlags.cpuena = ( value & FLAGS::D_CPUENA ) != 0;
   mFlags.i2sena = ( value & FLAGS::D_I2SENA ) != 0;
   mFlags.tim1ena = ( value & FLAGS::D_TIM1ENA ) != 0;
@@ -2438,6 +2527,18 @@ void Jerry::reconfigureDAC()
   setI2S( period );
 }
 
+void Jerry::reconfigureTimer1()
+{
+  int period = ( mJPIT1 + 1 ) * ( mJPIT2 + 1 );
+  setTimer1( period );
+}
+
+void Jerry::reconfigureTimer2()
+{
+  int period = ( mJPIT3 + 1 ) * ( mJPIT4 + 1 );
+  setTimer2( period );
+}
+
 void Jerry::sample()
 {
   if ( mJoystick.audioEnable )
@@ -2466,6 +2567,13 @@ void Jerry::StageWrite::updateReg( uint32_t reg, uint32_t value )
   updateMask |= UPDATE_REG;
   regFlags.reg = reg;
   data = value;
+}
+
+void Jerry::StageWrite::updateRegL( uint32_t reg, uint32_t data )
+{
+  updateMask |= UPDATE_REG_L;
+  regL = reg;
+  dataL = data;
 }
 
 

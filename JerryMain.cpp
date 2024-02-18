@@ -28,7 +28,7 @@ int main( int argc, char const* argv[] )
     
 
     jerry.debugWrite( input.address(), input.data() );
-    //jerry.busCycleRequestWriteLong( Jerry::JOYSTICK, 0x1000000 );
+    jerry.busCycleRequestWriteLong( Jerry::JOYSTICK, 0x1000000 );
     jerry.busCycleRequestWriteLong( Jerry::D_FLAGS, Jerry::FLAGS::REGPAGE );
     jerry.busCycleRequestWriteLong( Jerry::D_PC, input.address() );
     jerry.busCycleRequestWriteLong( Jerry::D_CTRL, Jerry::CTRL::DSPGO );

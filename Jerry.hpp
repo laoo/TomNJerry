@@ -220,6 +220,8 @@ private:
   void setTimer1( uint32_t period );
   void setTimer2( uint32_t period );
   void reconfigureDAC();
+  void reconfigureTimer1();
+  void reconfigureTimer2();
   void sample();
 
   struct Prefetch
@@ -300,7 +302,9 @@ private:
   void prefetch();
 
   bool stageWriteReg();
+  bool stageWriteRegL();
   void stageWriteFlags();
+  void stageWriteFlagsL();
   bool portWriteDst( uint32_t reg, uint32_t data );
   bool portReadSrc( uint32_t regSrc );
   bool portReadSrcAlt( uint32_t regSrc );
@@ -308,6 +312,7 @@ private:
   void portReadDstAndHiddenCommit( uint32_t regDst ); //to be used with indexed addressing modes
   bool portReadBoth( uint32_t regSrc, uint32_t regDst );
   void dualPortCommit();
+  void lockReg( uint32_t reg );
   void dualPortCommitMMULT( bool high );
   void busGatePush( AdvanceResult result );
   void busGatePop();
@@ -370,12 +375,16 @@ private:
     static const uint32_t UPDATE_NONE   = 0x00;
     static const uint32_t UPDATE_REG    = 0x01;
     static const uint32_t UPDATE_FLAGS  = 0x02;
+    static const uint32_t UPDATE_REG_L  = 0x04;
 
     uint32_t updateMask = UPDATE_NONE;
     RegFlags regFlags = {};
     uint32_t data = 0;
+    uint32_t regL = {};
+    uint32_t dataL = {};
 
     void updateReg( uint32_t reg, uint32_t data );
+    void updateRegL( uint32_t reg, uint32_t data );
     bool canUpdateReg() const;
 
   } mStageWrite = {};
