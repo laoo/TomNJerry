@@ -560,6 +560,7 @@ void Jerry::halfCycle()
   stageRead();
   decode();
   prefetch();
+  mCycle += 1;
 }
 
 bool Jerry::testCondition( uint32_t condition ) const
@@ -1843,22 +1844,24 @@ void Jerry::decode()
   if ( mStageRead.instruction != DSPI::EMPTY )
     return;
 
-  auto [pullStatus, opcode] = prefetchPull();
+  auto pull = prefetchPull();
 
-  switch ( pullStatus )
+  switch ( pull.status() )
   {
   case Prefetch::OPCODE:
-    mStageRead.instruction = ( DSPI )( opcode >> 10 );
-    mStageRead.regSrc = ( opcode >> 5 ) & 0x1f;
-    mStageRead.regDst = opcode & 0x1f;
+    mStageRead.instruction = pull.opcode();
+    mStageRead.regSrc = pull.regSrc();
+    mStageRead.regDst = pull.regDst();
     mLog->decodeDSP( mStageRead.instruction, mStageRead.regSrc, mStageRead.regDst );
+    if ( auto addr = pull.address() )
+      mLog->instrAddr( addr );
     break;
   case Prefetch::MOVEI1:
-    mStageRead.dataSrc = ( uint16_t )opcode;
+    mStageRead.dataSrc = pull.data();
     mLog->decodeMOVEI( 0, mStageRead.dataSrc );
     break;
   case Prefetch::MOVEI2:
-    mStageRead.dataSrc |= ( uint32_t )opcode << 16;
+    mStageRead.dataSrc |= pull.data() << 16;
     mStageWrite.updateReg( mStageRead.regDst, mStageRead.dataSrc );
     mLog->decodeMOVEI( 1, mStageRead.dataSrc );
     break;
@@ -1886,27 +1889,25 @@ void Jerry::prefetch()
 
   if ( mLastLocalRAMAccessCycle != mCycle )
   {
-    assert( ( mPC & 1 ) == 0 );
-    uint32_t code = std::byteswap( mLocalRAM[( mPC - RAM_BASE )>>2] );
-    uint32_t off = prefetchPush( code, mPC & 2 );
-
-    if ( off )
+    if ( mPrefetch.queueSize < 4 )
     {
-      mLog->prefetch( mPC, code );
-      mLastLocalRAMAccessCycle = mCycle;
-      mPC += off;
+      if ( int off = prefetchFill() )
+      {
+        mLog->prefetch( mPC );
+        mLastLocalRAMAccessCycle = mCycle;
+        mPC += off;
+      }
     }
   }
 
-  mCycle += 1;
   mLog->flush();
 }
 
-std::pair<Jerry::Prefetch::PullStatus, uint16_t> Jerry::prefetchPull()
+Jerry::Prefetch::Pull Jerry::prefetchPull()
 {
   if ( mPrefetch.queueSize > 0 )
   {
-    uint16_t result = mPrefetch.queue & 0xffff;
+    uint16_t result = mPrefetch.queue >> 48;
 
     switch ( mPrefetch.status )
     {
@@ -1933,85 +1934,98 @@ std::pair<Jerry::Prefetch::PullStatus, uint16_t> Jerry::prefetchPull()
       default:
         break;
       }
-      mPrefetch.queue >>= 16;
+      mPrefetch.queue <<= 16;
       mPrefetch.queueSize -= 1;
-      return { Prefetch::OPCODE, result };
+      return { Prefetch::OPCODE, ( mPrefetch.queuedAddress += 2 ) - 2, result };
     case Prefetch::MOVEI1:
       mPrefetch.status = Prefetch::MOVEI2;
-      mPrefetch.queue >>= 16;
+      mPrefetch.queue <<= 16;
       mPrefetch.queueSize -= 1;
-      return { Prefetch::MOVEI1, result };
+      return { Prefetch::MOVEI1, 0, result };
     case Prefetch::MOVEI2:
       mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
-      mPrefetch.queue >>= 16;
+      mPrefetch.queue <<= 16;
       mPrefetch.queueSize -= 1;
-      return { Prefetch::MOVEI2, result };
+      return { Prefetch::MOVEI2, 0, result };
     case Prefetch::IMULTN:
       mPrefetch.status = Prefetch::IMACN;
-      return { Prefetch::IMULTN, 0 };
+      return { Prefetch::IMULTN, 0, 0 };
     case Prefetch::IMACN:
       if ( mMacStage.cnt < mMacStage.size )
       {
-        return { Prefetch::IMACN, 0 };
+        return { Prefetch::IMACN, 0, 0 };
       }
       else
       {
         mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
-        return { Prefetch::RESMAC, 0 };
+        return { Prefetch::RESMAC, 0, 0 };
       }
     case Prefetch::INT0:
       mPrefetch.status = Prefetch::INT1;
       mLog->tagUninterruptibleSequence();
-      return { Prefetch::OPCODE, ( (uint16_t)DSPI::MOVEPC << 10 ) | 30 };
+      return { Prefetch::OPCODE, ( mPrefetch.queuedAddress += 2 ) - 2, ( (uint16_t)DSPI::MOVEPC << 10 ) | 30 };
     case Prefetch::INT1:
       mPrefetch.status = Prefetch::INT2;
       mLog->tagUninterruptibleSequence();
-      return { Prefetch::OPCODE, ( ( uint16_t )DSPI::SUBQ << 10 ) | ( 4 << 5 ) | 31 };
+      return { Prefetch::OPCODE, ( mPrefetch.queuedAddress += 2 ) - 2, ( ( uint16_t )DSPI::SUBQ << 10 ) | ( 4 << 5 ) | 31 };
     case Prefetch::INT2:
       mPrefetch.status = Prefetch::OPCODE;
       mLog->tagUninterruptibleSequence();
       mPC = mInterruptVector;
       mInterruptVector = 0;
       mPrefetch.queueSize = 0;
-      return { Prefetch::OPCODE, ( ( uint16_t )DSPI::STORE << 10 ) | ( 31 << 5 ) | 30 };
+      return { Prefetch::OPCODE, ( mPrefetch.queuedAddress += 2 ) - 2, ( ( uint16_t )DSPI::STORE << 10 ) | ( 31 << 5 ) | 30 };
     default:
       assert( false );
-      return { Prefetch::EMPTY, 0 };
+      return { Prefetch::EMPTY, 0, 0 };
     }
   }
   else
   {
-    return { Prefetch::EMPTY, 0 };
+    return { Prefetch::EMPTY, 0, 0 };
   }
 }
 
-uint32_t Jerry::prefetchPush( uint32_t value, uint32_t oddWord )
+int Jerry::prefetchFill()
 {
   static constexpr std::array<uint64_t, 4> mask = {
     0x0000000000000000,
-    0x000000000000ffff,
-    0x00000000ffffffff,
-    0x0000ffffffffffff
+    0xffff000000000000,
+    0xffffffff00000000,
+    0xffffffffffff0000
   };
 
-  if ( oddWord && mPrefetch.queueSize <= 3 )
+  assert( mPrefetch.queueSize < 4 );
+  assert( ( mPC & 1 ) == 0 );
+
+  if ( mPrefetch.queueSize == 0 )
   {
+    mPrefetch.queuedAddress = mPC;
+  }
+
+  if ( mPC & 2 )
+  {
+    auto pCode = ( uint16_t const* )mLocalRAM.data() + ( ( mPC - RAM_BASE ) >> 1 );
+
+    //fetching word from odd address
     mPrefetch.queue &= mask[mPrefetch.queueSize];
-    mPrefetch.queue |= ( uint64_t )( value & 0xffff ) << ( mPrefetch.queueSize * 16 );
+    mPrefetch.queue |= ( uint64_t )std::byteswap( *pCode ) << ( 48 - mPrefetch.queueSize * 16 );
     mPrefetch.queueSize += 1;
     return 2;
   }
-  else if ( mPrefetch.queueSize <= 2 )
+  else if ( mPrefetch.queueSize < 3 )
   {
+    auto pCode = ( uint16_t const* )mLocalRAM.data() + ( ( mPC - RAM_BASE ) >> 1 );
+
     mPrefetch.queue &= mask[mPrefetch.queueSize];
-    mPrefetch.queue |= ( uint64_t )( ( value >> 16 ) | ( value << 16 ) ) << ( mPrefetch.queueSize * 16 );
+    mPrefetch.queue |= ( uint64_t )std::byteswap( pCode[0] ) << ( 48 - mPrefetch.queueSize * 16 );
+    mPrefetch.queue |= ( uint64_t )std::byteswap( pCode[1] ) << ( 32 - mPrefetch.queueSize * 16 );
+
     mPrefetch.queueSize += 2;
     return 4;
   }
-  else
-  {
-    return 0;
-  }
+
+  return 0;
 }
 
 

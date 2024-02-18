@@ -238,8 +238,45 @@ private:
       INT2
     } status = OPCODE;
     uint64_t queue = 0;
-    size_t queueSize = 0;
+    uint32_t queueSize = 0;
+    uint32_t queuedAddress = 0;
+
+    struct Pull
+    {
+      uint32_t address() const
+      {
+        return value >> 32;
+      }
+      DSPI opcode() const
+      {
+        return static_cast<DSPI>( ( value >> 26 ) & 63 );
+      }
+      uint32_t regSrc() const
+      {
+        return ( value >> ( 16 + 5 ) ) & 31;
+      }
+      uint32_t regDst() const
+      {
+        return ( value >> 16 ) & 31;
+      }
+      uint32_t data() const
+      {
+        return ( value >> 16 ) & 0xffff;
+      }
+      PullStatus status() const
+      {
+        return static_cast<PullStatus>( value & 0xffff );
+      }
+
+      Pull( PullStatus status, uint32_t address, uint16_t data )
+      {
+        value = ( static_cast<uint64_t>( status ) & 0xffff ) | ( static_cast<uint64_t>( data ) << 16 ) | ( static_cast<uint64_t>( address ) << 32 );
+      }
+
+      uint64_t value;
+    };
   };
+
 
   void storeByte( uint32_t address, uint8_t data );
   void storeWord( uint32_t address, uint16_t data );
@@ -274,8 +311,8 @@ private:
   void dualPortCommitMMULT( bool high );
   void busGatePush( AdvanceResult result );
   void busGatePop();
-  std::pair<Prefetch::PullStatus, uint16_t> prefetchPull();
-  uint32_t prefetchPush( uint32_t value, uint32_t oddWord );
+  Prefetch::Pull prefetchPull();
+  int prefetchFill();
 
 
 private:

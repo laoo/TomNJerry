@@ -9,7 +9,8 @@ public:
   PipelineLog();
 
 
-  void prefetch( uint32_t address, uint32_t code );
+  void prefetch( uint32_t address );
+  void instrAddr( uint32_t address );
   void decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 );
   void decodeMOVEI( int stage, uint32_t data );
   void decodeIMACN( uint32_t reg, int width, int count );
