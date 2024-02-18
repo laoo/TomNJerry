@@ -131,7 +131,7 @@ void PipelineLog::prefetch( uint32_t address, uint32_t code )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) |    #31          #31       | C31 NCZ | W31:01234567
+  //012345:addqmod addqmod | store   r31,(r31+r31) |    #31            #31       | C31 NCZ | W31:01234567
   mBuffer[0x00 + sprintf( mBuffer + 0x00, "%06x", address )] = ':';
   if ( ( address & 2 ) == 0 )
   {
@@ -345,12 +345,12 @@ void PipelineLog::decodeMOVEI( int stage, uint32_t data )
   if ( stage == 0 )
   {
     mBuffer[0x22 + sprintf( mBuffer + 0x22, "----%04x", data )] = ' ';
-    mBuffer[0x38 + sprintf( mBuffer + 0x38, "#%04x", data )] = ' ';
+    mBuffer[0x39 + sprintf( mBuffer + 0x39, "#%04x", data )] = ' ';
   }
   else
   {
     mBuffer[0x22 + sprintf( mBuffer + 0x22, "%04x----", data >> 16 )] = ' ';
-    mBuffer[0x38 + sprintf( mBuffer + 0x38, "#%04x", data >> 16 )] = ' ';
+    mBuffer[0x39 + sprintf( mBuffer + 0x39, "#%04x", data >> 16 )] = ' ';
   }
 
   tagUninterruptibleSequence();
@@ -376,59 +376,59 @@ void PipelineLog::decodeIMACN( uint32_t reg, int width, int count )
 
 void PipelineLog::portImm( uint32_t value )
 {
-  //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
-  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
-  mBuffer[0x3a + sprintf( mBuffer + 0x3a, "#%02x", value )] = ' ';
+  //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555555
+  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567
+  mBuffer[0x3b + sprintf( mBuffer + 0x3b, "#%02x", value )] = ' ';
 }
 
 void PipelineLog::portCond( uint32_t value )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
-  int off = sprintf( mBuffer + 0x3d - kJumpConditions[value & 31].size, "%s", kJumpConditions[value & 31].name );
-  mBuffer[0x3d + off -kJumpConditions[value & 31].size] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567
+  int off = sprintf( mBuffer + 0x3e - kJumpConditions[value & 31].size, "%s", kJumpConditions[value & 31].name );
+  mBuffer[0x3e + off -kJumpConditions[value & 31].size] = ' ';
 }
 
 void PipelineLog::portReadSrc( uint32_t reg, uint32_t value )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
-  mBuffer[0x31 + sprintf( mBuffer + 0x31, "R%02d:%08x", reg, value )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567
+  mBuffer[0x31 + sprintf( mBuffer + 0x31, "R%02d%c:%08x", reg & 31, reg >= 32 ? '"' : '\'', value)] = ' ';
 }
 
 void PipelineLog::portReadSrcMMULT( uint32_t reg, bool high, uint32_t value )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
-  mBuffer[0x31 + sprintf( mBuffer + 0x31, "R%02d%c:    %04x", reg, high ? 'h':'l', value )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567
+  mBuffer[0x31 + sprintf( mBuffer + 0x31, "R%02d\"%c:    %04x", reg & 31, high ? 'h':'l', value )] = ' ';
 }
 
 void PipelineLog::portReadDst( uint32_t reg, uint32_t value )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
-  mBuffer[0x3e + sprintf( mBuffer + 0x3e, "R%02d:%08x", reg, value )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567
+  mBuffer[0x3f + sprintf( mBuffer + 0x3f, "R%02d%c:%08x", reg & 31, reg >= 32 ? '"' : '\'', value )] = ' ';
 }
 
 void PipelineLog::portWriteDst( uint32_t reg, uint32_t value )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
-  mBuffer[0x57 + sprintf( mBuffer + 0x57, "W%02d:%08x", reg, value )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567
+  mBuffer[0x59 + sprintf( mBuffer + 0x59, "W%02d%c:%08x", reg & 31, reg >= 32 ? '"' : '\'', value )] = ' ';
 }
 
 void PipelineLog::computeReg( RegFlags regFlags )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
-  mBuffer[0x4d + sprintf( mBuffer + 0x4d, "C%02d", (int32_t)regFlags.reg )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567
+  mBuffer[0x4f + sprintf( mBuffer + 0x4f, "C%02d", (int32_t)regFlags.reg )] = ' ';
 }
 
 void PipelineLog::computeRegFlags( RegFlags regFlags )
@@ -436,103 +436,103 @@ void PipelineLog::computeRegFlags( RegFlags regFlags )
 
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
-  mBuffer[0x4d + sprintf( mBuffer + 0x4d, "C%02d %c%c%c", ( int32_t )regFlags.reg, NFlag[regFlags.n+1], CFlag[regFlags.c + 1], ZFlag[regFlags.z + 1] )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567
+  mBuffer[0x4f + sprintf( mBuffer + 0x4f, "C%02d %c%c%c", ( int32_t )regFlags.reg, NFlag[regFlags.n+1], CFlag[regFlags.c + 1], ZFlag[regFlags.z + 1] )] = ' ';
 }
 
 void PipelineLog::computeFlags( RegFlags flags )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
-  mBuffer[0x51 + sprintf( mBuffer + 0x51, "%c%c%c", NFlag[flags.n + 1], CFlag[flags.c + 1], ZFlag[flags.z + 1] )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567
+  mBuffer[0x53 + sprintf( mBuffer + 0x53, "%c%c%c", NFlag[flags.n + 1], CFlag[flags.c + 1], ZFlag[flags.z + 1] )] = ' ';
 }
 
 void PipelineLog::computeMul()
 {
-  mBuffer[0x4d] = 'm';
-  mBuffer[0x4e] = 'u';
-  mBuffer[0x4f] = 'l';
+  mBuffer[0x4f] = 'm';
+  mBuffer[0x50] = 'u';
+  mBuffer[0x51] = 'l';
 }
 
 void PipelineLog::computeMac()
 {
-  mBuffer[0x4d] = 'm';
-  mBuffer[0x4e] = 'a';
-  mBuffer[0x4f] = 'c';
+  mBuffer[0x4f] = 'm';
+  mBuffer[0x50] = 'a';
+  mBuffer[0x51] = 'c';
 }
 
 void PipelineLog::computeMac( RegFlags flags )
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567
-  mBuffer[0x4d + sprintf( mBuffer + 0x4d, "mac %c%c%c", NFlag[flags.n + 1], CFlag[flags.c + 1], ZFlag[flags.z + 1] )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567
+  mBuffer[0x4f + sprintf( mBuffer + 0x4f, "mac %c%c%c", NFlag[flags.n + 1], CFlag[flags.c + 1], ZFlag[flags.z + 1] )] = ' ';
 }
 
 void PipelineLog::computeIndex()
 {
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 |  index  | W31:01234567
-  mBuffer[0x4e] = 'i';
-  mBuffer[0x4f] = 'n';
-  mBuffer[0x50] = 'd';
-  mBuffer[0x51] = 'e';
-  mBuffer[0x52] = 'x';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 |  index  | W31':01234567
+  mBuffer[0x50] = 'i';
+  mBuffer[0x51] = 'n';
+  mBuffer[0x52] = 'd';
+  mBuffer[0x53] = 'e';
+  mBuffer[0x54] = 'x';
 }
 
 void PipelineLog::div( int cycle )
 {
-  mBuffer[0x4b + sprintf( mBuffer + 0x4b, "%x", cycle )] = ' ';
+  mBuffer[0x4d + sprintf( mBuffer + 0x4d, "%x", cycle )] = ' ';
 }
 
 void PipelineLog::storeLong( uint32_t address, uint32_t value )
 {
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567 | S(123456)=12345678
-  mBuffer[0x66 + sprintf( mBuffer + 0x66, "S(%06x)=%08x", address, value )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567 | S(123456)=12345678
+  mBuffer[0x69 + sprintf( mBuffer + 0x69, "S(%06x)=%08x", address, value )] = ' ';
 }
 
 void PipelineLog::storeWord( uint32_t address, uint16_t value )
 {
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567 | S(123456)=12345678
-  mBuffer[0x66 + sprintf( mBuffer + 0x66, "S(%06x)=%04x", address, value )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567 | S(123456)=12345678
+  mBuffer[0x69 + sprintf( mBuffer + 0x69, "S(%06x)=%04x", address, value )] = ' ';
 }
 
 void PipelineLog::storeByte( uint32_t address, uint8_t value )
 {
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567 | S(123456)=12345678
-  mBuffer[0x66 + sprintf( mBuffer + 0x66, "S(%06x)=%02x", address, value )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567 | S(123456)=12345678
+  mBuffer[0x69 + sprintf( mBuffer + 0x69, "S(%06x)=%02x", address, value )] = ' ';
 }
 
 void PipelineLog::loadLong( uint32_t address, uint32_t value )
 {
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567 | L(123456):12345678
-  mBuffer[0x66 + sprintf( mBuffer + 0x66, "L(%06x):%08x", address, value )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567 | L(123456):12345678
+  mBuffer[0x69 + sprintf( mBuffer + 0x69, "L(%06x):%08x", address, value )] = ' ';
 }
 
 void PipelineLog::loadWord( uint32_t address, uint16_t value )
 {
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567 | L(123456):12345678
-  mBuffer[0x66 + sprintf( mBuffer + 0x66, "L(%06x):%04x", address, value )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567 | L(123456):12345678
+  mBuffer[0x69 + sprintf( mBuffer + 0x69, "L(%06x):%04x", address, value )] = ' ';
 }
 
 void PipelineLog::loadByte( uint32_t address, uint8_t value )
 {
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
-  //012345:addqmod addqmod | store   r31,(r31+r31) | R31:01234567 R31:01234567 | C31 NCZ | W31:01234567 | L(123456):12345678
-  mBuffer[0x66 + sprintf( mBuffer + 0x66, "L(%06x):%02x", address, value )] = ' ';
+  //012345:addqmod addqmod | store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31 NCZ | W31':01234567 | L(123456):12345678
+  mBuffer[0x69 + sprintf( mBuffer + 0x69, "L(%06x):%02x", address, value )] = ' ';
 }
 
 void PipelineLog::warnMemoryAccess()
@@ -553,7 +553,7 @@ void PipelineLog::flush()
 
 void PipelineLog::init()
 {
-  sprintf( mBuffer, "                       |                       |                           |         |              |                     \n" );
+  sprintf( mBuffer, "                       |                       |                             |         |               |                     \n" );
 }
 
 char const* PipelineLog::prefetchDSPMapper( uint32_t code )

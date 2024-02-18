@@ -2,11 +2,13 @@
 #include "PipelineLog.hpp"
 #include "Ex.hpp"
 
-Jerry::Jerry( bool isNTSC, std::filesystem::path wavOut ) : mLog{ std::make_unique<PipelineLog>() }, mNTSC{ isNTSC }, mClock{ isNTSC ? 26590906u : 26593900u }, mWavOut{ wavOut }
+Jerry::Jerry( bool isNTSC, std::filesystem::path wavOut ) : mLog{ std::make_unique<PipelineLog>() }, mClock{ isNTSC ? 26590906u : 26593900u }, mWavOut{ wavOut }
 {
   std::ranges::fill( mRegStatus, FREE );
   std::ranges::fill( mRegs, 0 );
   std::ranges::fill( mLocalRAM, std::byteswap( (uint32_t)( (uint16_t)DSPI::NOP << 10 | ( uint16_t )DSPI::NOP << ( 10 + 16 ) ) ) );
+
+  mJoystick.ntsc = isNTSC;
 }
 
 Jerry::~Jerry()
@@ -190,9 +192,9 @@ uint16_t Jerry::readWord( uint32_t address ) const
   case J_INT + 2:
     return 0;
   case JOYSTICK:
-    break;
+    return mJoystick.getJoy();
   case JOYBUTS:
-    return mNTSC ? 16 : 0;
+    return mJoystick.getBut();
   case SCLK:
     return 0;
   case SMODE:
@@ -246,7 +248,6 @@ uint32_t Jerry::readLong( uint32_t address ) const
   case JPIT1:
   case JPIT3:
   case J_INT:
-  case JOYSTICK:
   case SCLK:
   case SMODE:
   case L_I2S:
@@ -255,6 +256,8 @@ uint32_t Jerry::readLong( uint32_t address ) const
   case ASICTRL:
   case ASIDATA:
     return ( (uint32_t)readWord( address ) << 16 ) | readWord( address + 2 );
+  case JOYSTICK:
+    return mJIntCtrl.get();
   case D_FLAGS:
     return mFlags.get();
   case D_MTXC:
@@ -313,21 +316,21 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
     mJIntCtrl.set( data );
     break;
   case JOYSTICK:
-    mAudioEnabled = ( data & 0x100 ) != 0;
+    mJoystick.setJoy( data );
     break;
   case JOYBUTS:
     break;
   case SCLK:
-    break;
-  case SCLK + 2:
     mSCLK = data & 0xff;
     reconfigureDAC();
     break;
-  case SMODE:
+  case SCLK + 2:
     break;
-  case SMODE + 2:
+  case SMODE:
     smodeSet( data );
     reconfigureDAC();
+    break;
+  case SMODE + 2:
     break;
   case L_I2S:
     break;
@@ -382,9 +385,6 @@ void Jerry::writeLong( uint32_t address, uint32_t data )
   case JPIT1:
   case JPIT3:
   case J_INT:
-  case JOYSTICK:
-  case SCLK:
-  case SMODE:
   case L_I2S:
   case R_I2S:
   case ASICLK:
@@ -392,6 +392,17 @@ void Jerry::writeLong( uint32_t address, uint32_t data )
   case ASIDATA:
     writeWord( address, data >> 16 );
     writeWord( address + 2, data & 0xffff );
+    break;
+  case JOYSTICK:
+    mJIntCtrl.set( data );
+    break;
+  case SCLK:
+    mSCLK = data & 0xff;
+    reconfigureDAC();
+    break;
+  case SMODE:
+    smodeSet( data & 0xffff );
+    reconfigureDAC();
     break;
   case D_FLAGS:
     flagsSet( data );
@@ -2239,11 +2250,11 @@ void Jerry::flagsSet( uint16_t value )
 
 void Jerry::smodeSet( uint16_t value )
 {
-  mSMODE.internal = ( value & StructSMODE::INTERNAL ) != 0;
-  mSMODE.wsen = ( value & StructSMODE::WSEN ) != 0;
-  mSMODE.rising = ( value & StructSMODE::RISING ) != 0;
-  mSMODE.falling = ( value & StructSMODE::FALLING ) != 0;
-  mSMODE.everyword = ( value & StructSMODE::EVERYWORD ) != 0;
+  mSMODE.internal = ( value & SSMODE::INTERNAL ) != 0;
+  mSMODE.wsen = ( value & SSMODE::WSEN ) != 0;
+  mSMODE.rising = ( value & SSMODE::RISING ) != 0;
+  mSMODE.falling = ( value & SSMODE::FALLING ) != 0;
+  mSMODE.everyword = ( value & SSMODE::EVERYWORD ) != 0;
 }
 
 void Jerry::doInt( uint32_t mask )
@@ -2362,24 +2373,24 @@ void Jerry::setI2S( uint32_t period )
 {
   mInterruptor.periodI2S = period;
   mInterruptor.cycleI2S = mCycle + period - mCycle % period;
-  if ( mInterruptor.cycleI2S < mInterruptor.cycleMin )
-    mInterruptor.cycleMin = mInterruptor.cycleI2S;
+
+  mInterruptor.cycleMin = std::min( std::min( mInterruptor.cycleI2S, mInterruptor.cycleTimer1 ), mInterruptor.cycleTimer2 );
 }
 
 void Jerry::setTimer1( uint32_t period )
 {
   mInterruptor.periodTimer1 = period;
   mInterruptor.cycleTimer1 = mCycle + period - mCycle % period;
-  if ( mInterruptor.cycleTimer1 < mInterruptor.cycleMin )
-    mInterruptor.cycleMin = mInterruptor.cycleTimer1;
+
+  mInterruptor.cycleMin = std::min( std::min( mInterruptor.cycleI2S, mInterruptor.cycleTimer1 ), mInterruptor.cycleTimer2 );
 }
 
 void Jerry::setTimer2( uint32_t period )
 {
   mInterruptor.periodTimer2 = period;
   mInterruptor.cycleTimer2 = mCycle + period - mCycle % period;
-  if ( mInterruptor.cycleTimer2 < mInterruptor.cycleMin )
-    mInterruptor.cycleMin = mInterruptor.cycleTimer2;
+
+  mInterruptor.cycleMin = std::min( std::min( mInterruptor.cycleI2S, mInterruptor.cycleTimer1 ), mInterruptor.cycleTimer2 );
 }
 
 void Jerry::reconfigureDAC()
@@ -2415,7 +2426,7 @@ void Jerry::reconfigureDAC()
 
 void Jerry::sample()
 {
-  if ( mAudioEnabled )
+  if ( mJoystick.audioEnable )
     wav_write( mWav, &mI2S, 1 );
   doInt( FLAGS::D_I2SENA );
 }
@@ -2447,4 +2458,29 @@ void Jerry::StageWrite::updateReg( uint32_t reg, uint32_t value )
 bool Jerry::StageWrite::canUpdateReg() const
 {
   return ( updateMask & UPDATE_REG ) == 0;
+}
+
+uint32_t Jerry::Joystick::get() const
+{
+  return ntsc ? 16 : 0;
+}
+
+uint16_t Jerry::Joystick::getJoy() const
+{
+  return 0;
+}
+
+uint16_t Jerry::Joystick::getBut() const
+{
+  return ntsc ? 16 : 0;
+}
+
+void Jerry::Joystick::set( uint32_t data )
+{
+  audioEnable = ( data & 0x1000000 ) != 0;
+}
+
+void Jerry::Joystick::setJoy( uint16_t data )
+{
+  audioEnable = ( data & 0x100 ) != 0;
 }

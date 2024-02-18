@@ -91,6 +91,35 @@ public:
     bool synpend = false;
   };
 
+  struct Joystick
+  {
+    bool audioEnable = false;
+    bool ntsc = false;
+
+    uint32_t get() const;
+    uint16_t getJoy() const;
+    uint16_t getBut() const;
+    void set( uint32_t );
+    void setJoy( uint16_t );
+  };
+
+  struct SSMODE
+  {
+    static constexpr uint16_t INTERNAL = 0b000001;
+    static constexpr uint16_t RESERVED = 0b000010;
+    static constexpr uint16_t WSEN = 0b000100;
+    static constexpr uint16_t RISING = 0b001000;
+    static constexpr uint16_t FALLING = 0b010000;
+    static constexpr uint16_t EVERYWORD = 0b100000;
+
+    bool internal = false;
+    bool wsen = false;
+    bool rising = false;
+    bool falling = false;
+    bool everyword = false;
+  };
+
+
   struct CTRL
   {
     static constexpr uint32_t DSPGO       = 0b0000'0000'0000'0000'0000'0000'0000'0001;
@@ -149,22 +178,6 @@ public:
     bool regpage = false;
   };
 
-  struct StructSMODE
-  {
-    static constexpr uint16_t INTERNAL  = 0b000001;
-    static constexpr uint16_t RESERVED  = 0b000010;
-    static constexpr uint16_t WSEN      = 0b000100;
-    static constexpr uint16_t RISING    = 0b001000;
-    static constexpr uint16_t FALLING   = 0b010000;
-    static constexpr uint16_t EVERYWORD = 0b100000;
-
-    bool internal = false;
-    bool wsen = false;
-    bool rising = false;
-    bool falling = false;
-    bool everyword = false;
-  };
-
 
   Jerry( bool isNTSC, std::filesystem::path wavOut );
   ~Jerry();
@@ -209,8 +222,6 @@ private:
   void reconfigureDAC();
   void sample();
 
-
-
   struct Prefetch
   {
     enum PullStatus : uint16_t
@@ -241,11 +252,6 @@ private:
   bool testCondition( uint32_t condition ) const;
 
   void ackWrite();
-  void ackRead( uint8_t data );
-  void ackRead( uint16_t data );
-  void ackRead( uint32_t data );
-
-  AdvanceResult advance();
 
   void halfCycle();
 
@@ -274,17 +280,20 @@ private:
 
 private:
 
+  uint16_t mJPIT1;
+  uint16_t mJPIT2;
+  uint16_t mJPIT3;
+  uint16_t mJPIT4;
   JINTCTRL mJIntCtrl = {};
+  Joystick mJoystick = {};
   uint16_t mSCLK = 0xffff;
-  StructSMODE mSMODE = {};
+  SSMODE mSMODE = {};
 
   struct
   {
     uint16_t left = 0;
     uint16_t right = 0;
   } mI2S = {};
-
-  bool mAudioEnabled = false;
 
   uint32_t mMTXC = 0;
   uint32_t mMTXA = 0;
@@ -405,7 +414,6 @@ private:
 
   std::unique_ptr<PipelineLog> mLog;
   WavFile * mWav = nullptr;
-  bool mNTSC = false;
   std::filesystem::path mWavOut;
   uint32_t mClock = 0;
   uint32_t mClocksPerSample = 0;
