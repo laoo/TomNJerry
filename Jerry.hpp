@@ -237,7 +237,8 @@ private:
       RESMAC,
       INT0,
       INT1,
-      INT2
+      INT2,
+      INT3
     } status = OPCODE;
     uint64_t queue = 0;
     uint32_t queueSize = 0;
@@ -448,13 +449,9 @@ private:
   std::array<uint32_t, RAM_SIZE / sizeof( uint32_t )> mLocalRAM;
   uint64_t mLastLocalRAMAccessCycle = ~0;
 
-  enum RegStatus
-  {
-    FREE,
-    LOCKED
-  };
+  static constexpr int32_t FREE = -1;
 
-  std::array<RegStatus, 32> mRegStatus;
+  std::array<int32_t, 32> mRegStatus;
   std::array<uint32_t, 64> mRegs;
   int mFlagsSemaphore = 0;
 

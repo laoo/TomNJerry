@@ -14,9 +14,10 @@ int main( int argc, char const* argv[] )
     DSPRaw input{ "d:\\home\\yarc_reloaded\\lsp_v15.bin" };
 
     RAM ram;
-    uint32_t musicAddr = 65536;
-    uint32_t bankAddr = musicAddr + ram.load( "d:\\home\\yarc_reloaded\\mod\\my.lsmusic", musicAddr );
-    bankAddr = ( bankAddr + 3 ) & ~3;
+    uint32_t musicAddr = 0x6ad8;
+    uint32_t bankAddr = 0x10C34;
+    
+    ram.load( "d:\\home\\yarc_reloaded\\mod\\my.lsmusic", musicAddr );
     ram.load( "d:\\home\\yarc_reloaded\\mod\\my.lsbank", bankAddr );
 
     ram.l( 0x20 - 8, std::byteswap( musicAddr ) );
@@ -50,11 +51,7 @@ int main( int argc, char const* argv[] )
           jerry.busCycleAckReadByteRequest( ram.b( req.getAddress() ) );
           break;
         case AdvanceResult::kShortFlag:
-          {
-            uint32_t addr = req.getAddress();
-            uint16_t value = ram.w( addr );
-            jerry.busCycleAckReadWordRequest( value );
-          }
+          jerry.busCycleAckReadWordRequest( ram.w( req.getAddress() ) );
           break;
         case AdvanceResult::kLongFlag:
           jerry.busCycleAckReadLongRequest( ram.l( req.getAddress() ) );

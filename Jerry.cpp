@@ -98,7 +98,7 @@ void Jerry::busCycleAckReadByteRequest( uint8_t value )
 
   if ( portWriteDst( mBusGate.getReg(), value ) )
   {
-    mLog->loadLong( mBusGate.getAddress(), mPortWriteDstData );
+    LOG_LOADLONG( mBusGate.getAddress(), mPortWriteDstData );
     busGatePop();
   }
   else
@@ -119,7 +119,7 @@ void Jerry::busCycleAckReadWordRequest( uint16_t value )
 
   if ( portWriteDst( mBusGate.getReg(), std::byteswap( value ) ) )
   {
-    mLog->loadWord( mBusGate.getAddress(), mPortWriteDstData );
+    LOG_LOADWORD( mBusGate.getAddress(), mPortWriteDstData );
     busGatePop();
   }
   else
@@ -140,7 +140,7 @@ void Jerry::busCycleAckReadLongRequest( uint32_t value )
 
   if ( portWriteDst( mBusGate.getReg(), std::byteswap( value ) ) )
   {
-    mLog->loadLong( mBusGate.getAddress(), mPortWriteDstData );
+    LOG_LOADLONG( mBusGate.getAddress(), mPortWriteDstData );
     busGatePop();
   }
   else
@@ -158,13 +158,13 @@ void Jerry::ackWrite()
   switch ( mBusGate.getSize() )
   {
   case 1:
-    mLog->storeByte( mBusGate.getAddress(), mBusGate.getValue() );
+    LOG_STOREBYTE( mBusGate.getAddress(), mBusGate.getValue() );
     break;
   case 2:
-    mLog->storeWord( mBusGate.getAddress(), mBusGate.getValue() );
+    LOG_STOREWORD( mBusGate.getAddress(), mBusGate.getValue() );
     break;
   case 4:
-    mLog->storeLong( mBusGate.getAddress(), mBusGate.getValue() );
+    LOG_STORELONG( mBusGate.getAddress(), mBusGate.getValue() );
     break;
   default:
     throw Ex{ "Jerry::ackWrite: Unhandled size " };
@@ -482,12 +482,12 @@ void Jerry::storeByte( uint32_t address, uint8_t data )
   }
   else
   {
-    mLog->warnMemoryAccess();
+    LOG_WARNMEMORYACCESS();
     int shift = ( 3 - ( address & 3 ) ) * 8;
     writeLong( address & 0xfffffc, data << shift );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-    mLog->storeLong( address, data );
+    LOG_STORELONG( address, data );
   }
 }
 
@@ -495,16 +495,16 @@ void Jerry::storeWord( uint32_t address, uint16_t data )
 {
   if ( ( address & 0x00ff0000 ) != 0x00f10000 )
   {
-    busGatePush( AdvanceResult::writeWord( address, data ) );
+    busGatePush( AdvanceResult::writeWord( address, std::byteswap( data ) ) );
   }
   else
   {
-    mLog->warnMemoryAccess();
+    LOG_WARNMEMORYACCESS();
     int shift = ( ( address & 1 ) ^ 1 ) * 16;
     writeLong( address & 0xfffffc, data << shift );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-    mLog->storeLong( address, data );
+    LOG_STORELONG( address, data );
   }
 }
 
@@ -512,14 +512,14 @@ void Jerry::storeLong( uint32_t address, uint32_t data )
 {
   if ( ( address & 0x00ff0000 ) != 0x00f10000 )
   {
-    busGatePush( AdvanceResult::writeLong( address, data ) );
+    busGatePush( AdvanceResult::writeLong( address, std::byteswap( data ) ) );
   }
   else
   {
     writeLong( address, data );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-    mLog->storeLong( address, data );
+    LOG_STORELONG( address, data );
   }
 }
 
@@ -531,13 +531,13 @@ void Jerry::loadByte( uint32_t address, uint32_t reg )
   }
   else
   {
-    mLog->warnMemoryAccess();
+    LOG_WARNMEMORYACCESS();
     int shift = ( 3 - ( address & 3 ) ) * 8;
 
     mStageWrite.updateRegL( reg, readLong( address & 0xfffffc ) << shift );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-    mLog->loadLong( address, mStageWrite.data );
+    LOG_LOADLONG( address, mStageWrite.data );
   }
 }
 
@@ -549,13 +549,13 @@ void Jerry::loadWord( uint32_t address, uint32_t reg )
   }
   else
   {
-    mLog->warnMemoryAccess();
+    LOG_WARNMEMORYACCESS();
     int shift = ( ( address & 1 ) ^ 1 ) * 16;
 
     mStageWrite.updateRegL( reg, readLong( address & 0xfffffc ) << shift );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-    mLog->loadLong( address, mStageWrite.data );
+    LOG_LOADLONG( address, mStageWrite.data );
   }
 }
 
@@ -570,7 +570,7 @@ void Jerry::loadLong( uint32_t address, uint32_t reg )
     mStageWrite.updateRegL( reg, readLong( address ) );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-    mLog->loadLong( address, mStageWrite.data );
+    LOG_LOADLONG( address, mStageWrite.data );
   }
 }
 
@@ -645,7 +645,7 @@ void Jerry::io()
       mDivideUnit.q = ( mDivideUnit.q << 1 ) | ( ( ( ~mDivideUnit.r ) >> 31 ) & 0x01 );
 
       mDivideUnit.cycle -= 1;
-      mLog->div( mDivideUnit.cycle );
+      LOG_DIV( mDivideUnit.cycle );
     }
 
     if ( mDivideUnit.cycle == 0 )
@@ -803,7 +803,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::ADDC:
@@ -816,7 +816,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::ADDQT:
@@ -825,7 +825,7 @@ void Jerry::compute()
       auto result = mStageCompute.dataSrc + mStageCompute.dataDst;
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeReg( mStageWrite.regFlags );
+      LOG_COMPUTEREG( mStageWrite.regFlags );
     }
     break;
   case DSPI::SUB:
@@ -839,7 +839,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::SUBC:
@@ -852,7 +852,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::SUBQT:
@@ -861,7 +861,7 @@ void Jerry::compute()
       auto result = mStageCompute.dataDst - mStageCompute.dataSrc;
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeReg( mStageWrite.regFlags );
+      LOG_COMPUTEREG( mStageWrite.regFlags );
     }
     break;
   case DSPI::NEG:
@@ -874,7 +874,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::AND:
@@ -886,7 +886,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::OR:
@@ -898,7 +898,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::XOR:
@@ -910,7 +910,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::NOT:
@@ -922,7 +922,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::BTST:
@@ -931,7 +931,7 @@ void Jerry::compute()
       mStageWrite.regFlags.z = ( mStageCompute.dataDst & ( 1 << mStageCompute.dataSrc ) ) == 0 ? 1 : 0;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeFlags( mStageWrite.regFlags );
+      LOG_COMPUTEFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::BSET:
@@ -943,7 +943,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::BCLR:
@@ -955,7 +955,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::MULT:
@@ -967,7 +967,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::IMULT:
@@ -979,7 +979,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::IMULTN:
@@ -988,21 +988,21 @@ void Jerry::compute()
     mStageWrite.regFlags.n = mStageWrite.data >> 31;
     mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
     mStageCompute.instruction = DSPI::EMPTY;
-    mLog->computeMul();
-    mLog->computeFlags( mStageWrite.regFlags );
+    LOG_COMPUTEMUL();
+    LOG_COMPUTEFLAGS( mStageWrite.regFlags );
     break;
   case DSPI::RESMAC:
     if ( mStageWrite.canUpdateReg() )
     {
       mStageWrite.updateReg( mStageCompute.regDst, mMacStage.acc );
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeReg( mStageWrite.regFlags );
+      LOG_COMPUTEREG( mStageWrite.regFlags );
     }
     break;
   case DSPI::IMACN:
     mMacStage.acc += ( int16_t )mStageCompute.dataSrc * ( int16_t )mStageCompute.dataDst;
     mStageCompute.instruction = DSPI::EMPTY;
-    mLog->computeMac();
+    LOG_COMPUTEMAC();
     break;
   case DSPI::ABS:
     if ( mStageWrite.canUpdateReg() )
@@ -1012,7 +1012,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = 0;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::SH:
@@ -1024,7 +1024,7 @@ void Jerry::compute()
       mStageWrite.regFlags.c = mStageCompute.dataSrc > 0 ? ( mStageCompute.dataDst & 1 ) : ( mStageCompute.dataDst >> 31 );
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::SHLQ:
@@ -1036,7 +1036,7 @@ void Jerry::compute()
       mStageWrite.regFlags.c = mStageCompute.dataDst >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::SHRQ:
@@ -1048,7 +1048,7 @@ void Jerry::compute()
       mStageWrite.regFlags.c = mStageCompute.dataDst & 1;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::SHA:
@@ -1060,7 +1060,7 @@ void Jerry::compute()
       mStageWrite.regFlags.c = mStageCompute.dataSrc > 0 ? ( mStageCompute.dataDst & 1 ) : ( mStageCompute.dataDst >> 31 );
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::SHARQ:
@@ -1072,7 +1072,7 @@ void Jerry::compute()
       mStageWrite.regFlags.c = mStageCompute.dataDst & 1;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::ROR:
@@ -1085,7 +1085,7 @@ void Jerry::compute()
       mStageWrite.regFlags.c = mStageCompute.dataDst >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::CMP:
@@ -1096,7 +1096,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeFlags( mStageWrite.regFlags );
+      LOG_COMPUTEFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::CMPQ:
@@ -1111,7 +1111,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeFlags( mStageWrite.regFlags );
+      LOG_COMPUTEFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::SUBQMOD:
@@ -1123,7 +1123,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::SAT16S:
@@ -1134,7 +1134,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::SAT32S:
@@ -1146,7 +1146,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::LOAD14N:
@@ -1159,7 +1159,7 @@ void Jerry::compute()
       mStageIO.state = StageIO::LOAD_LONG;
       mStageIO.address = mStageCompute.dataSrc + mStageCompute.regDst;
       mStageIO.reg = mStageCompute.regSrc;
-      mLog->computeIndex();
+      LOG_COMPUTEINDEX();
     }
     break;
   case DSPI::MIRROR:
@@ -1181,7 +1181,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::STORE14N:
@@ -1196,7 +1196,7 @@ void Jerry::compute()
       mStageIO.state = StageIO::STORE_LONG;
       mStageIO.address = mStageCompute.dataSrc + mStageCompute.regDst;
       mStageIO.data = mStageCompute.dataDst;
-      mLog->computeIndex();
+      LOG_COMPUTEINDEX();
     }
     break;
   case DSPI::JUMP:
@@ -1224,7 +1224,7 @@ void Jerry::compute()
   case DSPI::MTOI:
     if ( mStageWrite.canUpdateReg() )
     {
-      if ( mRegStatus[mStageCompute.regDst] != FREE )
+      if ( mRegStatus[mStageCompute.regDst] == mRegisterFile )
         throw EmulationViolation{ "MTOI writes to a register in use" };
 
       mStageWrite.updateReg( mStageCompute.regDst, ( ( ( int32_t )mStageCompute.dataSrc >> 8 ) & 0xFF800000 ) | ( mStageCompute.dataSrc & 0x007FFFFF ) );
@@ -1232,13 +1232,13 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::NORMI:
     if ( mStageWrite.canUpdateReg() )
     {
-      if ( mRegStatus[mStageCompute.regDst] != FREE )
+      if ( mRegStatus[mStageCompute.regDst] == mRegisterFile )
         throw EmulationViolation{ "NORMI writes to a register in use" };
 
       uint32_t data = 0;
@@ -1261,7 +1261,7 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::ADDQMOD:
@@ -1273,13 +1273,13 @@ void Jerry::compute()
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
-      mLog->computeRegFlags( mStageWrite.regFlags );
+      LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
     }
     break;
   case DSPI::MM_IMULTN:
     mMacStage.acc = ( int16_t )mStageCompute.dataSrc * ( int16_t )mStageWrite.data;
     mStageCompute.instruction = DSPI::EMPTY;
-    mLog->computeMul();
+    LOG_COMPUTEMUL();
     break;
   case DSPI::MM_IMACN:
   {
@@ -1291,7 +1291,7 @@ void Jerry::compute()
     mStageWrite.regFlags.c = ( int32_t )mMacStage.acc < ( int32_t )old ? 1 : 0;
     mStageWrite.regFlags.n = mMacStage.acc >> 31;
     mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
-    mLog->computeMac( mStageWrite.regFlags );
+    LOG_COMPUTEMACARG( mStageWrite.regFlags );
   }
     break;
   default:
@@ -1365,7 +1365,7 @@ void Jerry::stageRead()
     if ( portReadDst( mStageRead.regDst ) )
     {
       dualPortCommit();
-      mLog->portImm( mStageRead.regSrc );
+      LOG_PORTIMM( mStageRead.regSrc );
       mFlagsSemaphore += 1;
       lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -1386,7 +1386,7 @@ void Jerry::stageRead()
     if ( portReadDst( mStageRead.regDst ) )
     {
       dualPortCommit();
-      mLog->portImm( mStageRead.regSrc );
+      LOG_PORTIMM( mStageRead.regSrc );
       mFlagsSemaphore += 1;
       lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -1403,7 +1403,7 @@ void Jerry::stageRead()
     if ( portReadDst( mStageRead.regDst ) )
     {
       dualPortCommit();
-      mLog->portImm( 32 - mStageRead.regSrc );
+      LOG_PORTIMM( 32 - mStageRead.regSrc );
       mFlagsSemaphore += 1;
       lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -1441,7 +1441,7 @@ void Jerry::stageRead()
     if ( portReadDst( mStageRead.regDst ) )
     {
       dualPortCommit();
-      mLog->portImm( mStageRead.regSrc );
+      LOG_PORTIMM( mStageRead.regSrc );
       lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = mStageRead.regDst;
@@ -1458,7 +1458,7 @@ void Jerry::stageRead()
     if ( portReadDst( mStageRead.regDst ) )
     {
       dualPortCommit();
-      mLog->portImm( mStageRead.regSrc );
+      LOG_PORTIMM( mStageRead.regSrc );
       mFlagsSemaphore += 1;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.regSrc;
@@ -1517,7 +1517,7 @@ void Jerry::stageRead()
   case DSPI::RESMAC:
     if ( mStageWrite.canUpdateReg() )
     {
-      if ( mRegStatus[mStageRead.regDst] != FREE )
+      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
         throw EmulationViolation{ "RESMAC writes to a register in use" };
       dualPortCommit();
       mStageWrite.updateReg( mStageRead.regDst, ( uint32_t )mMacStage.acc );
@@ -1532,10 +1532,10 @@ void Jerry::stageRead()
   case DSPI::MOVEQ:
     if ( mStageWrite.canUpdateReg() )
     {
-      if ( mRegStatus[mStageRead.regDst] != FREE )
+      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
         throw EmulationViolation{ "MOVEQ writes to a register in use" };
       dualPortCommit();
-      mLog->portImm( mStageRead.regSrc );
+      LOG_PORTIMM( mStageRead.regSrc );
       mStageWrite.updateReg( mStageRead.regDst, mStageRead.regSrc );
       lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
@@ -1548,7 +1548,7 @@ void Jerry::stageRead()
   case DSPI::MOVEFA:
     if ( mStageWrite.canUpdateReg() && portReadSrcAlt( mStageRead.regSrc ) )
     {
-      if ( mRegStatus[mStageRead.regDst] != FREE )
+      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
         throw EmulationViolation{ "MOVEFA writes to a register in use" };
 
       dualPortCommit();
@@ -1590,7 +1590,7 @@ void Jerry::stageRead()
   case DSPI::MOVE:
     if ( mStageWrite.canUpdateReg() && portReadSrc( mStageRead.regSrc ) )
     {
-      if ( mRegStatus[mStageRead.regDst] != FREE )
+      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
         throw EmulationViolation{ "MOVE writes to a register in use" };
 
       dualPortCommit();
@@ -1618,7 +1618,7 @@ void Jerry::stageRead()
   case DSPI::MOVEI:
     if ( mStageWrite.canUpdateReg() )
     {
-      if ( mRegStatus[mStageRead.regDst] != FREE )
+      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
         throw EmulationViolation{ "MOVEI writes to a register in use" };
       dualPortCommit();
       lockReg( mStageRead.regDst );
@@ -1835,7 +1835,7 @@ void Jerry::stageRead()
   case DSPI::MOVEPC:
     if ( mStageWrite.canUpdateReg() )
     {
-      if ( mRegStatus[mStageRead.regDst] != FREE )
+      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
         throw EmulationViolation{ "MOVE PC writes to a register in use" };
       dualPortCommit();
       mStageWrite.updateReg( mStageRead.regDst, mPC - ( mPrefetch.queueSize + 1 ) * 2 );
@@ -1852,7 +1852,7 @@ void Jerry::stageRead()
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mLog->portCond( mStageRead.regDst );
+      LOG_PORTCOND( mStageRead.regDst );
       mStageCompute.regDst = mStageRead.regDst;
       mStageCompute.dataDst = mStageRead.dataDst;
     }
@@ -1866,7 +1866,7 @@ void Jerry::stageRead()
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mLog->portCond( mStageRead.regDst );
+      LOG_PORTCOND( mStageRead.regDst );
       mStageCompute.regDst = mStageRead.regDst;
       mStageCompute.dataSrc = mStageRead.regSrc;
     }
@@ -1920,30 +1920,30 @@ void Jerry::decode()
     mStageRead.instruction = pull.opcode();
     mStageRead.regSrc = pull.regSrc();
     mStageRead.regDst = pull.regDst();
-    mLog->decodeDSP( mStageRead.instruction, mStageRead.regSrc, mStageRead.regDst );
+    LOG_DECODEDSP( mStageRead.instruction, mStageRead.regSrc, mStageRead.regDst );
     if ( auto addr = pull.address() )
-      mLog->instrAddr( addr );
+      LOG_INSTRADDR( addr );
     break;
   case Prefetch::MOVEI1:
     mStageRead.dataSrc = pull.data();
-    mLog->decodeMOVEI( 0, mStageRead.dataSrc );
+    LOG_DECODEMOVEI( 0, mStageRead.dataSrc );
     break;
   case Prefetch::MOVEI2:
     mStageRead.dataSrc |= pull.data() << 16;
     mStageWrite.updateReg( mStageRead.regDst, mStageRead.dataSrc );
-    mLog->decodeMOVEI( 1, mStageRead.dataSrc );
+    LOG_DECODEMOVEI( 1, mStageRead.dataSrc );
     break;
   case Prefetch::IMULTN:
     mStageRead.instruction = DSPI::MM_IMULTN;
-    mLog->decodeIMULTN( mStageCompute.regSrc, 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 ), mMacStage.cnt );
+    LOG_DECODEIMULTN( mStageCompute.regSrc, 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 ), mMacStage.cnt );
     break;
   case Prefetch::IMACN:
     mStageRead.instruction = DSPI::MM_IMACN;
-    mLog->decodeIMACN( mStageCompute.regSrc, 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 ), mMacStage.cnt );
+    LOG_DECODEIMACN( mStageCompute.regSrc, 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 ), mMacStage.cnt );
     break;
   case Prefetch::RESMAC:
     mStageRead.instruction = DSPI::MM_RESMAC;
-    mLog->decodeRESMAC( mStageCompute.regDst );
+    LOG_DECODERESMAC( mStageCompute.regDst );
     break;
   default:
     break;
@@ -1961,14 +1961,14 @@ void Jerry::prefetch()
     {
       if ( int off = prefetchFill() )
       {
-        mLog->prefetch( mPC );
+        LOG_PREFETCH( mPC );
         mLastLocalRAMAccessCycle = mCycle;
         mPC += off;
       }
     }
   }
 
-  mLog->flush();
+  LOG_FLUSH();
 }
 
 Jerry::Prefetch::Pull Jerry::prefetchPull()
@@ -2030,20 +2030,26 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
         mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
         return { Prefetch::RESMAC, 0, 0 };
       }
+      //TODO: -- make INT0 empty so that instruction before interrupt is executed
     case Prefetch::INT0:
       mPrefetch.status = Prefetch::INT1;
-      mLog->tagUninterruptibleSequence();
-      return { Prefetch::OPCODE, 0, ( (uint16_t)DSPI::MOVEPC << 10 ) | 30 };
+      LOG_TAGUNINTERRUPTIBLESEQUENCE();
+      return { Prefetch::EMPTY, 0, 0 };
     case Prefetch::INT1:
       mPrefetch.status = Prefetch::INT2;
-      mLog->tagUninterruptibleSequence();
-      return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::SUBQ << 10 ) | ( 4 << 5 ) | 31 };
+      LOG_TAGUNINTERRUPTIBLESEQUENCE();
+      return { Prefetch::OPCODE, 0, ( (uint16_t)DSPI::MOVEPC << 10 ) | 30 };
     case Prefetch::INT2:
+      mPrefetch.status = Prefetch::INT3;
+      LOG_TAGUNINTERRUPTIBLESEQUENCE();
+      mRegisterFile = 0;
+      return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::SUBQT << 10 ) | ( 4 << 5 ) | 31 };
+    case Prefetch::INT3:
       mPrefetch.status = Prefetch::OPCODE;
-      mLog->tagUninterruptibleSequence();
+      LOG_TAGUNINTERRUPTIBLESEQUENCE();
+      mPrefetch.queueSize = 0;
       mPC = mInterruptVector;
       mInterruptVector = 0;
-      mPrefetch.queueSize = 0;
       return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::STORE << 10 ) | ( 31 << 5 ) | 30 };
     default:
       assert( false );
@@ -2211,14 +2217,14 @@ void Jerry::dualPortCommit()
     if ( mPortWriteDstReg < 0x20 )
       mRegStatus[mPortWriteDstReg] = FREE;
     mRegs[(mRegisterFile + mPortWriteDstReg)&63] = mPortWriteDstData;
-    mLog->portWriteDst( ( mRegisterFile + mPortWriteDstReg ) & 63, mPortWriteDstData );
+    LOG_PORTWRITEDST( ( mRegisterFile + mPortWriteDstReg ) & 63, mPortWriteDstData );
     mPortWriteDstReg = -1;
   }
 
   if ( mPortReadSrcReg >= 0 )
   {
     mStageRead.dataSrc = mRegs[(mRegisterFile + mPortReadSrcReg)&63];
-    mLog->portReadSrc( ( mRegisterFile + mPortReadSrcReg ) & 63, mStageRead.dataSrc );
+    LOG_PORTREADSRC( ( mRegisterFile + mPortReadSrcReg ) & 63, mStageRead.dataSrc );
     mPortReadSrcReg = -1;
   }
 
@@ -2226,7 +2232,7 @@ void Jerry::dualPortCommit()
   {
     assert( mPortReadDstReg < 0x20 );
     mStageRead.dataDst = mRegs[mRegisterFile + mPortReadDstReg];
-    mLog->portReadDst( mRegisterFile + mPortReadDstReg, mStageRead.dataDst );
+    LOG_PORTREADDST( mRegisterFile + mPortReadDstReg, mStageRead.dataDst );
     mPortReadDstReg = -1;
   }
 }
@@ -2243,7 +2249,7 @@ void Jerry::lockReg( uint32_t reg )
       int k = 0;
     }
   }
-  mRegStatus[reg] = LOCKED;
+  mRegStatus[reg] = mRegisterFile;
 }
 
 void Jerry::dualPortCommitMMULT( bool high )
@@ -2251,7 +2257,7 @@ void Jerry::dualPortCommitMMULT( bool high )
   if ( mPortReadSrcReg >= 0 )
   {
     mStageRead.dataSrc = high ? mRegs[32 + mPortReadSrcReg] >> 16 : mRegs[32 + mPortReadSrcReg] & 0xffff;
-    mLog->portReadSrcMMULT( 32 + mPortReadSrcReg, high, mStageRead.dataSrc );
+    LOG_PORTREADSRCMMULT( 32 + mPortReadSrcReg, high, mStageRead.dataSrc );
     mPortReadSrcReg = -1;
   }
 }
@@ -2425,7 +2431,6 @@ void Jerry::prioritizeInt()
   }
 
   mFlags.imask = true;
-  mRegisterFile = 0;
 }
 
 void Jerry::launchInt( int priority )
