@@ -537,7 +537,7 @@ void Jerry::loadByte( uint32_t address, uint32_t reg )
     mStageWrite.updateRegL( reg, readLong( address & 0xfffffc ) << shift );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-    LOG_LOADLONG( address, mStageWrite.data );
+    LOG_LOADLONG( address, mStageWrite.dataL );
   }
 }
 
@@ -555,7 +555,7 @@ void Jerry::loadWord( uint32_t address, uint32_t reg )
     mStageWrite.updateRegL( reg, readLong( address & 0xfffffc ) << shift );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-    LOG_LOADLONG( address, mStageWrite.data );
+    LOG_LOADLONG( address, mStageWrite.dataL );
   }
 }
 
@@ -570,7 +570,7 @@ void Jerry::loadLong( uint32_t address, uint32_t reg )
     mStageWrite.updateRegL( reg, readLong( address ) );
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-    LOG_LOADLONG( address, mStageWrite.data );
+    LOG_LOADLONG( address, mStageWrite.dataL );
   }
 }
 
