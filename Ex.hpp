@@ -8,13 +8,13 @@
 class Ex : public std::exception
 {
 public:
-  
+
   Ex() : exception{}, mSS{ std::make_shared<std::stringstream>() }, mStr{}
   {
   }
 
   Ex( char const* str ) : Ex{}
-  { 
+  {
     *mSS << str;
   }
 
@@ -26,7 +26,7 @@ public:
     return *this;
   }
 
-  char const* what() const
+  char const* what() const noexcept override
   {
     mStr = mSS->str();
     return mStr.c_str();
