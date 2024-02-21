@@ -612,7 +612,7 @@ bool Jerry::testCondition( uint32_t condition ) const
   case 0x15:
     return !mFlags.n && !mFlags.z;
   case 0x16:
-    return !mFlags.c && mFlags.z;
+    return !mFlags.n && mFlags.z;
   case 0x18:
     return mFlags.n;
   case 0x19:
@@ -1007,9 +1007,16 @@ void Jerry::compute()
   case DSPI::ABS:
     if ( mStageWrite.canUpdateReg() )
     {
-      mStageWrite.updateReg( mStageCompute.regDst, mStageCompute.dataDst < 0 ? -mStageCompute.dataDst : mStageCompute.dataDst );
-      mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
-      mStageWrite.regFlags.n = 0;
+      if ( mStageCompute.dataDst == 0x80000000 ){
+        mStageWrite.regFlags.z = 0;
+        mStageWrite.regFlags.n = 1;
+        mStageWrite.regFlags.c = 1;
+      } else {
+        mStageWrite.updateReg( mStageCompute.regDst, mStageCompute.dataDst < 0 ? -mStageCompute.dataDst : mStageCompute.dataDst );
+        mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
+        mStageWrite.regFlags.n = 0;
+        mStageWrite.regFlags.c = mStageCompute.dataDst < 0 ? 1 : 0;
+      }
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
