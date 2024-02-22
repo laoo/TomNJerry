@@ -238,7 +238,12 @@ private:
       INT0,
       INT1,
       INT2,
-      INT3
+      INT3,
+      INT4,
+      INT5,
+      INT6,
+      INT7,
+      INT8
     } status = OPCODE;
     uint64_t queue = 0;
     uint32_t queueSize = 0;

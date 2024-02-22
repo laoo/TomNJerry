@@ -2037,7 +2037,7 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
         mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
         return { Prefetch::RESMAC, 0, 0 };
       }
-      //TODO: -- make INT0 empty so that instruction before interrupt is executed
+      //INT0 is empty so that instruction before interrupt is fully executed
     case Prefetch::INT0:
       mPrefetch.status = Prefetch::INT1;
       LOG_TAGUNINTERRUPTIBLESEQUENCE();
@@ -2052,12 +2052,31 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
       mRegisterFile = 0;
       return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::SUBQT << 10 ) | ( 4 << 5 ) | 31 };
     case Prefetch::INT3:
+      mPrefetch.status = Prefetch::INT4;
+      LOG_TAGUNINTERRUPTIBLESEQUENCE();
+      return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::STORE << 10 ) | ( 31 << 5 ) | 30 };
+    case Prefetch::INT4:
+      mPrefetch.status = Prefetch::INT5;
+      LOG_TAGUNINTERRUPTIBLESEQUENCE();
+      return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::MOVEI << 10 ) | 30 };
+    case Prefetch::INT5:
+      mPrefetch.status = Prefetch::INT6;
+      LOG_TAGUNINTERRUPTIBLESEQUENCE();
+      return { Prefetch::MOVEI1, 0, mInterruptVector & 0xffff };
+    case Prefetch::INT6:
+      mPrefetch.status = Prefetch::INT7;
+      LOG_TAGUNINTERRUPTIBLESEQUENCE();
+      return { Prefetch::MOVEI2, 0, mInterruptVector >> 16 };
+    case Prefetch::INT7:
+      mPrefetch.status = Prefetch::INT8;
+      LOG_TAGUNINTERRUPTIBLESEQUENCE();
+      mInterruptVector = 0;
+      return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::JUMP << 10 ) | ( 30 << 5 ) };
+    case Prefetch::INT8:
+      //giving time for jump to kick-in
       mPrefetch.status = Prefetch::OPCODE;
       LOG_TAGUNINTERRUPTIBLESEQUENCE();
-      mPrefetch.queueSize = 0;
-      mPC = mInterruptVector;
-      mInterruptVector = 0;
-      return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::STORE << 10 ) | ( 31 << 5 ) | 30 };
+      return { Prefetch::EMPTY, 0, 0 };
     default:
       assert( false );
       return { Prefetch::EMPTY, 0, 0 };
