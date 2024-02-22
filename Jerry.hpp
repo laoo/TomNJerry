@@ -232,7 +232,8 @@ private:
       OPCODE,
       MOVEI1,
       MOVEI2,
-      IMULTN,
+      NO_PREFETCH,
+      IMULTN = NO_PREFETCH,
       IMACN,
       RESMAC,
       INT0,
@@ -242,12 +243,12 @@ private:
       INT4,
       INT5,
       INT6,
-      INT7,
-      INT8
+      INT7
     } status = OPCODE;
     uint64_t queue = 0;
     uint32_t queueSize = 0;
-    uint32_t queuedAddress = 0;
+    uint32_t decodedAddress = 0;
+    bool doPrefetch = false;
 
     struct Pull
     {
