@@ -2012,6 +2012,7 @@ void Jerry::decode()
   switch ( pull.status() )
   {
   case Prefetch::OPCODE:
+  case Prefetch::MACSEQ:
     mStageRead.instruction = pull.opcode();
     mStageRead.regSrc = pull.regSrc();
     mStageRead.regDst = pull.regDst();
@@ -2068,8 +2069,6 @@ void Jerry::prefetch()
 
 Jerry::Prefetch::Pull Jerry::prefetchPull()
 {
-  uint16_t fetch;
-
   switch ( mPrefetch.status )
   {
   case Prefetch::OPCODE:
@@ -2078,61 +2077,94 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
       mPrefetch.doPrefetch = true;
       return { Prefetch::EMPTY, 0, 0 };
     }
-    fetch = mPrefetch.queue >> 48;
-
-    switch ( ( DSPI )( fetch >> 10 ) )
+    else
     {
-    case DSPI::MOVEI:
-      mPrefetch.status = Prefetch::MOVEI1;
-      break;
-    case DSPI::MMULT:
-      mPrefetch.status = Prefetch::IMULTN;
-      mMacStage.size = mMTXC & 15;
-      mMacStage.cnt = 0;
-      mMacStage.addr = mMTXA;
-      if ( mMacStage.addr < 0xf1b000 || mMacStage.addr > 0xf1bffc )
+      uint16_t fetch = mPrefetch.queue >> 48;
+
+      switch ( ( DSPI )( fetch >> 10 ) )
       {
-        throw EmulationViolation{ "Invalid D_MTXA address of " } << mMacStage.addr;
+      case DSPI::MOVEI:
+        mPrefetch.status = Prefetch::MOVEI1;
+        break;
+      case DSPI::MMULT:
+        mPrefetch.status = Prefetch::IMULTN;
+        mMacStage.size = mMTXC & 15;
+        mMacStage.cnt = 0;
+        mMacStage.addr = mMTXA;
+        if ( mMacStage.addr < 0xf1b000 || mMacStage.addr > 0xf1bffc )
+        {
+          throw EmulationViolation{ "Invalid D_MTXA address of " } << mMacStage.addr;
+        }
+        if ( mMacStage.size < 3 )
+        {
+          throw EmulationViolation{ "MMULT with invalid size of " } << mMacStage.size;
+        }
+        break;
+      case DSPI::IMULTN:
+        //Only difference between MACSEQ and OPCODE is that MACSEQ is uniterruptible
+        mPrefetch.status = Prefetch::MACSEQ;
+        break;
+      default:
+        break;
       }
-      if ( mMacStage.size < 3 )
-      {
-        throw EmulationViolation{ "MMULT with invalid size of " } << mMacStage.size;
-      }
-      break;
-    default:
-      break;
+      mPrefetch.queue <<= 16;
+      mPrefetch.queueSize -= 1;
+      mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
+      mPrefetch.decodedAddress += 2;
+      return { Prefetch::OPCODE, mPrefetch.decodedAddress - 2, fetch };
     }
-    mPrefetch.queue <<= 16;
-    mPrefetch.queueSize -= 1;
-    mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
-    mPrefetch.decodedAddress += 2;
-    return { Prefetch::OPCODE, mPrefetch.decodedAddress - 2, fetch };
+  case Prefetch::MACSEQ:
+    if ( mPrefetch.queueSize == 0 )
+    {
+      mPrefetch.doPrefetch = true;
+      return { Prefetch::EMPTY, 0, 0 };
+    }
+    else
+    {
+      uint16_t fetch = mPrefetch.queue >> 48;
+      mPrefetch.queue <<= 16;
+      mPrefetch.queueSize -= 1;
+      mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
+      mPrefetch.decodedAddress += 2;
+      Prefetch::Pull result{ Prefetch::OPCODE, mPrefetch.decodedAddress - 2, fetch };
+      if ( result.opcode() == DSPI::RESMAC )
+      {
+        mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
+      }
+      return result;
+    }
   case Prefetch::MOVEI1:
     if ( mPrefetch.queueSize == 0 )
     {
       mPrefetch.doPrefetch = true;
       return { Prefetch::EMPTY, 0, 0 };
     }
-    fetch = mPrefetch.queue >> 48;
-    mPrefetch.status = Prefetch::MOVEI2;
-    mPrefetch.queue <<= 16;
-    mPrefetch.queueSize -= 1;
-    mPrefetch.decodedAddress += 2;
-    mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
-    return { Prefetch::MOVEI1, 0, fetch };
+    else
+    {
+      uint16_t fetch = mPrefetch.queue >> 48;
+      mPrefetch.status = Prefetch::MOVEI2;
+      mPrefetch.queue <<= 16;
+      mPrefetch.queueSize -= 1;
+      mPrefetch.decodedAddress += 2;
+      mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
+      return { Prefetch::MOVEI1, 0, fetch };
+    }
   case Prefetch::MOVEI2:
     if ( mPrefetch.queueSize == 0 )
     {
       mPrefetch.doPrefetch = true;
       return { Prefetch::EMPTY, 0, 0 };
     }
-    fetch = mPrefetch.queue >> 48;
-    mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
-    mPrefetch.queue <<= 16;
-    mPrefetch.queueSize -= 1;
-    mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
-    mPrefetch.decodedAddress += 2;
-    return { Prefetch::MOVEI2, 0, fetch };
+    else
+    {
+      uint16_t fetch = mPrefetch.queue >> 48;
+      mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
+      mPrefetch.queue <<= 16;
+      mPrefetch.queueSize -= 1;
+      mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
+      mPrefetch.decodedAddress += 2;
+      return { Prefetch::MOVEI2, 0, fetch };
+    }
   case Prefetch::IMULTN:
     mPrefetch.doPrefetch = false;
     mPrefetch.status = Prefetch::IMACN;
@@ -2149,7 +2181,6 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
       mPrefetch.doPrefetch = mPrefetch.queueSize < 3 && mInterruptVector == 0;
       return { Prefetch::RESMAC, 0, 0 };
     }
-    //INT0 is empty so that instruction before interrupt is fully executed
   case Prefetch::INT0:
     mPrefetch.doPrefetch = false;
     mPrefetch.status = Prefetch::INT1;

@@ -232,6 +232,7 @@ private:
       OPCODE,
       MOVEI1,
       MOVEI2,
+      MACSEQ,
       NO_PREFETCH,
       IMULTN = NO_PREFETCH,
       IMACN,
