@@ -32,6 +32,10 @@ set_source_files_properties(wav.c PROPERTIES
   COMPILE_DEFINITIONS "__LITTLE_ENDIAN__"
 )
 
+set_target_properties( Jerry PROPERTIES
+  COMPILE_DEFINITIONS LOG_PIPELINE
+)
+
 target_precompile_headers( Tom PRIVATE
   <algorithm>
   <atomic>
