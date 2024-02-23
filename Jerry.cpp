@@ -239,7 +239,7 @@ void Jerry::ackWrite()
   case 2:
     LOG_STOREWORD( mBusGate.getAddress(), mBusGate.getValue() );
     break;
-  case 4:
+  case 3:
     LOG_STORELONG( mBusGate.getAddress(), mBusGate.getValue() );
     break;
   default:
