@@ -305,9 +305,13 @@ private:
 
   void ackWrite();
 
+
   void halfCycle();
+  void divideUnit();
 
   void io();
+  void localBus();
+  void ioDispatch();
   void stageWrite();
   void compute();
   void stageRead();
@@ -424,6 +428,26 @@ private:
       uint32_t reg;
     };
   } mStageIO;
+
+  struct LocalBus
+  {
+    enum State
+    {
+      IDLE,
+      WRITE_LONG,
+      WRITE_WORD,
+      WRITE_BYTE,
+      READ_LONG,
+      READ_WORD,
+      READ_BYTE
+    } state = IDLE;
+    uint32_t address = 0;
+    union
+    {
+      uint32_t data = 0;
+      uint32_t reg;
+    };
+  } mLocalBus;
 
   struct Interruptor
   {

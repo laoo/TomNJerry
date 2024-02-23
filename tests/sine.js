@@ -39,9 +39,18 @@ init:
     store   r2,(r0)
     store   r3,(r1)
     movei   #D_FLAGS,rFlagsAdr
-    movei   #D_I2SENA,r1
+    movei   #D_I2SENA|REGPAGE,r1
     moveq   #0,rSamp
-    store   r1,(rFlagsAdr)
+    store   r1, (rFlagsAdr)
+
+    moveta  rI2SL, rI2SL
+    moveta  rI2SR, rI2SR
+    moveta  rInd, rInd
+    moveta  rI2sAdr, rI2sAdr
+    moveta  rFlagsAdr, rFlagsAdr
+    moveta  rFlags, rFlags
+    moveta  rStack, rStack
+    moveta  rRetAdr, rRetAdr
 
     movei   #100,r0
     add     rInd,r0
@@ -49,7 +58,7 @@ init:
 loop
     cmp     r0, rInd
     jr      cc,loop
-    nop
+    movefa  rInd, rInd
     movei   #D_CTRL, r0
     moveq   #0, r1
     store   r1,(r0)
@@ -69,5 +78,6 @@ I2S:
     addqt   #2,rRetAdr          ; next instruction
     bclr    #3,rFlags           ; clear IMASK
     addq    #4,rStack           ; pop from stack
-    jump    (rRetAdr)           ; return
-    store   rFlags,(rFlagsAdr)  ; restore flags
+    store   rFlags, (rFlagsAdr); restore flags
+    jump    (rRetAdr); return
+    nop

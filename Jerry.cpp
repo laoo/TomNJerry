@@ -565,20 +565,67 @@ void Jerry::writeLong( uint32_t address, uint32_t data )
   }
 }
 
+void Jerry::localBus()
+{
+  switch ( mLocalBus.state )
+  {
+  case LocalBus::WRITE_LONG:
+    writeLong( mLocalBus.address, mLocalBus.data );
+    mLocalBus.state = LocalBus::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    LOG_STORELONG( mLocalBus.address, mLocalBus.data );
+    break;
+  case LocalBus::WRITE_WORD:
+    LOG_WARNMEMORYACCESS();
+    writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
+    mLocalBus.state = LocalBus::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    LOG_STORELONG( mLocalBus.address, mLocalBus.data );
+    break;
+  case LocalBus::WRITE_BYTE:
+    LOG_WARNMEMORYACCESS();
+    writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
+    mLocalBus.state = LocalBus::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    LOG_STORELONG( mLocalBus.address, mLocalBus.data );
+    break;
+  case LocalBus::READ_LONG:
+    mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address ) );
+    mLocalBus.state = LocalBus::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
+    break;
+  case LocalBus::READ_WORD:
+    LOG_WARNMEMORYACCESS();
+    mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) << ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
+    mStageIO.state = StageIO::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
+    break;
+  case LocalBus::READ_BYTE:
+    LOG_WARNMEMORYACCESS();
+    mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) << ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
+    mLocalBus.state = LocalBus::IDLE;
+    mLastLocalRAMAccessCycle = mCycle;
+    LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
+    break;
+  default:
+    break;
+  }
+}
+
 void Jerry::storeByte( uint32_t address, uint8_t data )
 {
   if ( ( address & 0x00ff0000 ) != 0x00f10000 )
   {
     busGatePush( AdvanceResult::writeByte( address, data ) );
   }
-  else
+  else if ( mLocalBus.state == LocalBus::IDLE )
   {
-    LOG_WARNMEMORYACCESS();
-    int shift = ( 3 - ( address & 3 ) ) * 8;
-    writeLong( address & 0xfffffc, data << shift );
+    mLocalBus.state = LocalBus::WRITE_BYTE;
+    mLocalBus.address = address;
+    mLocalBus.data = data;
     mStageIO.state = StageIO::IDLE;
-    mLastLocalRAMAccessCycle = mCycle;
-    LOG_STORELONG( address, data );
   }
 }
 
@@ -590,12 +637,10 @@ void Jerry::storeWord( uint32_t address, uint16_t data )
   }
   else
   {
-    LOG_WARNMEMORYACCESS();
-    int shift = ( ( address & 1 ) ^ 1 ) * 16;
-    writeLong( address & 0xfffffc, data << shift );
+    mLocalBus.state = LocalBus::WRITE_WORD;
+    mLocalBus.address = address;
+    mLocalBus.data = data;
     mStageIO.state = StageIO::IDLE;
-    mLastLocalRAMAccessCycle = mCycle;
-    LOG_STORELONG( address, data );
   }
 }
 
@@ -607,10 +652,10 @@ void Jerry::storeLong( uint32_t address, uint32_t data )
   }
   else
   {
-    writeLong( address, data );
+    mLocalBus.state = LocalBus::WRITE_LONG;
+    mLocalBus.address = address;
+    mLocalBus.data = data;
     mStageIO.state = StageIO::IDLE;
-    mLastLocalRAMAccessCycle = mCycle;
-    LOG_STORELONG( address, data );
   }
 }
 
@@ -622,13 +667,10 @@ void Jerry::loadByte( uint32_t address, uint32_t reg )
   }
   else
   {
-    LOG_WARNMEMORYACCESS();
-    int shift = ( 3 - ( address & 3 ) ) * 8;
-
-    mStageWrite.updateRegL( reg, readLong( address & 0xfffffc ) << shift );
+    mLocalBus.state = LocalBus::READ_BYTE;
+    mLocalBus.address = address;
+    mLocalBus.reg = reg;
     mStageIO.state = StageIO::IDLE;
-    mLastLocalRAMAccessCycle = mCycle;
-    LOG_LOADLONG( address, mStageWrite.dataL );
   }
 }
 
@@ -640,13 +682,10 @@ void Jerry::loadWord( uint32_t address, uint32_t reg )
   }
   else
   {
-    LOG_WARNMEMORYACCESS();
-    int shift = ( ( address & 1 ) ^ 1 ) * 16;
-
-    mStageWrite.updateRegL( reg, readLong( address & 0xfffffc ) << shift );
+    mLocalBus.state = LocalBus::READ_WORD;
+    mLocalBus.address = address;
+    mLocalBus.reg = reg;
     mStageIO.state = StageIO::IDLE;
-    mLastLocalRAMAccessCycle = mCycle;
-    LOG_LOADLONG( address, mStageWrite.dataL );
   }
 }
 
@@ -658,15 +697,23 @@ void Jerry::loadLong( uint32_t address, uint32_t reg )
   }
   else
   {
-    mStageWrite.updateRegL( reg, readLong( address ) );
+    mLocalBus.state = LocalBus::READ_LONG;
+    mLocalBus.address = address;
+    mLocalBus.reg = reg;
     mStageIO.state = StageIO::IDLE;
-    mLastLocalRAMAccessCycle = mCycle;
-    LOG_LOADLONG( address, mStageWrite.dataL );
   }
+}
+
+void Jerry::io()
+{
+  localBus();
+  ioDispatch();
 }
 
 void Jerry::halfCycle()
 {
+  checkInterrupt();
+  divideUnit();
   io();
   stageWrite();
   compute();
@@ -717,7 +764,7 @@ bool Jerry::testCondition( uint32_t condition ) const
   }
 }
 
-void Jerry::io()
+void Jerry::divideUnit()
 {
   if ( mDivideUnit.cycle >= 0 )
   {
@@ -754,6 +801,10 @@ void Jerry::io()
       }
     }
   }
+}
+
+void Jerry::ioDispatch()
+{
 
   switch ( mStageIO.state )
   {
@@ -779,7 +830,6 @@ void Jerry::io()
       break;
   }
 
-  checkInterrupt();
 }
 
 bool Jerry::stageWriteReg()
@@ -2063,16 +2113,13 @@ void Jerry::prefetch()
   //Only local RAM for now
   assert( ( mPC >= RAM_BASE ) && ( mPC < RAM_BASE + RAM_SIZE ) );
 
-  if ( mLastLocalRAMAccessCycle != mCycle )
+  if ( mPrefetch.doPrefetch && mLastLocalRAMAccessCycle != mCycle )
   {
-    if ( mPrefetch.doPrefetch )
+    if ( int off = prefetchFill() )
     {
-      if ( int off = prefetchFill() )
-      {
-        LOG_PREFETCH( mPC );
-        mLastLocalRAMAccessCycle = mCycle;
-        mPC += off;
-      }
+      LOG_PREFETCH( mPC );
+      mLastLocalRAMAccessCycle = mCycle;
+      mPC += off;
     }
   }
 
