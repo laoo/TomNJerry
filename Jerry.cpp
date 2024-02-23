@@ -210,7 +210,7 @@ void Jerry::busCycleAckReadLongRequest( uint32_t value )
 {
   assert( mBusGate );
   assert( mBusGate.getOperation() > 0 );
-  assert( mBusGate.getSize() == 4 );
+  assert( mBusGate.getSize() == 3 );
   assert( mBusGate.getAddress() <= 0xf10000 );
   assert( mBusGate.getReg() <= 0x1f );
 
@@ -1355,6 +1355,11 @@ void Jerry::compute()
     {
       mPC = mStageCompute.dataDst;
       mPrefetch.queueSize = 0;
+      LOG_JUMPT();
+    }
+    else
+    {
+      LOG_JUMPF();
     }
     mStageCompute.instruction = DSPI::EMPTY;
     break;
@@ -1366,6 +1371,11 @@ void Jerry::compute()
     {
       mPC = mStageCompute.dataSrc;
       mPrefetch.queueSize = 0;
+      LOG_JUMPT();
+    }
+    else
+    {
+      LOG_JUMPF();
     }
     mStageCompute.instruction = DSPI::EMPTY;
     break;

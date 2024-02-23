@@ -379,6 +379,16 @@ void PipelineLog::computeFlags( RegFlags flags )
   mBuffer[0x4b + sprintf( mBuffer + 0x4b, "%c%c%c", NFlag[flags.n + 1], CFlag[flags.c + 1], ZFlag[flags.z + 1] )] = ' ';
 }
 
+void PipelineLog::jumpT()
+{
+  mBuffer[0x48] = 'T';
+}
+
+void PipelineLog::jumpF()
+{
+  mBuffer[0x48] = 'F';
+}
+
 void PipelineLog::computeMul()
 {
   mBuffer[0x47] = 'm';

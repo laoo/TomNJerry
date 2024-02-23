@@ -18,6 +18,8 @@ public:
   void decodeRESMAC( uint32_t reg2 );
   void portImm( uint32_t value );
   void portCond( uint32_t value );
+  void jumpT();
+  void jumpF();
   void portReadSrc( uint32_t reg, uint32_t value );
   void portReadSrcMMULT( uint32_t reg, bool high, uint32_t value );
   void portReadDst( uint32_t reg, uint32_t value );
@@ -64,6 +66,8 @@ static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32, 1, 2, 3, 4, 5, 6, 7
 #define LOG_DECODERESMAC( REG2 ) mLog->decodeRESMAC( REG2 );
 #define LOG_PORTIMM( VALUE ) mLog->portImm( VALUE );
 #define LOG_PORTCOND( VALUE ) mLog->portCond( VALUE );
+#define LOG_JUMPT() mLog->jumpT();
+#define LOG_JUMPF() mLog->jumpF();
 #define LOG_PORTREADSRC( REG, VALUE ) mLog->portReadSrc( REG, VALUE );
 #define LOG_PORTREADSRCMMULT( REG, HIGH, VALUE ) mLog->portReadSrcMMULT( REG, HIGH, VALUE );
 #define LOG_PORTREADDST( REG, VALUE ) mLog->portReadDst( REG, VALUE );
@@ -97,6 +101,8 @@ static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32, 1, 2, 3, 4, 5, 6, 7
 #define LOG_DECODERESMAC( REG2 )
 #define LOG_PORTIMM( VALUE )
 #define LOG_PORTCOND( VALUE )
+#define LOG_JUMPT()
+#define LOG_JUMPF()
 #define LOG_PORTREADSRC( REG, VALUE )
 #define LOG_PORTREADSRCMMULT( REG, HIGH, VALUE )
 #define LOG_PORTREADDST( REG, VALUE )
