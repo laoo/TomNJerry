@@ -381,12 +381,12 @@ void PipelineLog::computeFlags( RegFlags flags )
 
 void PipelineLog::jumpT()
 {
-  mBuffer[0x48] = 'T';
+  mBuffer[0x4a] = 'T';
 }
 
 void PipelineLog::jumpF()
 {
-  mBuffer[0x48] = 'F';
+  mBuffer[0x4a] = 'F';
 }
 
 void PipelineLog::computeMul()

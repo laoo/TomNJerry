@@ -572,6 +572,7 @@ void Jerry::localBus()
   case LocalBus::WRITE_LONG:
     writeLong( mLocalBus.address, mLocalBus.data );
     mLocalBus.state = LocalBus::IDLE;
+    mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
     LOG_STORELONG( mLocalBus.address, mLocalBus.data );
     break;
@@ -579,6 +580,7 @@ void Jerry::localBus()
     LOG_WARNMEMORYACCESS();
     writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
     mLocalBus.state = LocalBus::IDLE;
+    mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
     LOG_STORELONG( mLocalBus.address, mLocalBus.data );
     break;
@@ -586,18 +588,21 @@ void Jerry::localBus()
     LOG_WARNMEMORYACCESS();
     writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
     mLocalBus.state = LocalBus::IDLE;
+    mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
     LOG_STORELONG( mLocalBus.address, mLocalBus.data );
     break;
   case LocalBus::READ_LONG:
     mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address ) );
     mLocalBus.state = LocalBus::IDLE;
+    mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
     LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
     break;
   case LocalBus::READ_WORD:
     LOG_WARNMEMORYACCESS();
     mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) << ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
+    mStageIO.state = StageIO::IDLE;
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
     LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
@@ -606,6 +611,7 @@ void Jerry::localBus()
     LOG_WARNMEMORYACCESS();
     mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) << ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
     mLocalBus.state = LocalBus::IDLE;
+    mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
     LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
     break;
@@ -625,7 +631,6 @@ void Jerry::storeByte( uint32_t address, uint8_t data )
     mLocalBus.state = LocalBus::WRITE_BYTE;
     mLocalBus.address = address;
     mLocalBus.data = data;
-    mStageIO.state = StageIO::IDLE;
   }
 }
 
@@ -640,7 +645,6 @@ void Jerry::storeWord( uint32_t address, uint16_t data )
     mLocalBus.state = LocalBus::WRITE_WORD;
     mLocalBus.address = address;
     mLocalBus.data = data;
-    mStageIO.state = StageIO::IDLE;
   }
 }
 
@@ -655,7 +659,6 @@ void Jerry::storeLong( uint32_t address, uint32_t data )
     mLocalBus.state = LocalBus::WRITE_LONG;
     mLocalBus.address = address;
     mLocalBus.data = data;
-    mStageIO.state = StageIO::IDLE;
   }
 }
 
@@ -670,7 +673,6 @@ void Jerry::loadByte( uint32_t address, uint32_t reg )
     mLocalBus.state = LocalBus::READ_BYTE;
     mLocalBus.address = address;
     mLocalBus.reg = reg;
-    mStageIO.state = StageIO::IDLE;
   }
 }
 
@@ -685,7 +687,6 @@ void Jerry::loadWord( uint32_t address, uint32_t reg )
     mLocalBus.state = LocalBus::READ_WORD;
     mLocalBus.address = address;
     mLocalBus.reg = reg;
-    mStageIO.state = StageIO::IDLE;
   }
 }
 
@@ -700,7 +701,6 @@ void Jerry::loadLong( uint32_t address, uint32_t reg )
     mLocalBus.state = LocalBus::READ_LONG;
     mLocalBus.address = address;
     mLocalBus.reg = reg;
-    mStageIO.state = StageIO::IDLE;
   }
 }
 
@@ -805,7 +805,6 @@ void Jerry::divideUnit()
 
 void Jerry::ioDispatch()
 {
-
   switch ( mStageIO.state )
   {
     case StageIO::STORE_BYTE:
@@ -829,7 +828,6 @@ void Jerry::ioDispatch()
     default:
       break;
   }
-
 }
 
 bool Jerry::stageWriteReg()
@@ -2476,16 +2474,7 @@ void Jerry::dualPortCommit()
 
 void Jerry::lockReg( uint32_t reg )
 {
-  static int cnt = 0;
   assert( mRegStatus[reg] == FREE );
-  if ( reg == 18 )
-  {
-    cnt += 1;
-    if ( cnt == 7 )
-    {
-      int k = 0;
-    }
-  }
   mRegStatus[reg] = mRegisterFile;
 }
 
