@@ -329,11 +329,15 @@ private:
 
 
 private:
-
-  uint16_t mJPIT1;
+  uint16_t mJPIT1; // original values
   uint16_t mJPIT2;
   uint16_t mJPIT3;
   uint16_t mJPIT4;
+  uint16_t mJPIT1R; // modified values
+  uint16_t mJPIT2R;
+  uint16_t mJPIT3R;
+  uint16_t mJPIT4R;
+
   JINTCTRL mJIntCtrl = {};
   Joystick mJoystick = {};
   uint16_t mSCLK = 0xffff;
@@ -378,7 +382,7 @@ private:
     uint32_t regDst = 0;
   } mStageCompute = {};
 
-  struct StageWrite 
+  struct StageWrite
   {
     static const uint32_t UPDATE_NONE   = 0x00;
     static const uint32_t UPDATE_REG    = 0x01;

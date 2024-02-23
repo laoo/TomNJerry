@@ -263,6 +263,14 @@ uint16_t Jerry::readWord( uint32_t address ) const
     break;
   case JPIT4:
     break;
+  case JPIT1R:
+    return mJPIT1R;
+  case JPIT2R:
+    return mJPIT2R;
+  case JPIT3R:
+    return mJPIT3R;
+  case JPIT4R:
+    return mJPIT4R;
   case J_INT:
     return mJIntCtrl.get();
   case J_INT + 2:
@@ -382,16 +390,20 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
   switch ( address )
   {
   case JPIT1:
-    mJPIT1 = data;
+    mJPIT1R = mJPIT1 = data;
+    reconfigureTimer1();
     break;
   case JPIT2:
-    mJPIT2 = data;
+    mJPIT2R = mJPIT2 = data;
+    reconfigureTimer1();
     break;
   case JPIT3:
-    mJPIT3 = data;
+    mJPIT3R = mJPIT3 = data;
+    reconfigureTimer1();
     break;
   case JPIT4:
-    mJPIT4 = data;
+    mJPIT4R = mJPIT4 = data;
+    reconfigureTimer1();
     break;
   case J_INT:
     mJIntCtrl.set( data );
@@ -435,7 +447,7 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
   case JPIT2R:
   case JPIT3R:
   case JPIT4R:
-    throw Ex{ "Reading PIT Not implemented yet" };
+    throw Ex{ "Writing RO PIT register." };
     break;
   case D_FLAGS:
   case D_MTXC:
@@ -472,23 +484,23 @@ void Jerry::writeLong( uint32_t address, uint32_t data )
   switch ( address )
   {
   case JPIT1:
-    mJPIT1 = data >> 16;
-    mJPIT2 = data & 0xffff;
+    mJPIT1R = mJPIT1 = data >> 16;
+    mJPIT2R = mJPIT2 = data & 0xffff;
     reconfigureTimer1();
     break;
   case JPIT3:
-    mJPIT3 = data >> 16;
-    mJPIT4 = data & 0xffff;
+    mJPIT3R = mJPIT3 = data >> 16;
+    mJPIT4R = mJPIT4 = data & 0xffff;
     reconfigureTimer2();
     break;
   case J_INT:
     mJIntCtrl.set( data );
     break;
   case L_I2S:
-    mI2S.left = data;
+    mI2S.left = data & 0xffff;
     break;
   case R_I2S:
-    mI2S.right = data;
+    mI2S.right = data & 0xffff;
     break;
   case ASICLK:
   case ASICTRL:
