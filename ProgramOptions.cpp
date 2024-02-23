@@ -10,6 +10,7 @@ ProgramOptions::ProgramOptions( char const* name, char const* desc, int argc, ch
     ( "w,wav", "wave output file", cxxopts::value<std::string>(), "wav" )
     ( "c,cycles", "number of bus cycles to analyze", cxxopts::value<int>() )
     ( "system", "PAL or NTSC", cxxopts::value<std::string>()->default_value("PAL") )
+    ( "r,regdump","dump register when finished")
     ;
 
   mOpt->
@@ -52,6 +53,9 @@ ProgramOptions::ProgramOptions( char const* name, char const* desc, int argc, ch
     mWavOut = std::filesystem::absolute( ( *mRes )["wav"].as<std::string>() );
   }
 
+  if ( mRes->count( "regdump" ) ) {
+    mDumpRegisters = 1;
+  }
   mInput = std::filesystem::absolute( input );
 
   {
@@ -81,4 +85,9 @@ int ProgramOptions::cycles() const
 bool ProgramOptions::isNTSC() const
 {
   return ( *mRes )["system"].as<std::string>() == "NTSC";
+}
+
+int ProgramOptions::dumpRegisters() const
+{
+  return mDumpRegisters;
 }

@@ -75,6 +75,24 @@ int main( int argc, char const* argv[] )
         break;
       }
     }
+    if ( options.dumpRegisters() ){
+      int i;
+      printf("Bank 0");
+      for(i = 0; i < 32; ++i){
+        if ( (i & 7) == 0 ){
+          printf("\n%02x:",i);
+        }
+        printf(" %08x",jerry.getReg(i));
+      }
+      printf("\nBank 1");
+      for(i = 0; i < 32; ++i){
+        if ( (i & 7) == 0 ){
+          printf("\n%02x:",i);
+        }
+        printf(" %08x",jerry.getReg(32+i));
+      }
+      printf("\n");
+    }
   }
   catch ( const std::exception& e )
   {

@@ -19,6 +19,7 @@ public:
   std::filesystem::path wavOut() const;
   int cycles() const;
   bool isNTSC() const;
+  int dumpRegisters() const;
 
 private:
   std::shared_ptr<cxxopts::Options> mOpt;
@@ -27,4 +28,5 @@ private:
   std::filesystem::path mInput = {};
   std::filesystem::path mWavOut = {};
   int mCycles = 0;
+  int mDumpRegisters = 0;
 };

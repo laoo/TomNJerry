@@ -196,6 +196,11 @@ public:
   void busCycleAckReadWordRequest( uint16_t value );
   void busCycleAckReadLongRequest( uint32_t value );
 
+  uint32_t getReg(int index)
+  {
+    return mRegs[index & 63];
+  };
+
 private:
 
   uint16_t readWord( uint32_t address ) const;
@@ -326,7 +331,6 @@ private:
   void busGatePop();
   Prefetch::Pull prefetchPull();
   int prefetchFill();
-
 
 private:
   uint16_t mJPIT1; // original values
