@@ -42,10 +42,19 @@ init:
     movei   #D_I2SENA,r1
     moveq   #0,rSamp
     store   r1,(rFlagsAdr)
-    move    pc,r0
+
+    movei   #100,r0
+    add     rInd,r0
 
 loop
-    jr      loop
+    cmp     r0, rInd
+    jr      cc,loop
+    nop
+    movei   #D_CTRL, r0
+    moveq   #0, r1
+    store   r1,(r0)
+wait
+    jr      wait
     nop
 
 I2S:

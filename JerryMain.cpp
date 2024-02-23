@@ -4,14 +4,64 @@
 #include "DSPRaw.hpp"
 #include "RAM.hpp"
 
+
+void loop( Jerry & jerry, RAM & ram, uint64_t cycles, int finish )
+{
+  static constexpr uint64_t LATENCY = 3;
+
+  AdvanceResult req = AdvanceResult::nop();
+  for ( uint64_t i = 0; i < cycles; ++i )
+  {
+    switch ( i & 0x3 )
+    {
+    case 1:
+      req = jerry.busCycleGetRequest();
+      break;
+    case 3:
+      switch ( req.getOperation() )
+      {
+      case AdvanceResult::kByteFlag:
+        jerry.busCycleAckReadByteRequest( ram.b( req.getAddress() ) );
+        break;
+      case AdvanceResult::kWordFlag:
+        jerry.busCycleAckReadWordRequest( ram.w( req.getAddress() ) );
+        break;
+      case AdvanceResult::kLongFlag:
+        jerry.busCycleAckReadLongRequest( ram.l( req.getAddress() ) );
+        break;
+      case AdvanceResult::kWriteFlag | AdvanceResult::kByteFlag:
+        ram.b()[req.getAddress()] = ( uint8_t )req.getValue();
+        jerry.busCycleIdle();
+        break;
+      case AdvanceResult::kWriteFlag | AdvanceResult::kWordFlag:
+        ram.w()[req.getAddress() >> 1] = ( uint16_t )req.getValue();
+        jerry.busCycleIdle();
+        break;
+      case AdvanceResult::kWriteFlag | AdvanceResult::kLongFlag:
+        ram.l()[req.getAddress() >> 2] = req.getValue();
+        jerry.busCycleIdle();
+        break;
+      case AdvanceResult::kFinishFlag:
+        if ( finish )
+          return;
+        break;
+      }
+      break;
+    default:
+      jerry.busCycleIdle();
+      break;
+    }
+  }
+}
+
 int main( int argc, char const* argv[] )
 {
   try
   {
     ProgramOptions options{ "Jerry", "DSP pipeline symulator", argc, argv};
 
-    //BS94 input{ options.input() };
-    DSPRaw input{ "d:\\home\\yarc_reloaded\\lsp_v15.bin" };
+    BS94 input{ options.input() };
+    //DSPRaw input{ "d:\\home\\yarc_reloaded\\lsp_v15.bin" };
 
     RAM ram;
     uint32_t musicAddr = 0x6ad8;
@@ -25,56 +75,14 @@ int main( int argc, char const* argv[] )
 
     Jerry jerry{ options.isNTSC(), options.wavOut() };
 
-    static constexpr uint64_t LATENCY = 3;
-    
-
     jerry.debugWrite( input.address(), input.data() );
     jerry.busCycleRequestWriteLong( Jerry::JOYSTICK, 0x1000000 );
-    jerry.busCycleRequestWriteLong( Jerry::D_FLAGS, Jerry::FLAGS::REGPAGE );
+    //jerry.busCycleRequestWriteLong( Jerry::D_FLAGS, Jerry::FLAGS::REGPAGE );
     jerry.busCycleRequestWriteLong( Jerry::D_PC, input.address() );
     jerry.busCycleRequestWriteLong( Jerry::D_CTRL, Jerry::CTRL::DSPGO );
 
-    const uint64_t cycles = options.cycles();
+    loop( jerry, ram, options.cycles(), options.finish() );
 
-    AdvanceResult req = AdvanceResult::nop();
-    for ( uint64_t i = 0; i < cycles; ++i )
-    {
-      switch ( i & 0x3 )
-      {
-      case 1:
-        req = jerry.busCycleGetRequest();
-        break;
-      case 3:
-        switch ( req.getOperation() )
-        {
-        case AdvanceResult::kByteFlag:
-          jerry.busCycleAckReadByteRequest( ram.b( req.getAddress() ) );
-          break;
-        case AdvanceResult::kShortFlag:
-          jerry.busCycleAckReadWordRequest( ram.w( req.getAddress() ) );
-          break;
-        case AdvanceResult::kLongFlag:
-          jerry.busCycleAckReadLongRequest( ram.l( req.getAddress() ) );
-          break;
-        case AdvanceResult::kWriteFlag | AdvanceResult::kByteFlag:
-          ram.b()[req.getAddress()] = ( uint8_t )req.getValue();
-          jerry.busCycleIdle();
-          break;
-        case AdvanceResult::kWriteFlag | AdvanceResult::kShortFlag:
-          ram.w()[req.getAddress() >> 1] = ( uint16_t )req.getValue();
-          jerry.busCycleIdle();
-          break;
-        case AdvanceResult::kWriteFlag | AdvanceResult::kLongFlag:
-          ram.l()[req.getAddress() >> 2] = req.getValue();
-          jerry.busCycleIdle();
-          break;
-        }
-        break;
-      default:
-        jerry.busCycleIdle();
-        break;
-      }
-    }
     if ( options.dumpRegisters() ){
       int i;
       printf("Bank 0");

@@ -636,7 +636,7 @@ void Jerry::loadWord( uint32_t address, uint32_t reg )
 {
   if ( ( address & 0x00ff0000 ) != 0x00f10000 )
   {
-    busGatePush( AdvanceResult::readShort( address, reg ) );
+    busGatePush( AdvanceResult::readWord( address, reg ) );
   }
   else
   {
@@ -2506,6 +2506,9 @@ void Jerry::ctrlSet( uint16_t value )
 
   if ( value & CTRL::BUS_HOG )
     throw EmulationViolation{ "DSP Bus hog triggered" };
+
+  if ( !mCtrl.dspgo )
+    mBusGate = AdvanceResult::finish();
 }
 
 void Jerry::flagsSet( uint16_t value )

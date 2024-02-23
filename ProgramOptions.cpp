@@ -8,9 +8,10 @@ ProgramOptions::ProgramOptions( char const* name, char const* desc, int argc, ch
     ( "h,help", "produce help message" )
     ( "i,input", "input file, first implicit agrument", cxxopts::value<std::string>(), "input" )
     ( "w,wav", "wave output file", cxxopts::value<std::string>(), "wav" )
-    ( "c,cycles", "number of bus cycles to analyze", cxxopts::value<int>() )
+    ( "c,cycles", "number of bus cycles to analyzem -1 for infinite", cxxopts::value<int>()->default_value("-1") )
     ( "system", "PAL or NTSC", cxxopts::value<std::string>()->default_value("PAL") )
-    ( "r,regdump","dump register when finished")
+    ( "r,regdump","dump register when finished" )
+    ( "f,finish","exit when DSP clears DSPGO" )
     ;
 
   mOpt->
@@ -56,6 +57,12 @@ ProgramOptions::ProgramOptions( char const* name, char const* desc, int argc, ch
   if ( mRes->count( "regdump" ) ) {
     mDumpRegisters = 1;
   }
+
+  if ( mRes->count( "finish" ) )
+  {
+    mFinish = 1;
+  }
+
   mInput = std::filesystem::absolute( input );
 
   {
@@ -90,4 +97,9 @@ bool ProgramOptions::isNTSC() const
 int ProgramOptions::dumpRegisters() const
 {
   return mDumpRegisters;
+}
+
+int ProgramOptions::finish() const
+{
+  return mFinish;
 }

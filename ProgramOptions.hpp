@@ -20,6 +20,7 @@ public:
   int cycles() const;
   bool isNTSC() const;
   int dumpRegisters() const;
+  int finish() const;
 
 private:
   std::shared_ptr<cxxopts::Options> mOpt;
@@ -29,4 +30,5 @@ private:
   std::filesystem::path mWavOut = {};
   int mCycles = 0;
   int mDumpRegisters = 0;
+  int mFinish = 0;
 };
