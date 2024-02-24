@@ -31,15 +31,15 @@ void loop( Jerry & jerry, RAM & ram, uint64_t cycles, int finish )
         break;
       case AdvanceResult::kWriteFlag | AdvanceResult::kByteFlag:
         ram.b()[req.getAddress()] = ( uint8_t )req.getValue();
-        jerry.busCycleIdle();
+        jerry.busCycleAckWrite();
         break;
       case AdvanceResult::kWriteFlag | AdvanceResult::kWordFlag:
         ram.w()[req.getAddress() >> 1] = ( uint16_t )req.getValue();
-        jerry.busCycleIdle();
+        jerry.busCycleAckWrite();
         break;
       case AdvanceResult::kWriteFlag | AdvanceResult::kLongFlag:
         ram.l()[req.getAddress() >> 2] = req.getValue();
-        jerry.busCycleIdle();
+        jerry.busCycleAckWrite();
         break;
       case AdvanceResult::kFinishFlag:
         if ( finish )

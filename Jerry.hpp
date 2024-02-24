@@ -192,14 +192,12 @@ public:
   void busCycleRequestWriteWord( uint32_t address, uint16_t data );
   void busCycleRequestWriteLong( uint32_t address, uint32_t data );
 
+  void busCycleAckWrite();
   void busCycleAckReadByteRequest( uint8_t value );
   void busCycleAckReadWordRequest( uint16_t value );
   void busCycleAckReadLongRequest( uint32_t value );
 
-  uint32_t getReg(int index)
-  {
-    return mRegs[index & 63];
-  };
+  uint32_t getReg( int32_t index ) const;
 
 private:
 
@@ -266,13 +264,13 @@ private:
       {
         return static_cast<DSPI>( ( value >> 26 ) & 63 );
       }
-      uint32_t regSrc() const
+      LocalReg regSrc() const
       {
-        return ( value >> ( 16 + 5 ) ) & 31;
+        return LocalReg( ( value >> ( 16 + 5 ) ) & 31 );
       }
-      uint32_t regDst() const
+      LocalReg regDst() const
       {
-        return ( value >> 16 ) & 31;
+        return LocalReg( ( value >> 16 ) & 31 );
       }
       uint32_t data() const
       {
@@ -297,14 +295,11 @@ private:
   void storeWord( uint32_t address, uint16_t data );
   void storeLong( uint32_t address, uint32_t data );
 
-  void loadByte( uint32_t address, uint32_t reg );
-  void loadWord( uint32_t address, uint32_t reg );
-  void loadLong( uint32_t address, uint32_t reg );
+  void loadByte( uint32_t address, GlobalReg reg );
+  void loadWord( uint32_t address, GlobalReg reg );
+  void loadLong( uint32_t address, GlobalReg reg );
 
   bool testCondition( uint32_t condition ) const;
-
-  void ackWrite();
-
 
   void halfCycle();
   void divideUnit();
@@ -322,14 +317,13 @@ private:
   bool stageWriteRegL();
   void stageWriteFlags();
   void stageWriteFlagsL();
-  bool portWriteDst( uint32_t reg, uint32_t data );
-  bool portReadSrc( uint32_t regSrc );
-  bool portReadSrcAlt( uint32_t regSrc );
-  bool portReadDst( uint32_t regDst );
-  void portReadDstAndHiddenCommit( uint32_t regDst ); //to be used with indexed addressing modes
-  bool portReadBoth( uint32_t regSrc, uint32_t regDst );
+  bool portWriteDst( GlobalReg reg, uint32_t data );
+  bool portReadSrc( GlobalReg regSrc );
+  bool portReadDst( GlobalReg regDst );
+  void portReadDstAndHiddenCommit( GlobalReg regDst ); //to be used with indexed addressing modes
+  bool portReadBoth( GlobalReg regSrc, GlobalReg regDst );
   void dualPortCommit();
-  void lockReg( uint32_t reg );
+  void lockReg( GlobalReg reg );
   void dualPortCommitMMULT( bool high );
   void busGatePush( AdvanceResult result );
   void busGatePop();
@@ -377,8 +371,8 @@ private:
     DSPI instruction = DSPI::EMPTY;
     uint32_t dataSrc = 0;
     uint32_t dataDst = 0;
-    uint32_t regSrc = 0;
-    uint32_t regDst = 0;
+    LocalReg regSrc = LocalReg{};
+    LocalReg regDst = LocalReg{};
   } mStageRead = {};
 
   struct StageCompute
@@ -386,8 +380,8 @@ private:
     DSPI instruction = DSPI::EMPTY;
     uint32_t dataSrc = 0;
     uint32_t dataDst = 0;
-    uint32_t regSrc = 0;
-    uint32_t regDst = 0;
+    GlobalReg regSrc = GlobalReg{};
+    GlobalReg regDst = GlobalReg{};
   } mStageCompute = {};
 
   struct StageWrite
@@ -400,11 +394,11 @@ private:
     uint32_t updateMask = UPDATE_NONE;
     RegFlags regFlags = {};
     uint32_t data = 0;
-    uint32_t regL = {};
+    GlobalReg regL = GlobalReg{};
     uint32_t dataL = {};
 
-    void updateReg( uint32_t reg, uint32_t data );
-    void updateRegL( uint32_t reg, uint32_t data );
+    void updateReg( GlobalReg reg, uint32_t data );
+    void updateRegL( GlobalReg reg, uint32_t data );
     bool canUpdateReg() const;
 
   } mStageWrite = {};
@@ -425,7 +419,7 @@ private:
     union
     {
       uint32_t data = 0;
-      uint32_t reg;
+      GlobalReg reg;
     };
   } mStageIO;
 
@@ -445,7 +439,7 @@ private:
     union
     {
       uint32_t data = 0;
-      uint32_t reg;
+      GlobalReg reg;
     };
   } mLocalBus;
 
@@ -471,16 +465,16 @@ private:
   struct DivideUnit
   {
     int32_t cycle = -1;
-    int32_t reg = -1;
+    GlobalReg reg = GlobalReg{};
     uint32_t divisor = 0;
     uint32_t q = 0;
     uint32_t r = 0;
     bool busy = false;
   } mDivideUnit;
 
-  int32_t mPortReadSrcReg = -1;
-  int32_t mPortReadDstReg = -1;
-  int32_t mPortWriteDstReg = -1;
+  GlobalReg mPortReadSrcReg = GlobalReg{};
+  GlobalReg mPortReadDstReg = GlobalReg{};
+  GlobalReg mPortWriteDstReg = GlobalReg{};
   uint32_t mPortWriteDstData = 0;
 
   AdvanceResult mBusGate = AdvanceResult::nop();
@@ -490,8 +484,45 @@ private:
 
   static constexpr int32_t FREE = -1;
 
-  std::array<int32_t, 32> mRegStatus;
-  std::array<uint32_t, 64> mRegs;
+  struct RegStatus : protected std::array<int32_t, 64>
+  {
+    RegStatus()
+    {
+      std::fill( begin(), end(), FREE );
+    }
+    int32_t& operator[]( GlobalReg index ) noexcept
+    {
+      assert( index.idx < 64 );
+      return std::array<int32_t, 64>::operator[]( index.idx );
+    }
+
+    int32_t operator[]( GlobalReg index ) const noexcept
+    {
+      assert( index.idx < 64 );
+      return std::array<int32_t, 64>::operator[]( index.idx );
+    }
+  } mRegStatus = {};
+
+  struct Regs : protected std::array<uint32_t, 64>
+  {
+    Regs()
+    {
+      std::fill( begin(), end(), 0 );
+    }
+
+    uint32_t& operator[]( GlobalReg index ) noexcept
+    {
+      assert( index.idx < 64 );
+      return std::array<uint32_t, 64>::operator[]( index.idx );
+    }
+
+    uint32_t operator[]( GlobalReg index ) const noexcept
+    {
+      assert( index.idx < 64 );
+      return std::array<uint32_t, 64>::operator[]( index.idx );
+    }
+  } mRegs = {};
+
   int mFlagsSemaphore = 0;
 
   std::unique_ptr<PipelineLog> mLog;

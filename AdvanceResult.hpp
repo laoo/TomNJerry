@@ -1,6 +1,26 @@
 #pragma once
 #include <span>
 
+//Global register index translated by the register file
+struct GlobalReg
+{
+  explicit GlobalReg( int32_t idx = -1 ) : idx( idx ) {}
+  int32_t idx;
+
+  friend bool operator==( GlobalReg lhs, GlobalReg rhs ) { return lhs.idx == rhs.idx; }
+};
+
+struct LocalReg
+{
+  explicit LocalReg( int32_t idx = -1 ) : idx( idx ) {}
+  int32_t idx;
+
+  GlobalReg translate( int32_t file ) const
+  {
+    return GlobalReg{ idx >= 0 ? idx + file : idx };
+  }
+};
+
 class AdvanceResult
 {
 public:
@@ -15,17 +35,17 @@ public:
   static constexpr uint64_t kFinishFlag   = 0x0400000000000000ull;
   static constexpr uint64_t kWriteFlag    = 0x8000000000000000ull;
 
-  static AdvanceResult readByte( uint32_t addres, uint32_t reg )
+  static AdvanceResult readByte( uint32_t addres, GlobalReg reg )
   {
-    return AdvanceResult{ kByteFlag | ( (uint64_t)addres << 32 ) & kAddressMask | ( uint64_t )reg };
+    return AdvanceResult{ kByteFlag | ( (uint64_t)addres << 32 ) & kAddressMask | ( uint64_t )reg.idx };
   }
-  static AdvanceResult readWord( uint32_t addres, uint32_t reg )
+  static AdvanceResult readWord( uint32_t addres, GlobalReg reg )
   {
-    return AdvanceResult{ kWordFlag | ( (uint64_t)addres << 32 ) & kAddressMask | ( uint64_t )reg };
+    return AdvanceResult{ kWordFlag | ( (uint64_t)addres << 32 ) & kAddressMask | ( uint64_t )reg.idx };
   }
-  static AdvanceResult readLong( uint32_t addres, uint32_t reg )
+  static AdvanceResult readLong( uint32_t addres, GlobalReg reg )
   {
-    return AdvanceResult{ kLongFlag | ( (uint64_t)addres << 32 ) & kAddressMask | ( uint64_t )reg };
+    return AdvanceResult{ kLongFlag | ( (uint64_t)addres << 32 ) & kAddressMask | ( uint64_t )reg.idx };
   }
   static AdvanceResult writeByte( uint32_t addres, uint8_t value )
   {
@@ -54,7 +74,7 @@ public:
   // Returns 0 for nop, positive for read, negative for write
   int64_t getOperation() const { return std::bit_cast< int64_t >( mData & kFlagsMask ); }
   size_t getSize() const { return ( mData >> 56 ) & 7; }
-  uint32_t getReg() const { return (uint32_t)( mData & kRegMask ); }
+  GlobalReg getReg() const { return GlobalReg{ ( int32_t )( mData & kRegMask ) }; }
 
   explicit operator bool() const { return ( mData & kFlagsMask ) != 0; }
 

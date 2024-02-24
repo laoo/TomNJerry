@@ -80,8 +80,6 @@ static constexpr std::array<int16_t,1024> gWaveTable =
 
 Jerry::Jerry( bool isNTSC, std::filesystem::path wavOut ) : mLog{ std::make_unique<PipelineLog>() }, mClock{ isNTSC ? 26590906u : 26593900u }, mWavOut{ wavOut }
 {
-  std::ranges::fill( mRegStatus, FREE );
-  std::ranges::fill( mRegs, 0 );
   std::ranges::fill( mLocalRAM, std::byteswap( (uint32_t)( (uint16_t)DSPI::NOP << 10 | ( uint16_t )DSPI::NOP << ( 10 + 16 ) ) ) );
 
   mJoystick.ntsc = isNTSC;
@@ -119,17 +117,7 @@ void Jerry::busCycleIdle()
 AdvanceResult Jerry::busCycleGetRequest()
 {
   busCycleIdle();
-
-  if ( mBusGate.getOperation() < 0 )
-  {
-    auto result = mBusGate;
-    ackWrite();
-    return result;
-  }
-  else
-  {
-    return mBusGate;
-  }
+  return mBusGate;
 }
 
 uint16_t Jerry::busCycleRequestReadWord( uint32_t address )
@@ -170,7 +158,6 @@ void Jerry::busCycleAckReadByteRequest( uint8_t value )
   assert( mBusGate.getOperation() > 0 );
   assert( mBusGate.getSize() == 1 );
   assert( mBusGate.getAddress() <= 0xf10000 );
-  assert( mBusGate.getReg() <= 0x1f );
 
   if ( portWriteDst( mBusGate.getReg(), value ) )
   {
@@ -191,7 +178,6 @@ void Jerry::busCycleAckReadWordRequest( uint16_t value )
   assert( mBusGate.getOperation() > 0 );
   assert( mBusGate.getSize() == 2 );
   assert( mBusGate.getAddress() <= 0xf10000 );
-  assert( mBusGate.getReg() <= 0x1f );
 
   if ( portWriteDst( mBusGate.getReg(), std::byteswap( value ) ) )
   {
@@ -212,7 +198,6 @@ void Jerry::busCycleAckReadLongRequest( uint32_t value )
   assert( mBusGate.getOperation() > 0 );
   assert( mBusGate.getSize() == 3 );
   assert( mBusGate.getAddress() <= 0xf10000 );
-  assert( mBusGate.getReg() <= 0x1f );
 
   if ( portWriteDst( mBusGate.getReg(), std::byteswap( value ) ) )
   {
@@ -227,7 +212,12 @@ void Jerry::busCycleAckReadLongRequest( uint32_t value )
   busCycleIdle();
 }
 
-void Jerry::ackWrite()
+uint32_t Jerry::getReg( int32_t index ) const
+{
+  return mRegs[GlobalReg{ index }];
+}
+
+void Jerry::busCycleAckWrite()
 {
   assert( mBusGate );
 
@@ -601,7 +591,7 @@ void Jerry::localBus()
     break;
   case LocalBus::READ_WORD:
     LOG_WARNMEMORYACCESS();
-    mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) << ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
+    mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) >> ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
     mStageIO.state = StageIO::IDLE;
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
@@ -609,7 +599,7 @@ void Jerry::localBus()
     break;
   case LocalBus::READ_BYTE:
     LOG_WARNMEMORYACCESS();
-    mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) << ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
+    mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) >> ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
     mLocalBus.state = LocalBus::IDLE;
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
@@ -662,7 +652,7 @@ void Jerry::storeLong( uint32_t address, uint32_t data )
   }
 }
 
-void Jerry::loadByte( uint32_t address, uint32_t reg )
+void Jerry::loadByte( uint32_t address, GlobalReg reg )
 {
   if ( ( address & 0x00ff0000 ) != 0x00f10000 )
   {
@@ -676,7 +666,7 @@ void Jerry::loadByte( uint32_t address, uint32_t reg )
   }
 }
 
-void Jerry::loadWord( uint32_t address, uint32_t reg )
+void Jerry::loadWord( uint32_t address, GlobalReg reg )
 {
   if ( ( address & 0x00ff0000 ) != 0x00f10000 )
   {
@@ -690,7 +680,7 @@ void Jerry::loadWord( uint32_t address, uint32_t reg )
   }
 }
 
-void Jerry::loadLong( uint32_t address, uint32_t reg )
+void Jerry::loadLong( uint32_t address, GlobalReg reg )
 {
   if ( ( address & 0x00ff0000 ) != 0x00f10000 )
   {
@@ -834,12 +824,12 @@ bool Jerry::stageWriteReg()
 {
   assert( mStageWrite.regFlags.reg >= 0 );
 
-  return portWriteDst( mStageWrite.regFlags.reg, mStageWrite.data );
+  return portWriteDst( GlobalReg( mStageWrite.regFlags.reg ), mStageWrite.data );
 }
 
 bool Jerry::stageWriteRegL()
 {
-  assert( mStageWrite.regL >= 0 );
+  assert( mStageWrite.regL.idx >= 0 );
 
   return portWriteDst( mStageWrite.regL, mStageWrite.dataL );
 }
@@ -1303,7 +1293,7 @@ void Jerry::compute()
     {
       mStageCompute.instruction = DSPI::EMPTY;
       mStageIO.state = StageIO::LOAD_LONG;
-      mStageIO.address = mStageCompute.dataSrc + mStageCompute.regDst;
+      mStageIO.address = mStageCompute.dataSrc + mStageCompute.regDst.idx;
       mStageIO.reg = mStageCompute.regSrc;
       LOG_COMPUTEINDEX();
     }
@@ -1340,7 +1330,7 @@ void Jerry::compute()
       portReadDstAndHiddenCommit( mStageCompute.regSrc );
       mStageCompute.instruction = DSPI::EMPTY;
       mStageIO.state = StageIO::STORE_LONG;
-      mStageIO.address = mStageCompute.dataSrc + mStageCompute.regDst;
+      mStageIO.address = mStageCompute.dataSrc + mStageCompute.regDst.idx;
       mStageIO.data = mStageCompute.dataDst;
       LOG_COMPUTEINDEX();
     }
@@ -1349,7 +1339,7 @@ void Jerry::compute()
     //JUMP can't be executed if no instruction is in the pipeline after it
     if ( mStageRead.instruction == DSPI::EMPTY )
       break;
-    if ( testCondition( mStageCompute.regDst ) )
+    if ( testCondition( mStageCompute.regDst.idx ) )
     {
       mPC = mStageCompute.dataDst;
       mPrefetch.queueSize = 0;
@@ -1365,7 +1355,7 @@ void Jerry::compute()
     //JR can't be executed if no instruction is in the pipeline after it
     if ( mStageRead.instruction == DSPI::EMPTY )
       break;
-    if ( testCondition( mStageCompute.regDst ) )
+    if ( testCondition( mStageCompute.regDst.idx ) )
     {
       mPC = mStageCompute.dataSrc;
       mPrefetch.queueSize = 0;
@@ -1468,6 +1458,9 @@ void Jerry::stageRead()
     return;
   }
 
+  auto regSrc = mStageRead.regSrc.translate( mRegisterFile );
+  auto regDst = mStageRead.regDst.translate( mRegisterFile );
+
   switch ( mStageRead.instruction )
   {
   case DSPI::EMPTY:
@@ -1487,15 +1480,15 @@ void Jerry::stageRead()
   case DSPI::SH:
   case DSPI::SHA:
   case DSPI::ROR:
-    if ( portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
+    if ( portReadBoth( regSrc, regDst ) )
     {
       dualPortCommit();
       mFlagsSemaphore += 1;
-      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.regDst = regDst;
       mStageCompute.dataSrc = mStageRead.dataSrc;
       mStageCompute.dataDst = mStageRead.dataDst;
+      lockReg( regDst );
     }
     else
     {
@@ -1504,15 +1497,15 @@ void Jerry::stageRead()
     break;
   case DSPI::ADDC:
   case DSPI::SUBC:
-    if ( mFlagsSemaphore == 0 && portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
+    if ( mFlagsSemaphore == 0 && portReadBoth( regSrc, regDst ) )
     {
       dualPortCommit();
       mFlagsSemaphore += 1;
-      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.regDst = regDst;
       mStageCompute.dataSrc = mStageRead.dataSrc;
       mStageCompute.dataDst = mStageRead.dataDst;
+      lockReg( regDst );
     }
     else
     {
@@ -1523,16 +1516,16 @@ void Jerry::stageRead()
   case DSPI::SUBQ:
   case DSPI::SUBQMOD:
   case DSPI::ADDQMOD:
-    if ( portReadDst( mStageRead.regDst ) )
+    if ( portReadDst( regDst ) )
     {
       dualPortCommit();
-      LOG_PORTIMM( mStageRead.regSrc );
+      LOG_PORTIMM( mStageRead.regSrc.idx );
       mFlagsSemaphore += 1;
-      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.regDst = mStageRead.regDst;
-      mStageCompute.dataSrc = tabAddSubQ[ mStageRead.regSrc];
+      mStageCompute.regDst = regDst;
+      mStageCompute.dataSrc = tabAddSubQ[ mStageRead.regSrc.idx ];
       mStageCompute.dataDst = mStageRead.dataDst;
+      lockReg( regDst );
     }
     else
     {
@@ -1544,16 +1537,16 @@ void Jerry::stageRead()
   case DSPI::SHRQ:
   case DSPI::SHARQ:
   case DSPI::RORQ:
-    if ( portReadDst( mStageRead.regDst ) )
+    if ( portReadDst( regDst ) )
     {
       dualPortCommit();
-      LOG_PORTIMM( mStageRead.regSrc );
+      LOG_PORTIMM( mStageRead.regSrc.idx );
       mFlagsSemaphore += 1;
-      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.regDst = mStageRead.regDst;
-      mStageCompute.dataSrc = mStageRead.regSrc;
+      mStageCompute.regDst = regDst;
+      mStageCompute.dataSrc = mStageRead.regSrc.idx;
       mStageCompute.dataDst = mStageRead.dataDst;
+      lockReg( regDst );
     }
     else
     {
@@ -1561,16 +1554,16 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::SHLQ:
-    if ( portReadDst( mStageRead.regDst ) )
+    if ( portReadDst( regDst ) )
     {
       dualPortCommit();
-      LOG_PORTIMM( 32 - mStageRead.regSrc );
+      LOG_PORTIMM( 32 - mStageRead.regSrc.idx );
       mFlagsSemaphore += 1;
-      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.regDst = mStageRead.regDst;
-      mStageCompute.dataSrc = mStageRead.regSrc;
+      mStageCompute.regDst = regDst;
+      mStageCompute.dataSrc = mStageRead.regSrc.idx;
       mStageCompute.dataDst = mStageRead.dataDst;
+      lockReg( regDst );
     }
     else
     {
@@ -1583,14 +1576,14 @@ void Jerry::stageRead()
   case DSPI::SAT16S:
   case DSPI::SAT32S:
   case DSPI::MIRROR:
-    if ( portReadDst( mStageRead.regDst ) )
+    if ( portReadDst( regDst ) )
     {
       dualPortCommit();
       mFlagsSemaphore += 1;
-      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.regDst = regDst;
       mStageCompute.dataDst = mStageRead.dataDst;
+      lockReg( regDst );
     }
     else
     {
@@ -1599,15 +1592,15 @@ void Jerry::stageRead()
     break;
   case DSPI::ADDQT:
   case DSPI::SUBQT:
-    if ( portReadDst( mStageRead.regDst ) )
+    if ( portReadDst( regDst ) )
     {
       dualPortCommit();
-      LOG_PORTIMM( mStageRead.regSrc );
-      lockReg( mStageRead.regDst );
+      LOG_PORTIMM( mStageRead.regSrc.idx );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.regDst = mStageRead.regDst;
-      mStageCompute.dataSrc = tabAddSubQ[mStageRead.regSrc];
+      mStageCompute.regDst = regDst;
+      mStageCompute.dataSrc = tabAddSubQ[mStageRead.regSrc.idx];
       mStageCompute.dataDst = mStageRead.dataDst;
+      lockReg( regDst );
     }
     else
     {
@@ -1616,13 +1609,13 @@ void Jerry::stageRead()
     break;
   case DSPI::BTST:
   case DSPI::CMPQ:
-    if ( portReadDst( mStageRead.regDst ) )
+    if ( portReadDst( regDst ) )
     {
       dualPortCommit();
-      LOG_PORTIMM( mStageRead.regSrc );
+      LOG_PORTIMM( mStageRead.regSrc.idx );
       mFlagsSemaphore += 1;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.dataSrc = mStageRead.regSrc;
+      mStageCompute.dataSrc = mStageRead.regSrc.idx;
       mStageCompute.dataDst = mStageRead.dataDst;
     }
     else
@@ -1633,7 +1626,7 @@ void Jerry::stageRead()
   case DSPI::IMULTN:
   case DSPI::IMACN:
     //TODO: make instruction after either of these atomic
-    if ( portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
+    if ( portReadBoth( regSrc, regDst ) )
     {
       dualPortCommit();
       mFlagsSemaphore += 1;
@@ -1647,7 +1640,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::CMP:
-    if ( portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
+    if ( portReadBoth( regSrc, regDst ) )
     {
       dualPortCommit();
       mFlagsSemaphore += 1;
@@ -1662,12 +1655,12 @@ void Jerry::stageRead()
     break;
   case DSPI::MTOI:
   case DSPI::NORMI:
-    if ( portReadSrc( mStageRead.regSrc ) )
+    if ( portReadSrc( regSrc ) )
     {
       dualPortCommit();
       mFlagsSemaphore += 1;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.regDst = mStageRead.regDst;
+      mStageCompute.regDst = regDst;
       mStageCompute.dataSrc = mStageRead.dataSrc;
     }
     else
@@ -1678,12 +1671,12 @@ void Jerry::stageRead()
   case DSPI::RESMAC:
     if ( mStageWrite.canUpdateReg() )
     {
-      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
+      if ( mRegStatus[regDst] != FREE )
         throw EmulationViolation{ "RESMAC writes to a register in use" };
       dualPortCommit();
-      mStageWrite.updateReg( mStageRead.regDst, ( uint32_t )mMacStage.acc );
-      lockReg( mStageRead.regDst );
+      mStageWrite.updateReg( regDst, ( uint32_t )mMacStage.acc );
       mStageRead.instruction = DSPI::EMPTY;
+      lockReg( regDst );
     }
     else
     {
@@ -1693,13 +1686,13 @@ void Jerry::stageRead()
   case DSPI::MOVEQ:
     if ( mStageWrite.canUpdateReg() )
     {
-      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
+      if ( mRegStatus[regDst] != FREE )
         throw EmulationViolation{ "MOVEQ writes to a register in use" };
       dualPortCommit();
-      LOG_PORTIMM( mStageRead.regSrc );
-      mStageWrite.updateReg( mStageRead.regDst, mStageRead.regSrc );
-      lockReg( mStageRead.regDst );
+      LOG_PORTIMM( mStageRead.regSrc.idx );
+      mStageWrite.updateReg( regDst, mStageRead.regSrc.idx );
       mStageRead.instruction = DSPI::EMPTY;
+      lockReg( regDst );
     }
     else
     {
@@ -1707,15 +1700,14 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MOVEFA:
-    if ( mStageWrite.canUpdateReg() && portReadSrcAlt( mStageRead.regSrc ) )
+    if ( mStageWrite.canUpdateReg() && portReadSrc( mStageRead.regSrc.translate( mRegisterFile ^ 32 ) ) )
     {
-      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
+      if ( mRegStatus[regDst] != FREE )
         throw EmulationViolation{ "MOVEFA writes to a register in use" };
-
       dualPortCommit();
-      mStageWrite.updateReg( mStageRead.regDst, mStageRead.dataSrc );
-      lockReg( mStageRead.regDst );
+      mStageWrite.updateReg( regDst, mStageRead.dataSrc );
       mStageRead.instruction = DSPI::EMPTY;
+      lockReg( regDst );
     }
     else
     {
@@ -1723,16 +1715,15 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::DIV:
-    if ( mDivideUnit.cycle <= 0 && portReadBoth( mStageRead.regSrc, mStageRead.regDst ) )
+    if ( mDivideUnit.cycle <= 0 && portReadBoth( regSrc, regDst ) )
     {
-      if ( mDivideUnit.cycle == 0 && ( mDivideUnit.reg == mStageRead.regDst || mDivideUnit.reg == mStageRead.regSrc ) )
+      if ( mDivideUnit.cycle == 0 && ( mDivideUnit.reg == regDst || mDivideUnit.reg == regSrc ) )
         throw EmulationViolation{ "Two consecutive DIV instructions are too close to each other" };
 
       dualPortCommit();
-      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
       mDivideUnit.cycle = 16;
-      mDivideUnit.reg = mStageRead.regDst;
+      mDivideUnit.reg = regDst;
       mDivideUnit.divisor = mStageRead.dataSrc;
       mDivideUnit.q = mStageRead.dataDst;
       mDivideUnit.r = 0;
@@ -1742,6 +1733,7 @@ void Jerry::stageRead()
         mDivideUnit.q <<= 16;
         mDivideUnit.r = mStageCompute.dataDst >> 16;
       }
+      lockReg( regDst );
     }
     else
     {
@@ -1749,15 +1741,15 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MOVE:
-    if ( mStageWrite.canUpdateReg() && portReadSrc( mStageRead.regSrc ) )
+    if ( mStageWrite.canUpdateReg() && portReadSrc( regSrc ) )
     {
-      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
+      if ( mRegStatus[regDst] != FREE )
         throw EmulationViolation{ "MOVE writes to a register in use" };
 
       dualPortCommit();
-      mStageWrite.updateReg( mStageRead.regDst, mStageRead.dataSrc );
-      lockReg( mStageRead.regDst );
+      mStageWrite.updateReg( regDst, mStageRead.dataSrc );
       mStageRead.instruction = DSPI::EMPTY;
+      lockReg( regDst );
     }
     else
     {
@@ -1765,10 +1757,10 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MOVETA:
-    if ( mStageWrite.canUpdateReg() && portReadSrc( mStageRead.regSrc ) )
+    if ( mStageWrite.canUpdateReg() && portReadSrc( regSrc ) )
     {
       dualPortCommit();
-      mStageWrite.updateReg( mStageRead.regDst + 32, mStageRead.dataSrc );
+      mStageWrite.updateReg( mStageRead.regDst.translate( mRegisterFile ^ 32 ), mStageRead.dataSrc );
       mStageRead.instruction = DSPI::EMPTY;
     }
     else
@@ -1779,11 +1771,11 @@ void Jerry::stageRead()
   case DSPI::MOVEI:
     if ( mStageWrite.canUpdateReg() )
     {
-      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
+      if ( mRegStatus[regDst] != FREE )
         throw EmulationViolation{ "MOVEI writes to a register in use" };
       dualPortCommit();
-      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
+      lockReg( regDst );
     }
     else
     {
@@ -1791,14 +1783,14 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOADB:
-    if ( mStageIO.state == StageIO::IDLE && portReadSrc( mStageRead.regSrc ) )
+    if ( mStageIO.state == StageIO::IDLE && portReadSrc( regSrc ) )
     {
       dualPortCommit();
-      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
       mStageIO.state = StageIO::LOAD_BYTE;
       mStageIO.address = mStageRead.dataSrc;
-      mStageIO.reg = mStageRead.regDst;
+      mStageIO.reg = regDst;
+      lockReg( regDst );
     }
     else
     {
@@ -1806,14 +1798,14 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOADW:
-    if ( mStageIO.state == StageIO::IDLE && portReadSrc( mStageRead.regSrc ) )
+    if ( mStageIO.state == StageIO::IDLE && portReadSrc( regSrc ) )
     {
       dualPortCommit();
-      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
       mStageIO.state = StageIO::LOAD_WORD;
       mStageIO.address = mStageRead.dataSrc;
-      mStageIO.reg = mStageRead.regDst;
+      mStageIO.reg = regDst;
+      lockReg( regDst );
     }
     else
     {
@@ -1821,14 +1813,14 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOAD:
-    if ( mStageIO.state == StageIO::IDLE && portReadSrc( mStageRead.regSrc ) )
+    if ( mStageIO.state == StageIO::IDLE && portReadSrc( regSrc ) )
     {
       dualPortCommit();
-      lockReg( mStageRead.regDst );
       mStageRead.instruction = DSPI::EMPTY;
       mStageIO.state = StageIO::LOAD_LONG;
       mStageIO.address = mStageRead.dataSrc;
-      mStageIO.reg = mStageRead.regDst;
+      mStageIO.reg = regDst;
+      lockReg( regDst );
     }
     else
     {
@@ -1836,14 +1828,14 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOAD14R:
-    if ( portReadBoth( 14, mStageRead.regSrc ) )
+    if ( portReadBoth( LocalReg{ 14 }.translate( mRegisterFile ), regSrc ) )
     {
       dualPortCommit();
-      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
-      mStageCompute.regSrc = mStageRead.regDst;     //register to store to
-      mStageCompute.regDst = mStageRead.dataDst;    //offset
+      mStageCompute.regSrc = regDst;                //register to store to
+      mStageCompute.regDst = GlobalReg( mStageRead.dataDst );    //offset
+      lockReg( regDst );
     }
     else
     {
@@ -1851,14 +1843,14 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOAD15R:
-    if ( portReadBoth( 15, mStageRead.regSrc ) )
+    if ( portReadBoth( LocalReg{ 15 }.translate( mRegisterFile ), regSrc) )
     {
       dualPortCommit();
-      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
-      mStageCompute.regSrc = mStageRead.regDst;     //register to store to
-      mStageCompute.regDst = mStageRead.dataDst;    //offset
+      mStageCompute.regSrc = regDst;     //register to store to
+      mStageCompute.regDst = GlobalReg( mStageRead.dataDst );    //offset
+      lockReg( regDst );
     }
     else
     {
@@ -1866,14 +1858,14 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOAD14N:
-    if ( portReadSrc( 14 ) )
+    if ( portReadSrc( LocalReg{ 14 }.translate( mRegisterFile ) ) )
     {
       dualPortCommit();
-      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
-      mStageCompute.regSrc = mStageRead.regDst;     //register to store
-      mStageCompute.regDst = tabAddSubQ[mStageRead.regSrc] * 4;     //offset
+      mStageCompute.regSrc = regDst;     //register to store
+      mStageCompute.regDst = GlobalReg( tabAddSubQ[mStageRead.regSrc.idx] * 4 );     //offset
+      lockReg( regDst );
     }
     else
     {
@@ -1881,14 +1873,14 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOAD15N:
-    if ( portReadSrc( 15 ) )
+    if ( portReadSrc( LocalReg{ 15 }.translate( mRegisterFile ) ) )
     {
       dualPortCommit();
-      lockReg( mStageRead.regDst );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
-      mStageCompute.regSrc = mStageRead.regDst;     //register to store
-      mStageCompute.regDst = tabAddSubQ[mStageRead.regSrc] * 4;     //offset
+      mStageCompute.regSrc = regDst;     //register to store
+      mStageCompute.regDst = GlobalReg( tabAddSubQ[mStageRead.regSrc.idx] * 4 );     //offset
+      lockReg( regDst );
     }
     else
     {
@@ -1896,7 +1888,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STOREB:
-    if ( mStageIO.state == StageIO::IDLE && portReadBoth( mStageRead.regDst, mStageRead.regSrc ) )
+    if ( mStageIO.state == StageIO::IDLE && portReadBoth( regDst, regSrc ) )
     {
       dualPortCommit();
       mStageRead.instruction = DSPI::EMPTY;
@@ -1910,7 +1902,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STOREW:
-    if ( mStageIO.state == StageIO::IDLE && portReadBoth( mStageRead.regDst, mStageRead.regSrc ) )
+    if ( mStageIO.state == StageIO::IDLE && portReadBoth( regDst, regSrc ) )
     {
       dualPortCommit();
       mStageRead.instruction = DSPI::EMPTY;
@@ -1924,7 +1916,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STORE:
-    if ( mStageIO.state == StageIO::IDLE && portReadBoth( mStageRead.regDst, mStageRead.regSrc ) )
+    if ( mStageIO.state == StageIO::IDLE && portReadBoth( regDst, regSrc ) )
     {
       dualPortCommit();
       mStageRead.instruction = DSPI::EMPTY;
@@ -1938,13 +1930,13 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STORE14R:
-    if ( portReadBoth( 14, mStageRead.regSrc ) )
+    if ( portReadBoth( LocalReg{ 14 }.translate( mRegisterFile ), regSrc ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
-      mStageCompute.regSrc = mStageRead.regDst;     //register to store
-      mStageCompute.regDst = mStageRead.dataDst;    //offset
+      mStageCompute.dataSrc = mStageRead.dataSrc;                 //base address to store
+      mStageCompute.regSrc = regDst;                              //register to store
+      mStageCompute.regDst = GlobalReg( mStageRead.dataDst );     //offset
     }
     else
     {
@@ -1952,13 +1944,13 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STORE15R:
-    if ( portReadBoth( 15, mStageRead.regSrc ) )
+    if ( portReadBoth( LocalReg{ 15 }.translate( mRegisterFile ), regSrc ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
-      mStageCompute.regSrc = mStageRead.regDst;     //register to store
-      mStageCompute.regDst = mStageRead.dataDst;    //offset
+      mStageCompute.dataSrc = mStageRead.dataSrc;                 //base address to store
+      mStageCompute.regSrc = regDst;                              //register to store
+      mStageCompute.regDst = GlobalReg( mStageRead.dataDst );     //offset
     }
     else
     {
@@ -1966,13 +1958,13 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STORE14N:
-    if ( portReadSrc( 14 ) )
+    if ( portReadSrc( LocalReg{ 14 }.translate( mRegisterFile ) ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
-      mStageCompute.regSrc = mStageRead.regDst;     //register to store
-      mStageCompute.regDst = tabAddSubQ[mStageRead.regSrc] * 4;     //offset
+      mStageCompute.dataSrc = mStageRead.dataSrc;                                   //base address to store
+      mStageCompute.regSrc = regDst;                                                //register to store
+      mStageCompute.regDst = GlobalReg( tabAddSubQ[mStageRead.regSrc.idx] * 4 );    //offset
     }
     else
     {
@@ -1980,13 +1972,13 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STORE15N:
-    if ( portReadSrc( 15 ) )
+    if ( portReadSrc( LocalReg{ 15 }.translate( mRegisterFile ) ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
-      mStageCompute.regSrc = mStageRead.regDst;     //register to store
-      mStageCompute.regDst = tabAddSubQ[mStageRead.regSrc] * 4;     //offset
+      mStageCompute.dataSrc = mStageRead.dataSrc;                                   //base address to store
+      mStageCompute.regSrc = regDst;                                                //register to store
+      mStageCompute.regDst = GlobalReg( tabAddSubQ[mStageRead.regSrc.idx] * 4 );    //offset
     }
     else
     {
@@ -1996,12 +1988,12 @@ void Jerry::stageRead()
   case DSPI::MOVEPC:
     if ( mStageWrite.canUpdateReg() )
     {
-      if ( mRegStatus[mStageRead.regDst] == mRegisterFile )
+      if ( mRegStatus[regDst] != FREE )
         throw EmulationViolation{ "MOVE PC writes to a register in use" };
       dualPortCommit();
-      mStageWrite.updateReg( mStageRead.regDst, mPC - ( mPrefetch.queueSize + 1 ) * 2 );
-      lockReg( mStageRead.regDst );
+      mStageWrite.updateReg( regDst, mPC - ( mPrefetch.queueSize + 1 ) * 2 );
       mStageRead.instruction = DSPI::EMPTY;
+      lockReg( regDst );
     }
     else
     {
@@ -2009,12 +2001,12 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::JUMP:
-    if ( mFlagsSemaphore == 0 && portReadDst( mStageRead.regSrc ) )
+    if ( mFlagsSemaphore == 0 && portReadDst( regSrc ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      LOG_PORTCOND( mStageRead.regDst );
-      mStageCompute.regDst = mStageRead.regDst;
+      LOG_PORTCOND( mStageRead.regDst.idx );
+      mStageCompute.regDst = GlobalReg{ mStageRead.regDst.idx };
       mStageCompute.dataDst = mStageRead.dataDst;
     }
     else
@@ -2027,9 +2019,9 @@ void Jerry::stageRead()
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      LOG_PORTCOND( mStageRead.regDst );
-      mStageCompute.regDst = mStageRead.regDst;
-      int32_t off = ( ( int8_t )( mStageRead.regSrc << 3 ) >> 3 );
+      LOG_PORTCOND( mStageRead.regDst.idx );
+      mStageCompute.regDst = GlobalReg{ mStageRead.regDst.idx };
+      int32_t off = ( ( int8_t )( mStageRead.regSrc.idx << 3 ) >> 3 );
       mStageCompute.dataSrc = mPC + ( off - mPrefetch.queueSize ) * 2;
     }
     else
@@ -2040,14 +2032,14 @@ void Jerry::stageRead()
   case DSPI::MMULT:
     dualPortCommit();
     std::swap( mStageRead.instruction, mStageCompute.instruction );
-    mStageCompute.regSrc = mStageRead.regSrc;
-    mStageCompute.regDst = mStageRead.regDst;
+    mStageCompute.regSrc = mStageRead.regSrc.translate( 32 );
+    mStageCompute.regDst = regDst;
     break;
   case DSPI::MM_IMACN:
     mFlagsSemaphore += 1;
     [[fallthrough]];
   case DSPI::MM_IMULTN:
-    if ( portReadSrc( mStageCompute.regSrc + ( mMacStage.cnt >> 1 ) ) )
+    if ( portReadSrc( GlobalReg( mStageCompute.regSrc.idx + ( mMacStage.cnt >> 1 ) ) ) )
     {
       dualPortCommitMMULT( ( mMacStage.cnt & 1 ) == 1 );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -2060,12 +2052,12 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MM_RESMAC:
-      //resetting write flag of internal memory load
-      mPortWriteDstReg = -1;
-      mStageWrite.updateReg( mStageRead.regDst, ( uint32_t )mMacStage.acc );
+    //resetting write flag of internal memory load
+    mPortWriteDstReg = GlobalReg{};
+    mStageWrite.updateReg( regDst, ( uint32_t )mMacStage.acc );
 
-      mStageRead.instruction = DSPI::EMPTY;
-      break;
+    mStageRead.instruction = DSPI::EMPTY;
+    break;
   }
 }
 
@@ -2086,7 +2078,7 @@ void Jerry::decode()
     mStageRead.instruction = pull.opcode();
     mStageRead.regSrc = pull.regSrc();
     mStageRead.regDst = pull.regDst();
-    LOG_DECODEDSP( mStageRead.instruction, mStageRead.regSrc, mStageRead.regDst );
+    LOG_DECODEDSP( mStageRead.instruction, mStageRead.regSrc.idx, mStageRead.regDst.idx );
     if ( auto addr = pull.address() )
       LOG_INSTRADDR( addr );
     break;
@@ -2096,20 +2088,20 @@ void Jerry::decode()
     break;
   case Prefetch::MOVEI2:
     mStageRead.dataSrc |= pull.data() << 16;
-    mStageWrite.updateReg( mStageRead.regDst, mStageRead.dataSrc );
+    mStageWrite.updateReg( mStageRead.regDst.translate( mRegisterFile ), mStageRead.dataSrc );
     LOG_DECODEMOVEI( 1, mStageRead.dataSrc );
     break;
   case Prefetch::IMULTN:
     mStageRead.instruction = DSPI::MM_IMULTN;
-    LOG_DECODEIMULTN( mStageCompute.regSrc, 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 ), mMacStage.cnt );
+    LOG_DECODEIMULTN( mStageCompute.regSrc.idx, 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 ), mMacStage.cnt );
     break;
   case Prefetch::IMACN:
     mStageRead.instruction = DSPI::MM_IMACN;
-    LOG_DECODEIMACN( mStageCompute.regSrc, 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 ), mMacStage.cnt );
+    LOG_DECODEIMACN( mStageCompute.regSrc.idx, 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 ), mMacStage.cnt );
     break;
   case Prefetch::RESMAC:
     mStageRead.instruction = DSPI::MM_RESMAC;
-    LOG_DECODERESMAC( mStageCompute.regDst );
+    LOG_DECODERESMAC( mStageCompute.regDst.idx );
     break;
   default:
     break;
@@ -2340,9 +2332,9 @@ int Jerry::prefetchFill()
 }
 
 
-bool Jerry::portWriteDst( uint32_t reg, uint32_t data )
+bool Jerry::portWriteDst( GlobalReg reg, uint32_t data )
 {
-  if ( mPortWriteDstReg >= 0 )
+  if ( mPortWriteDstReg.idx >= 0 )
     return false;
 
   mPortWriteDstReg = reg;
@@ -2350,14 +2342,14 @@ bool Jerry::portWriteDst( uint32_t reg, uint32_t data )
   return true;
 }
 
-bool Jerry::portReadSrc( uint32_t regSrc )
+bool Jerry::portReadSrc( GlobalReg regSrc )
 {
-  assert( regSrc >= 0 );
+  assert( regSrc.idx >= 0 );
 
   if ( mRegStatus[regSrc] != FREE && mPortWriteDstReg != regSrc )
     return false;
 
-  if ( mPortReadSrcReg >= 0 )
+  if ( mPortReadSrcReg.idx >= 0 )
     return false;
 
   mPortReadSrcReg = regSrc;
@@ -2365,26 +2357,14 @@ bool Jerry::portReadSrc( uint32_t regSrc )
   return true;
 }
 
-bool Jerry::portReadSrcAlt( uint32_t regSrc )
+bool Jerry::portReadDst( GlobalReg regDst )
 {
-  assert( regSrc >= 0 );
-
-  if ( mPortReadSrcReg >= 0 )
-    return false;
-
-  mPortReadSrcReg = regSrc + 32;
-
-  return true;
-}
-
-bool Jerry::portReadDst( uint32_t regDst )
-{
-  assert( regDst >= 0 );
+  assert( regDst.idx >= 0 );
 
   if ( mRegStatus[regDst] != FREE && mPortWriteDstReg != regDst )
     return false;
 
-  if ( mPortReadDstReg >= 0 )
+  if ( mPortReadDstReg.idx >= 0 )
     return false;
 
   mPortReadDstReg = regDst;
@@ -2392,14 +2372,16 @@ bool Jerry::portReadDst( uint32_t regDst )
   return true;
 }
 
-void Jerry::portReadDstAndHiddenCommit( uint32_t regDst )
+void Jerry::portReadDstAndHiddenCommit( GlobalReg regDst )
 {
-  assert( mPortReadDstReg < 0 );
-  assert( regDst >= 0 );
+  assert( mPortReadDstReg.idx < 0 );
+  assert( regDst.idx >= 0 );
 
-  if ( mRegStatus[regDst] != FREE )
+  mPortReadDstReg = regDst;
+
+  if ( mRegStatus[mPortReadDstReg] != FREE )
   {
-    if ( mPortWriteDstReg != regDst )
+    if ( mPortWriteDstReg != mPortReadDstReg )
     {
       throw EmulationViolation{ "Indexed store of data from a long latency instruction" };
     }
@@ -2412,16 +2394,14 @@ void Jerry::portReadDstAndHiddenCommit( uint32_t regDst )
   else
   {
     //a hack for indexed addressing done in compute stage
-    mStageCompute.dataDst = mRegs[mRegisterFile + regDst];
+    mStageCompute.dataDst = mRegs[mPortReadDstReg];
   }
-
-  mPortReadDstReg = regDst;
 }
 
-bool Jerry::portReadBoth( uint32_t regSrc, uint32_t regDst )
+bool Jerry::portReadBoth( GlobalReg regSrc, GlobalReg regDst )
 {
-  assert( regSrc >= 0 );
-  assert( regDst >= 0 );
+  assert( regSrc.idx >= 0 );
+  assert( regDst.idx >= 0 );
 
   if ( mRegStatus[regSrc] != FREE && mPortWriteDstReg != regSrc )
     return false;
@@ -2429,10 +2409,10 @@ bool Jerry::portReadBoth( uint32_t regSrc, uint32_t regDst )
   if ( mRegStatus[regDst] != FREE && mPortWriteDstReg != regDst )
     return false;
 
-  if ( mPortWriteDstReg >= 0 && mPortWriteDstReg != regSrc && mPortWriteDstReg != regDst )
+  if ( mPortWriteDstReg.idx >= 0 && mPortWriteDstReg != regSrc && mPortWriteDstReg != regDst )
     return false;
 
-  if ( mPortReadSrcReg >= 0 || mPortReadDstReg >= 0 )
+  if ( mPortReadSrcReg.idx >= 0 || mPortReadDstReg.idx >= 0 )
     return false;
 
   mPortReadSrcReg = regSrc;
@@ -2443,48 +2423,42 @@ bool Jerry::portReadBoth( uint32_t regSrc, uint32_t regDst )
 
 void Jerry::dualPortCommit()
 {
-  if ( mPortWriteDstReg >= 0 )
+  if ( mPortWriteDstReg.idx >= 0 )
   {
-    if ( mPortWriteDstReg == 18 )
-    {
-      int k = 0;
-    }
-    if ( mPortWriteDstReg < 0x20 )
-      mRegStatus[mPortWriteDstReg] = FREE;
-    mRegs[(mRegisterFile + mPortWriteDstReg)&63] = mPortWriteDstData;
-    LOG_PORTWRITEDST( ( mRegisterFile + mPortWriteDstReg ) & 63, mPortWriteDstData );
-    mPortWriteDstReg = -1;
+    mRegStatus[mPortWriteDstReg] = FREE;
+    mRegs[mPortWriteDstReg] = mPortWriteDstData;
+    LOG_PORTWRITEDST( mPortWriteDstReg.idx, mPortWriteDstData );
+    mPortWriteDstReg = GlobalReg{};
   }
 
-  if ( mPortReadSrcReg >= 0 )
+  if ( mPortReadSrcReg.idx >= 0 )
   {
-    mStageRead.dataSrc = mRegs[(mRegisterFile + mPortReadSrcReg)&63];
-    LOG_PORTREADSRC( ( mRegisterFile + mPortReadSrcReg ) & 63, mStageRead.dataSrc );
-    mPortReadSrcReg = -1;
+    mStageRead.dataSrc = mRegs[mPortReadSrcReg];
+    LOG_PORTREADSRC( mPortReadSrcReg.idx, mStageRead.dataSrc );
+    mPortReadSrcReg = GlobalReg{};
   }
 
-  if ( mPortReadDstReg >= 0 )
+  if ( mPortReadDstReg.idx >= 0 )
   {
-    assert( mPortReadDstReg < 0x20 );
-    mStageRead.dataDst = mRegs[mRegisterFile + mPortReadDstReg];
-    LOG_PORTREADDST( mRegisterFile + mPortReadDstReg, mStageRead.dataDst );
-    mPortReadDstReg = -1;
+    mStageRead.dataDst = mRegs[mPortReadDstReg];
+    LOG_PORTREADDST( mPortReadDstReg.idx, mStageRead.dataDst );
+    mPortReadDstReg = GlobalReg{};
   }
 }
 
-void Jerry::lockReg( uint32_t reg )
+void Jerry::lockReg( GlobalReg reg )
 {
   assert( mRegStatus[reg] == FREE );
-  mRegStatus[reg] = mRegisterFile;
+  mRegStatus[reg] = 1;
 }
 
 void Jerry::dualPortCommitMMULT( bool high )
 {
-  if ( mPortReadSrcReg >= 0 )
+  if ( mPortReadSrcReg.idx >= 0 )
   {
-    mStageRead.dataSrc = high ? mRegs[32 + mPortReadSrcReg] >> 16 : mRegs[32 + mPortReadSrcReg] & 0xffff;
-    LOG_PORTREADSRCMMULT( 32 + mPortReadSrcReg, high, mStageRead.dataSrc );
-    mPortReadSrcReg = -1;
+    mStageRead.dataSrc = high ? mRegs[mPortReadSrcReg] >> 16 : mRegs[mPortReadSrcReg] & 0xffff;
+    LOG_PORTREADSRCMMULT( mPortReadSrcReg.idx, high, mStageRead.dataSrc );
+    mPortReadSrcReg = GlobalReg{};
   }
 }
 
@@ -2796,14 +2770,14 @@ uint16_t Jerry::FLAGS::get() const
     ( regpage ? REGPAGE : 0 );
 }
 
-void Jerry::StageWrite::updateReg( uint32_t reg, uint32_t value )
+void Jerry::StageWrite::updateReg( GlobalReg reg, uint32_t value )
 {
   updateMask |= UPDATE_REG;
-  regFlags.reg = reg;
+  regFlags.reg = (int8_t)reg.idx;
   data = value;
 }
 
-void Jerry::StageWrite::updateRegL( uint32_t reg, uint32_t data )
+void Jerry::StageWrite::updateRegL( GlobalReg reg, uint32_t data )
 {
   updateMask |= UPDATE_REG_L;
   regL = reg;
