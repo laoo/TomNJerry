@@ -39,6 +39,7 @@ public:
   void loadWord( uint32_t address, uint16_t value );
   void loadByte( uint32_t address, uint8_t value );
   void warnMemoryAccess();
+  void warnRegInUse();
   void tagUninterruptibleSequence();
   void flush();
 
@@ -87,6 +88,7 @@ static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32, 1, 2, 3, 4, 5, 6, 7
 #define LOG_LOADWORD( ADDRESS, VALUE ) mLog->loadWord( ADDRESS, VALUE );
 #define LOG_LOADBYTE( ADDRESS, VALUE ) mLog->loadByte( ADDRESS, VALUE );
 #define LOG_WARNMEMORYACCESS() mLog->warnMemoryAccess();
+#define LOG_WARNREGINUSE() mLog->warnRegInUse();
 #define LOG_TAGUNINTERRUPTIBLESEQUENCE() mLog->tagUninterruptibleSequence();
 #define LOG_FLUSH() mLog->flush();
 
@@ -122,6 +124,7 @@ static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32, 1, 2, 3, 4, 5, 6, 7
 #define LOG_LOADWORD( ADDRESS, VALUE )
 #define LOG_LOADBYTE( ADDRESS, VALUE )
 #define LOG_WARNMEMORYACCESS()
+#define LOG_WARNREGINUSE()
 #define LOG_TAGUNINTERRUPTIBLESEQUENCE()
 #define LOG_FLUSH()
 

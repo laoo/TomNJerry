@@ -1376,7 +1376,7 @@ void Jerry::compute()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[mStageCompute.regDst] == mRegisterFile )
-        throw EmulationViolation{ "MTOI writes to a register in use" };
+        LOG_WARNREGINUSE();
 
       mStageWrite.updateReg( mStageCompute.regDst, ( ( ( int32_t )mStageCompute.dataSrc >> 8 ) & 0xFF800000 ) | ( mStageCompute.dataSrc & 0x007FFFFF ) );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
@@ -1390,7 +1390,7 @@ void Jerry::compute()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[mStageCompute.regDst] == mRegisterFile )
-        throw EmulationViolation{ "NORMI writes to a register in use" };
+        LOG_WARNREGINUSE();
 
       uint32_t data = 0;
 
@@ -1672,7 +1672,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[regDst] != FREE )
-        throw EmulationViolation{ "RESMAC writes to a register in use" };
+        LOG_WARNREGINUSE();
       dualPortCommit();
       mStageWrite.updateReg( regDst, ( uint32_t )mMacStage.acc );
       mStageRead.instruction = DSPI::EMPTY;
@@ -1687,7 +1687,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[regDst] != FREE )
-        throw EmulationViolation{ "MOVEQ writes to a register in use" };
+        LOG_WARNREGINUSE();
       dualPortCommit();
       LOG_PORTIMM( mStageRead.regSrc.idx );
       mStageWrite.updateReg( regDst, mStageRead.regSrc.idx );
@@ -1703,7 +1703,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() && portReadSrc( mStageRead.regSrc.translate( mRegisterFile ^ 32 ) ) )
     {
       if ( mRegStatus[regDst] != FREE )
-        throw EmulationViolation{ "MOVEFA writes to a register in use" };
+        LOG_WARNREGINUSE();
       dualPortCommit();
       mStageWrite.updateReg( regDst, mStageRead.dataSrc );
       mStageRead.instruction = DSPI::EMPTY;
@@ -1744,7 +1744,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() && portReadSrc( regSrc ) )
     {
       if ( mRegStatus[regDst] != FREE )
-        throw EmulationViolation{ "MOVE writes to a register in use" };
+        LOG_WARNREGINUSE();
 
       dualPortCommit();
       mStageWrite.updateReg( regDst, mStageRead.dataSrc );
@@ -1772,7 +1772,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[regDst] != FREE )
-        throw EmulationViolation{ "MOVEI writes to a register in use" };
+        LOG_WARNREGINUSE();
       dualPortCommit();
       mStageRead.instruction = DSPI::EMPTY;
       lockReg( regDst );
@@ -1989,7 +1989,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[regDst] != FREE )
-        throw EmulationViolation{ "MOVE PC writes to a register in use" };
+        LOG_WARNREGINUSE();
       dualPortCommit();
       mStageWrite.updateReg( regDst, mPC - ( mPrefetch.queueSize + 1 ) * 2 );
       mStageRead.instruction = DSPI::EMPTY;
@@ -2448,7 +2448,9 @@ void Jerry::dualPortCommit()
 
 void Jerry::lockReg( GlobalReg reg )
 {
-  assert( mRegStatus[reg] == FREE );
+  if ( mRegStatus[reg] != FREE )
+    LOG_WARNREGINUSE();
+
   mRegStatus[reg] = 1;
 }
 
