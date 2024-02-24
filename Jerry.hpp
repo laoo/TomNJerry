@@ -418,8 +418,8 @@ private:
     uint32_t address = 0;
     union
     {
-      uint32_t data = 0;
-      GlobalReg reg;
+      GlobalReg reg = GlobalReg{};
+      uint32_t data;
     };
   } mStageIO;
 
@@ -438,8 +438,8 @@ private:
     uint32_t address = 0;
     union
     {
-      uint32_t data = 0;
-      GlobalReg reg;
+      GlobalReg reg = GlobalReg{};
+      uint32_t data;
     };
   } mLocalBus;
 
