@@ -25,7 +25,7 @@ class AdvanceResult
 {
 public:
 
-  static constexpr uint64_t kRegMask      = 0x000000000000001full;
+  static constexpr uint64_t kRegMask      = 0x000000000000003full;
   static constexpr uint64_t kValueMask    = 0x00000000ffffffffull;
   static constexpr uint64_t kAddressMask  = 0x00ffffff00000000ull;
   static constexpr uint64_t kFlagsMask    = 0xff00000000000000ull;
