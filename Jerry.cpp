@@ -824,15 +824,7 @@ bool Jerry::stageWriteReg()
 {
   assert( mStageWrite.regFlags.reg >= 0 );
 
-  if ( portWriteDst( GlobalReg( mStageWrite.regFlags.reg ), mStageWrite.data ) )
-  {
-    mStageWrite.regFlags.reg = -1;
-    return true;
-  }
-  else
-  {
-    return false;
-  }
+  return portWriteDst( GlobalReg( mStageWrite.regFlags.reg ), mStageWrite.data );
 }
 
 bool Jerry::stageWriteRegL()
@@ -847,20 +839,46 @@ void Jerry::stageWriteFlags()
   if ( mStageWrite.regFlags.z >= 0 )
   {
     mFlags.z = mStageWrite.regFlags.z > 0;
-    mStageWrite.regFlags.z = -1;
   }
 
   if ( mStageWrite.regFlags.c >= 0 )
   {
     mFlags.c = mStageWrite.regFlags.c > 0;
-    mStageWrite.regFlags.c = -1;
   }
 
   if ( mStageWrite.regFlags.n >= 0 )
   {
     mFlags.n = mStageWrite.regFlags.n > 0;
-    mStageWrite.regFlags.n = -1;
   }
+
+  // stageWriteReg must be called ALWAYES before stageWriteFlags
+  mStageWrite.regFlags = RegFlags();
+
+  mFlagsSemaphore -= 1;
+  assert( mFlagsSemaphore >= 0 );
+}
+
+void Jerry::stageWriteFlagsL()
+{
+  if ( mStageWrite.regFlags.z >= 0 )
+  {
+    mFlags.z = mStageWrite.regFlags.z > 0;
+  }
+
+  if ( mStageWrite.regFlags.c >= 0 )
+  {
+    mFlags.c = mStageWrite.regFlags.c > 0;
+  }
+
+  if ( mStageWrite.regFlags.n >= 0 )
+  {
+    mFlags.n = mStageWrite.regFlags.n > 0;
+  }
+
+  auto reg = mStageWrite.regFlags.reg;
+  mStageWrite.regFlags = RegFlags();
+  mStageWrite.regFlags.reg = reg;
+
   mFlagsSemaphore -= 1;
   assert( mFlagsSemaphore >= 0 );
 }
@@ -892,7 +910,7 @@ void Jerry::stageWrite()
     break;
   case ( StageWrite::UPDATE_REG_L | StageWrite::UPDATE_REG | StageWrite::UPDATE_FLAGS ):
     mStageWrite.updateMask = stageWriteRegL() ? StageWrite::UPDATE_REG : StageWrite::UPDATE_REG_L;
-    stageWriteFlags();
+    stageWriteFlagsL();
     break;
   default:
     break;
@@ -1123,7 +1141,7 @@ void Jerry::compute()
         mStageWrite.regFlags.n = 1;
         mStageWrite.regFlags.c = 1;
       } else {
-        mStageWrite.updateReg( mStageCompute.regDst, mStageCompute.dataDst < 0 ? -mStageCompute.dataDst : mStageCompute.dataDst );
+        mStageWrite.updateReg( mStageCompute.regDst,(int32_t) mStageCompute.dataDst < 0 ? (~mStageCompute.dataDst)+1 : mStageCompute.dataDst );
         mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
         mStageWrite.regFlags.n = 0;
         mStageWrite.regFlags.c = mStageCompute.dataDst < 0 ? 1 : 0;
@@ -1505,7 +1523,7 @@ void Jerry::stageRead()
       mFlagsSemaphore += 1;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = regDst;
-      mStageCompute.dataSrc = mStageRead.regSrc.idx ? mStageRead.regSrc.idx : 32;
+      mStageCompute.dataSrc = mStageRead.regSrc.idx == 0 ? 32 : mStageRead.regSrc.idx;
       mStageCompute.dataDst = mStageRead.dataDst;
       lockReg( regDst );
     }
@@ -1580,7 +1598,7 @@ void Jerry::stageRead()
       LOG_PORTIMM( mStageRead.regSrc.idx );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = regDst;
-      mStageCompute.dataSrc = mStageRead.regSrc.idx ? mStageRead.regSrc.idx : 32;
+      mStageCompute.dataSrc = mStageRead.regSrc.idx == 0 ? 32 : mStageRead.regSrc.idx;
       mStageCompute.dataDst = mStageRead.dataDst;
       lockReg( regDst );
     }
@@ -1846,7 +1864,7 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
       mStageCompute.regSrc = regDst;     //register to store
-      mStageCompute.regDst = GlobalReg( mStageRead.regSrc.idx ? ( mStageRead.regSrc.idx << 2 ) : 128 );     //offset
+      mStageCompute.regDst = GlobalReg( (mStageRead.regSrc.idx == 0 ? 32 : mStageRead.regSrc.idx) * 4 );     //offset
       lockReg( regDst );
     }
     else
@@ -1861,7 +1879,7 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
       mStageCompute.regSrc = regDst;     //register to store
-      mStageCompute.regDst = GlobalReg( mStageRead.regSrc.idx ? ( mStageRead.regSrc.idx << 2 ) : 128 );     //offset
+      mStageCompute.regDst = GlobalReg( (mStageRead.regSrc.idx == 0 ? 32 : mStageRead.regSrc.idx) * 4 );     //offset
       lockReg( regDst );
     }
     else
@@ -1946,7 +1964,7 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;                                   //base address to store
       mStageCompute.regSrc = regDst;                                                //register to store
-      mStageCompute.regDst = GlobalReg( mStageRead.regSrc.idx ? ( mStageRead.regSrc.idx << 2 ) : 128 );    //offset
+      mStageCompute.regDst = GlobalReg( (mStageRead.regSrc.idx == 0 ? 32 : mStageRead.regSrc.idx) * 4 );    //offset
     }
     else
     {
@@ -1960,7 +1978,7 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;                                   //base address to store
       mStageCompute.regSrc = regDst;                                                //register to store
-      mStageCompute.regDst = GlobalReg( mStageRead.regSrc.idx ? ( mStageRead.regSrc.idx << 2 ) : 128 );    //offset
+      mStageCompute.regDst = GlobalReg( (mStageRead.regSrc.idx == 0 ? 32 : mStageRead.regSrc.idx) * 4 );    //offset
     }
     else
     {
@@ -2325,7 +2343,6 @@ bool Jerry::portWriteDst( GlobalReg reg, uint32_t data )
 
   mPortWriteDstReg = reg;
   mPortWriteDstData = data;
-  assert( mPortWriteDstReg.idx >= 0 );
   return true;
 }
 
@@ -2703,7 +2720,7 @@ void Jerry::reconfigureDAC()
 
   int period  = ( 64 * ( mSCLK + 1 ) );
   int serialClockFrequency = mClock / period;
-  
+
   mWaveOut = std::make_unique<WaveOut>( mWavePath, serialClockFrequency );
 
   setI2S( period );
@@ -2748,7 +2765,6 @@ void Jerry::StageWrite::updateReg( GlobalReg reg, uint32_t value )
 {
   updateMask |= UPDATE_REG;
   regFlags.reg = (int8_t)reg.idx;
-  assert( regFlags.reg >= 0 );
   data = value;
 }
 
