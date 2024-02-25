@@ -34,6 +34,7 @@ public:
   void portCond( uint32_t value );
   void jumpT();
   void jumpF();
+  void jr( uint32_t condition, uint32_t address );
   void portReadSrc( uint32_t reg, uint32_t value );
   void portReadSrcMMULT( uint32_t reg, bool high, uint32_t value );
   void portReadDst( uint32_t reg, uint32_t value );
@@ -67,7 +68,7 @@ private:
 
 };
 
-static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31 };
+static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32 * 4, 1 * 4, 2 * 4, 3 * 4, 4 * 4, 5 * 4, 6 * 4, 7 * 4, 8 * 4, 9 * 4, 10 * 4, 11 * 4, 12 * 4, 13 * 4, 14 * 4, 15 * 4, 16 * 4, 17 * 4, 18 * 4, 19 * 4, 20 * 4, 21 * 4, 22 * 4, 23 * 4, 24 * 4, 25 * 4, 26 * 4, 27 * 4, 28 * 4, 29 * 4, 30 * 4, 31 * 4 };
 
 #ifdef LOG_PIPELINE
 
@@ -82,6 +83,7 @@ static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32, 1, 2, 3, 4, 5, 6, 7
 #define LOG_PORTCOND( VALUE ) mLog->portCond( VALUE );
 #define LOG_JUMPT() mLog->jumpT();
 #define LOG_JUMPF() mLog->jumpF();
+#define LOG_JR( COND, ADDR ) mLog->jr( COND, ADDR );
 #define LOG_PORTREADSRC( REG, VALUE ) mLog->portReadSrc( REG, VALUE );
 #define LOG_PORTREADSRCMMULT( REG, HIGH, VALUE ) mLog->portReadSrcMMULT( REG, HIGH, VALUE );
 #define LOG_PORTREADDST( REG, VALUE ) mLog->portReadDst( REG, VALUE );
@@ -117,6 +119,7 @@ static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32, 1, 2, 3, 4, 5, 6, 7
 #define LOG_PORTCOND( VALUE )
 #define LOG_JUMPT()
 #define LOG_JUMPF()
+#define LOG_JR( COND, ADDR )
 #define LOG_PORTREADSRC( REG, VALUE )
 #define LOG_PORTREADSRCMMULT( REG, HIGH, VALUE )
 #define LOG_PORTREADDST( REG, VALUE )

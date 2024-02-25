@@ -18,39 +18,39 @@ struct JumpCondition
 static constexpr JumpCondition kJumpConditions[32] =
 {
   { "", 0 },
-  { "!z", 2 },
-  { "z", 1 },
-  { "3?", 1 },
-  { "!c", 2 },
-  { "!c !z", 5 },
-  { "!c z", 4 },
-  { "7?", 1 },
+  { "ne,", 3 },
+  { "eq,", 3 },
+  { "3?,", 3 },
+  { "cc,", 3 },
+  { "ccne,", 5 },
+  { "cceq,", 5 },
+  { "7?,", 3 },
 
-  { "c", 1 },
-  { "c !z", 4 },
-  { "c z", 3 },
-  { "11?", 1 },
-  { "12?", 1 },
-  { "13?", 1 },
-  { "14?", 1 },
-  { "15?", 1 },
+  { "cs,", 3 },
+  { "csne,", 5 },
+  { "cseq,", 5 },
+  { "11?,", 4 },
+  { "12?,", 4 },
+  { "13?,", 4 },
+  { "14?,", 4 },
+  { "15?,", 4 },
 
-  { "16?", 1 },
-  { "17?", 1 },
-  { "18?", 1 },
-  { "19?", 1 },
-  { "!n", 2 },
-  { "!n !z", 5 },
-  { "!n z", 4 },
-  { "23?", 1 },
-  { "n", 1 },
-  { "n !z", 4 },
-  { "n z", 3 },
-  { "27?", 1 },
-  { "28?", 1 },
-  { "29?", 1 },
-  { "30?", 1 },
-  { "!", 1 }
+  { "16?,", 4 },
+  { "17?,", 4 },
+  { "18?,", 4 },
+  { "19?,", 4 },
+  { "pl,", 3 },
+  { "plne,", 5 },
+  { "pleq,", 5 },
+  { "23?,", 4 },
+  { "mi,", 3 },
+  { "mine,", 5 },
+  { "mieq,", 5 },
+  { "27?,", 4 },
+  { "28?,", 4 },
+  { "29?,", 4 },
+  { "30?,", 4 },
+  { "!,", 2 }
 };
 
 static constexpr char ZFlag[] = "*-Z";
@@ -80,6 +80,15 @@ void PipelineLog::instrAddr( uint32_t address )
   stbsp_sprintf( mBuffer + 0x09, "%06x:", address );
 }
 
+void PipelineLog::jr( uint32_t condition, uint32_t address )
+{
+  //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
+  //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
+  //012345 | 012345: store   r31,(r31+r31) |    #31            #31       | C31' NCZ | W31:01234567
+  stbsp_sprintf( mBuffer + 0x3e, "%06x", address );
+  portCond( condition );
+}
+
 void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
 {
   switch ( instr )
@@ -91,10 +100,10 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     stbsp_sprintf( mBuffer + 0x11, "addc    r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::ADDQ:
-    stbsp_sprintf( mBuffer + 0x11, "addq    #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "addq    #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::ADDQT:
-    stbsp_sprintf( mBuffer + 0x11, "addqt   #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "addqt   #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SUB:
     stbsp_sprintf( mBuffer + 0x11, "sub     r%02d,r%02d", reg1, reg2 );
@@ -103,10 +112,10 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     stbsp_sprintf( mBuffer + 0x11, "subc    r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SUBQ:
-    stbsp_sprintf( mBuffer + 0x11, "subq    #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "subq    #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SUBQT:
-    stbsp_sprintf( mBuffer + 0x11, "subqt   #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "subqt   #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::NEG:
     stbsp_sprintf( mBuffer + 0x11, "neg     r%02d", reg2 );
@@ -124,13 +133,13 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     stbsp_sprintf( mBuffer + 0x11, "not     r%02d", reg2 );
     break;
   case DSPI::BTST:
-    stbsp_sprintf( mBuffer + 0x11, "btst    #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "btst    #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::BSET:
-    stbsp_sprintf( mBuffer + 0x11, "bset    #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "bset    #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::BCLR:
-    stbsp_sprintf( mBuffer + 0x11, "bclr    #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "bclr    #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::MULT:
     stbsp_sprintf( mBuffer + 0x11, "mult    r%02d,r%02d", reg1, reg2 );
@@ -157,31 +166,31 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     stbsp_sprintf( mBuffer + 0x11, "sh      r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SHLQ:
-    stbsp_sprintf( mBuffer + 0x11, "shlq    #%02x,r%02d", 32-reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "shlq    #%02d,r%02d", 32-reg1, reg2 );
     break;
   case DSPI::SHRQ:
-    stbsp_sprintf( mBuffer + 0x11, "shrq    #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "shrq    #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SHA:
     stbsp_sprintf( mBuffer + 0x11, "sha     r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SHARQ:
-    stbsp_sprintf( mBuffer + 0x11, "sharq   #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "sharq   #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::ROR:
     stbsp_sprintf( mBuffer + 0x11, "ror     r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::RORQ:
-    stbsp_sprintf( mBuffer + 0x11, "rorq    #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "rorq    #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::CMP:
     stbsp_sprintf( mBuffer + 0x11, "cmp     r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::CMPQ:
-    stbsp_sprintf( mBuffer + 0x11, "cmpq    #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "cmpq    #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SUBQMOD:
-    stbsp_sprintf( mBuffer + 0x11, "sumbmod #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "sumbmod #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SAT16S:
     stbsp_sprintf( mBuffer + 0x11, "sat16s  r%02d", reg2 );
@@ -190,7 +199,7 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     stbsp_sprintf( mBuffer + 0x11, "move    r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::MOVEQ:
-    stbsp_sprintf( mBuffer + 0x11, "moveq   #%02x,r%02d", reg1, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "moveq   #%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::MOVETA:
     stbsp_sprintf( mBuffer + 0x11, "moveta  r%02d,r%02d", reg1, reg2 );
@@ -214,10 +223,10 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     stbsp_sprintf( mBuffer + 0x11, "sat32s  r%02d", reg2 );
     break;
   case DSPI::LOAD14N:
-    stbsp_sprintf( mBuffer + 0x11, "load    (r14+#%02x),r%02d", tabAddSubQ[reg1] * 4, reg2);
+    stbsp_sprintf( mBuffer + 0x11, "load    (r14+#%02d),r%02d", tabAddSubQ[reg1], reg2);
     break;
   case DSPI::LOAD15N:
-    stbsp_sprintf( mBuffer + 0x11, "load    (r15+#%02x),r%02d", tabAddSubQ[reg1], reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "load    (r15+#%02d),r%02d", tabAddSubQ[reg1], reg2 );
     break;
   case DSPI::STOREB:
     stbsp_sprintf( mBuffer + 0x11, "storeb  r%02d,(r%02d)", reg2, reg1 );
@@ -232,19 +241,19 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     stbsp_sprintf( mBuffer + 0x11, "mirror  r%02d", reg2 );
     break;
   case DSPI::STORE14N:
-    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r14+#%02x)", reg2, tabAddSubQ[reg1] * 4 );
+    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r14+#%02d)", reg2, tabAddSubQ[reg1] );
     break;
   case DSPI::STORE15N:
-    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r15+#%02x)", reg2, tabAddSubQ[reg1] * 4 );
+    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r15+#%02d)", reg2, tabAddSubQ[reg1] );
     break;
   case DSPI::MOVEPC:
     stbsp_sprintf( mBuffer + 0x11, "move    pc,r%02d",       reg2 );
     break;
   case DSPI::JUMP:
-    stbsp_sprintf( mBuffer + 0x11, "jump    %s%s(r%02d)", kJumpConditions[reg2 & 31].name, kJumpConditions[reg2 & 31].size == 0 ? "" : ",", reg1);
+    stbsp_sprintf( mBuffer + 0x11, "jump    %s(r%02d)", kJumpConditions[reg2 & 31].name, reg1);
     break;
   case DSPI::JR:
-    stbsp_sprintf( mBuffer + 0x11, "jr      %s%s%s%d", kJumpConditions[reg2 & 31].name, kJumpConditions[reg2 & 31].size == 0 ? "" : ",", ( reg1 & 5 ) == 0?"+":"", ( ( int8_t )( reg1 << 3 ) / 8 ));
+    stbsp_sprintf( mBuffer + 0x11, "jr      %s%s%d", kJumpConditions[reg2 & 31].name, ( reg1 & 5 ) == 0?"+":"", ( ( int8_t )( reg1 << 3 ) / 8 ));
     break;
   case DSPI::MMULT:
     stbsp_sprintf( mBuffer + 0x11, "mmult   r%02d,r%02d", reg1, reg2 );
@@ -281,12 +290,12 @@ void PipelineLog::decodeMOVEI( int stage, uint32_t data )
   if ( stage == 0 )
   {
     stbsp_sprintf( mBuffer + 0x1a, "----%04x", data );
-    stbsp_sprintf( mBuffer + 0x31, "#%04x", data );
+    stbsp_sprintf( mBuffer + 0x31, "$%04x", data );
   }
   else
   {
     stbsp_sprintf( mBuffer + 0x1a, "%04x----", data >> 16 );
-    stbsp_sprintf( mBuffer + 0x31, "#%04x", data >> 16 );
+    stbsp_sprintf( mBuffer + 0x31, "$%04x", data >> 16 );
   }
 
   tagUninterruptibleSequence();
@@ -315,7 +324,7 @@ void PipelineLog::portImm( uint32_t value )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  stbsp_sprintf( mBuffer + 0x33, "#%02x", value );
+  stbsp_sprintf( mBuffer + 0x33, "#%02d", value );
 }
 
 void PipelineLog::portCond( uint32_t value )
@@ -323,7 +332,8 @@ void PipelineLog::portCond( uint32_t value )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  int off = stbsp_sprintf( mBuffer + 0x36 - kJumpConditions[value & 31].size, "%s", kJumpConditions[value & 31].name );
+  if ( kJumpConditions[value & 31].size )
+    std::memcpy( mBuffer + 0x36 - kJumpConditions[value & 31].size + 1, kJumpConditions[value & 31].name, kJumpConditions[value & 31].size - 1 );
 }
 
 void PipelineLog::portReadSrc( uint32_t reg, uint32_t value )

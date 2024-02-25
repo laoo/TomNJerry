@@ -2024,10 +2024,10 @@ void Jerry::stageRead()
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
-      LOG_PORTCOND( mStageRead.regDst.idx );
       mStageCompute.regDst = GlobalReg{ mStageRead.regDst.idx };
       int32_t off = ( ( int8_t )( mStageRead.regSrc.idx << 3 ) >> 3 );
       mStageCompute.dataSrc = mPC + ( off - mPrefetch.queueSize ) * 2;
+      LOG_JR( mStageRead.regDst.idx, mStageCompute.dataSrc );
     }
     else
     {
