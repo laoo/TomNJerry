@@ -1499,6 +1499,10 @@ void Jerry::stageRead()
   case DSPI::SUBQ:
   case DSPI::SUBQMOD:
   case DSPI::ADDQMOD:
+  case DSPI::SHRQ:
+  case DSPI::SHARQ:
+  case DSPI::RORQ:
+
     if ( portReadDst( regDst ) )
     {
       dualPortCommit();
@@ -1517,9 +1521,6 @@ void Jerry::stageRead()
     break;
   case DSPI::BSET:
   case DSPI::BCLR:
-  case DSPI::SHRQ:
-  case DSPI::SHARQ:
-  case DSPI::RORQ:
     if ( portReadDst( regDst ) )
     {
       dualPortCommit();
@@ -1544,7 +1545,7 @@ void Jerry::stageRead()
       mFlagsSemaphore += 1;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = regDst;
-      mStageCompute.dataSrc = mStageRead.regSrc.idx;
+      mStageCompute.dataSrc = mStageRead.regSrc.idx == 0 ? 32 : mStageRead.regSrc.idx;
       mStageCompute.dataDst = mStageRead.dataDst;
       lockReg( regDst );
     }
