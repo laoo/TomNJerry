@@ -3,6 +3,12 @@
 #include "Opcodes.hpp"
 #include "RegFlags.hpp"
 
+enum WarnReason
+{
+  WARN_MEMORY_ACCESS,
+  WARN_REG_IN_USE
+};
+
 class PipelineLog
 {
 public:
@@ -38,8 +44,7 @@ public:
   void loadLong( uint32_t address, uint32_t value );
   void loadWord( uint32_t address, uint16_t value );
   void loadByte( uint32_t address, uint8_t value );
-  void warnMemoryAccess();
-  void warnRegInUse();
+  void warn( WarnReason reason );
   void tagUninterruptibleSequence();
   void flush();
 
@@ -87,8 +92,7 @@ static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32, 1, 2, 3, 4, 5, 6, 7
 #define LOG_LOADLONG( ADDRESS, VALUE ) mLog->loadLong( ADDRESS, VALUE );
 #define LOG_LOADWORD( ADDRESS, VALUE ) mLog->loadWord( ADDRESS, VALUE );
 #define LOG_LOADBYTE( ADDRESS, VALUE ) mLog->loadByte( ADDRESS, VALUE );
-#define LOG_WARNMEMORYACCESS() mLog->warnMemoryAccess();
-#define LOG_WARNREGINUSE() mLog->warnRegInUse();
+#define LOG_WARN( REASON ) mLog->warn( REASON );
 #define LOG_TAGUNINTERRUPTIBLESEQUENCE() mLog->tagUninterruptibleSequence();
 #define LOG_FLUSH() mLog->flush();
 
@@ -123,9 +127,9 @@ static constexpr std::array<uint32_t, 32> tabAddSubQ = { 32, 1, 2, 3, 4, 5, 6, 7
 #define LOG_LOADLONG( ADDRESS, VALUE )
 #define LOG_LOADWORD( ADDRESS, VALUE )
 #define LOG_LOADBYTE( ADDRESS, VALUE )
-#define LOG_WARNMEMORYACCESS()
-#define LOG_WARNREGINUSE()
+#define LOG_WARN( REASON )
 #define LOG_TAGUNINTERRUPTIBLESEQUENCE()
 #define LOG_FLUSH()
 
 #endif
+

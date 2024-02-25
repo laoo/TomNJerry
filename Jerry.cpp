@@ -567,7 +567,7 @@ void Jerry::localBus()
     LOG_STORELONG( mLocalBus.address, mLocalBus.data );
     break;
   case LocalBus::WRITE_WORD:
-    LOG_WARNMEMORYACCESS();
+    LOG_WARN( WARN_MEMORY_ACCESS );
     writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
     mLocalBus.state = LocalBus::IDLE;
     mStageIO.state = StageIO::IDLE;
@@ -575,7 +575,7 @@ void Jerry::localBus()
     LOG_STORELONG( mLocalBus.address, mLocalBus.data );
     break;
   case LocalBus::WRITE_BYTE:
-    LOG_WARNMEMORYACCESS();
+    LOG_WARN( WARN_MEMORY_ACCESS );
     writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
     mLocalBus.state = LocalBus::IDLE;
     mStageIO.state = StageIO::IDLE;
@@ -590,7 +590,7 @@ void Jerry::localBus()
     LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
     break;
   case LocalBus::READ_WORD:
-    LOG_WARNMEMORYACCESS();
+    LOG_WARN( WARN_MEMORY_ACCESS );
     mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) >> ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
     mStageIO.state = StageIO::IDLE;
     mStageIO.state = StageIO::IDLE;
@@ -598,7 +598,7 @@ void Jerry::localBus()
     LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
     break;
   case LocalBus::READ_BYTE:
-    LOG_WARNMEMORYACCESS();
+    LOG_WARN( WARN_MEMORY_ACCESS );
     mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) >> ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
     mLocalBus.state = LocalBus::IDLE;
     mStageIO.state = StageIO::IDLE;
@@ -1376,7 +1376,7 @@ void Jerry::compute()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[mStageCompute.regDst] == mRegisterFile )
-        LOG_WARNREGINUSE();
+        LOG_WARN( WARN_REG_IN_USE );
 
       mStageWrite.updateReg( mStageCompute.regDst, ( ( ( int32_t )mStageCompute.dataSrc >> 8 ) & 0xFF800000 ) | ( mStageCompute.dataSrc & 0x007FFFFF ) );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
@@ -1390,7 +1390,7 @@ void Jerry::compute()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[mStageCompute.regDst] == mRegisterFile )
-        LOG_WARNREGINUSE();
+        LOG_WARN( WARN_REG_IN_USE );
 
       uint32_t data = 0;
 
@@ -1672,7 +1672,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[regDst] != FREE )
-        LOG_WARNREGINUSE();
+        LOG_WARN( WARN_REG_IN_USE );
       dualPortCommit();
       mStageWrite.updateReg( regDst, ( uint32_t )mMacStage.acc );
       mStageRead.instruction = DSPI::EMPTY;
@@ -1687,7 +1687,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[regDst] != FREE )
-        LOG_WARNREGINUSE();
+        LOG_WARN( WARN_REG_IN_USE );
       dualPortCommit();
       LOG_PORTIMM( mStageRead.regSrc.idx );
       mStageWrite.updateReg( regDst, mStageRead.regSrc.idx );
@@ -1703,7 +1703,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() && portReadSrc( mStageRead.regSrc.translate( mRegisterFile ^ 32 ) ) )
     {
       if ( mRegStatus[regDst] != FREE )
-        LOG_WARNREGINUSE();
+        LOG_WARN( WARN_REG_IN_USE );
       dualPortCommit();
       mStageWrite.updateReg( regDst, mStageRead.dataSrc );
       mStageRead.instruction = DSPI::EMPTY;
@@ -1744,7 +1744,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() && portReadSrc( regSrc ) )
     {
       if ( mRegStatus[regDst] != FREE )
-        LOG_WARNREGINUSE();
+        LOG_WARN( WARN_REG_IN_USE );
 
       dualPortCommit();
       mStageWrite.updateReg( regDst, mStageRead.dataSrc );
@@ -1772,7 +1772,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[regDst] != FREE )
-        LOG_WARNREGINUSE();
+        LOG_WARN( WARN_REG_IN_USE );
       dualPortCommit();
       mStageRead.instruction = DSPI::EMPTY;
       lockReg( regDst );
@@ -1989,7 +1989,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() )
     {
       if ( mRegStatus[regDst] != FREE )
-        LOG_WARNREGINUSE();
+        LOG_WARN( WARN_REG_IN_USE );
       dualPortCommit();
       mStageWrite.updateReg( regDst, mPC - ( mPrefetch.queueSize + 1 ) * 2 );
       mStageRead.instruction = DSPI::EMPTY;
@@ -2449,7 +2449,7 @@ void Jerry::dualPortCommit()
 void Jerry::lockReg( GlobalReg reg )
 {
   if ( mRegStatus[reg] != FREE )
-    LOG_WARNREGINUSE();
+    LOG_WARN( WARN_REG_IN_USE );
 
   mRegStatus[reg] = 1;
 }

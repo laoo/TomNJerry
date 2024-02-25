@@ -481,14 +481,17 @@ void PipelineLog::loadByte( uint32_t address, uint8_t value )
   stbsp_sprintf( mBuffer + 0x62, "L(%06x):%02x", address, value );
 }
 
-void PipelineLog::warnMemoryAccess()
+void PipelineLog::warn( WarnReason reason )
 {
-  stbsp_sprintf( mBuffer + 0x75, "? memSize\n" );
-}
+  static constexpr std::array<char const*, 2> kWarnReasons =
+  {
+    "? memSize\n",
+    "? regInUse\n"
+  };
 
-void PipelineLog::warnRegInUse()
-{
-  stbsp_sprintf( mBuffer + 0x75, "? regInUse\n" );
+  assert( (size_t)reason < kWarnReasons.size() );
+
+  stbsp_sprintf( mBuffer + 0x75, kWarnReasons[(size_t)reason] );
 }
 
 void PipelineLog::tagUninterruptibleSequence()
