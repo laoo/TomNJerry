@@ -1523,7 +1523,7 @@ void Jerry::stageRead()
       mFlagsSemaphore += 1;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = regDst;
-      mStageCompute.dataSrc = tabAddSubQ[mStageRead.regSrc.idx];
+      mStageCompute.dataSrc = mStageRead.regSrc.idx ? mStageRead.regSrc.idx : 32;
       mStageCompute.dataDst = mStageRead.dataDst;
       lockReg( regDst );
     }
@@ -1598,7 +1598,7 @@ void Jerry::stageRead()
       LOG_PORTIMM( mStageRead.regSrc.idx );
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = regDst;
-      mStageCompute.dataSrc = tabAddSubQ[mStageRead.regSrc.idx];
+      mStageCompute.dataSrc = mStageRead.regSrc.idx ? mStageRead.regSrc.idx : 32;
       mStageCompute.dataDst = mStageRead.dataDst;
       lockReg( regDst );
     }
@@ -1864,7 +1864,7 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
       mStageCompute.regSrc = regDst;     //register to store
-      mStageCompute.regDst = GlobalReg( tabAddSubQ[mStageRead.regSrc.idx] * 4 );     //offset
+      mStageCompute.regDst = GlobalReg( mStageRead.regSrc.idx ? ( mStageRead.regSrc.idx << 2 ) : 128 );     //offset
       lockReg( regDst );
     }
     else
@@ -1879,7 +1879,7 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;   //base address to store
       mStageCompute.regSrc = regDst;     //register to store
-      mStageCompute.regDst = GlobalReg( tabAddSubQ[mStageRead.regSrc.idx] * 4 );     //offset
+      mStageCompute.regDst = GlobalReg( mStageRead.regSrc.idx ? ( mStageRead.regSrc.idx << 2 ) : 128 );     //offset
       lockReg( regDst );
     }
     else
@@ -1964,7 +1964,7 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;                                   //base address to store
       mStageCompute.regSrc = regDst;                                                //register to store
-      mStageCompute.regDst = GlobalReg( tabAddSubQ[mStageRead.regSrc.idx] * 4 );    //offset
+      mStageCompute.regDst = GlobalReg( mStageRead.regSrc.idx ? ( mStageRead.regSrc.idx << 2 ) : 128 );    //offset
     }
     else
     {
@@ -1978,7 +1978,7 @@ void Jerry::stageRead()
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;                                   //base address to store
       mStageCompute.regSrc = regDst;                                                //register to store
-      mStageCompute.regDst = GlobalReg( tabAddSubQ[mStageRead.regSrc.idx] * 4 );    //offset
+      mStageCompute.regDst = GlobalReg( mStageRead.regSrc.idx ? ( mStageRead.regSrc.idx << 2 ) : 128 );    //offset
     }
     else
     {

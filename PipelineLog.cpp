@@ -223,10 +223,10 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     stbsp_sprintf( mBuffer + 0x11, "sat32s  r%02d", reg2 );
     break;
   case DSPI::LOAD14N:
-    stbsp_sprintf( mBuffer + 0x11, "load    (r14+%02d),r%02d", tabAddSubQ[reg1] * 4, reg2);
+    stbsp_sprintf( mBuffer + 0x11, "load    (r14+%02d),r%02d", reg1 ? reg1 * 4 : 128, reg2);
     break;
   case DSPI::LOAD15N:
-    stbsp_sprintf( mBuffer + 0x11, "load    (r15+%02d),r%02d", tabAddSubQ[reg1] * 4, reg2 );
+    stbsp_sprintf( mBuffer + 0x11, "load    (r15+%02d),r%02d", reg1 ? reg1 * 4 : 128, reg2 );
     break;
   case DSPI::STOREB:
     stbsp_sprintf( mBuffer + 0x11, "storeb  r%02d,(r%02d)", reg2, reg1 );
@@ -241,10 +241,10 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
     stbsp_sprintf( mBuffer + 0x11, "mirror  r%02d", reg2 );
     break;
   case DSPI::STORE14N:
-    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r14+%02d)", reg2, tabAddSubQ[reg1] * 4 );
+    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r14+%02d)", reg2, reg1 ? reg1 * 4 : 128 );
     break;
   case DSPI::STORE15N:
-    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r15+%02d)", reg2, tabAddSubQ[reg1] * 4 );
+    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r15+%02d)", reg2, reg1 ? reg1 * 4 : 128 );
     break;
   case DSPI::MOVEPC:
     stbsp_sprintf( mBuffer + 0x11, "move    pc,r%02d",       reg2 );
