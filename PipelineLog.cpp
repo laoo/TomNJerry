@@ -1,5 +1,10 @@
 #include "PipelineLog.hpp"
 #include "RegFlags.hpp"
+#define STB_SPRINTF_IMPLEMENTATION
+#define STB_SPRINTF_NOFLOAT
+#define STB_SPRINTF_STATIC
+//modified stb_sprintf.h to remove final null-char terminator at line 1349
+#include "stb_sprintf.h"
 
 namespace
 {
@@ -64,7 +69,7 @@ void PipelineLog::prefetch( uint32_t address )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) |    #31            #31       | C31' NCZ | W31:01234567
-  mBuffer[0x00 + sprintf( mBuffer + 0x00, "%06x", address )] = ' ';
+  stbsp_sprintf( mBuffer + 0x00, "%06x", address );
 }
 
 void PipelineLog::instrAddr( uint32_t address )
@@ -72,7 +77,7 @@ void PipelineLog::instrAddr( uint32_t address )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) |    #31            #31       | C31' NCZ | W31:01234567
-  mBuffer[0x09 + sprintf( mBuffer + 0x09, "%06x", address )] = ':';
+  stbsp_sprintf( mBuffer + 0x09, "%06x:", address );
 }
 
 void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
@@ -80,193 +85,193 @@ void PipelineLog::decodeDSP( DSPI instr, uint32_t reg1, uint32_t reg2 )
   switch ( instr )
   {
   case DSPI::ADD:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "add     r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "add     r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::ADDC:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "addc    r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "addc    r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::ADDQ:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "addq    #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "addq    #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::ADDQT:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "addqt   #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "addqt   #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::SUB:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "sub     r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "sub     r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SUBC:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "subc    r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "subc    r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SUBQ:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "subq    #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "subq    #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::SUBQT:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "subqt   #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "subqt   #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::NEG:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "neg     r%02d", reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "neg     r%02d", reg2 );
     break;
   case DSPI::AND:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "and     r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "and     r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::OR:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "or      r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "or      r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::XOR:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "xor     r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "xor     r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::NOT:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "not     r%02d", reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "not     r%02d", reg2 );
     break;
   case DSPI::BTST:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "btst    #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "btst    #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::BSET:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "bset    #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "bset    #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::BCLR:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "bclr    #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "bclr    #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::MULT:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "mult    r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "mult    r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::IMULT:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "imult   r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "imult   r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::IMULTN:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "imultn  r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "imultn  r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::RESMAC:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "resmac  r%02d", reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "resmac  r%02d", reg2 );
     break;
   case DSPI::IMACN:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "imacn   r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "imacn   r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::DIV:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "div     r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "div     r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::ABS:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "abs     r%02d", reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "abs     r%02d", reg2 );
     break;
   case DSPI::SH:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "sh      r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "sh      r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SHLQ:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "shlq    #%02x,r%02d", 32-reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "shlq    #%02x,r%02d", 32-reg1, reg2 );
     break;
   case DSPI::SHRQ:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "shrq    #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "shrq    #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::SHA:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "sha     r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "sha     r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::SHARQ:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "sharq   #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "sharq   #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::ROR:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "ror     r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "ror     r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::RORQ:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "rorq    #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "rorq    #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::CMP:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "cmp     r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "cmp     r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::CMPQ:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "cmpq    #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "cmpq    #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::SUBQMOD:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "sumbmod #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "sumbmod #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::SAT16S:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "sat16s  r%02d", reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "sat16s  r%02d", reg2 );
     break;
   case DSPI::MOVE:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "move    r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "move    r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::MOVEQ:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "moveq   #%02x,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "moveq   #%02x,r%02d", reg1, reg2 );
     break;
   case DSPI::MOVETA:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "moveta  r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "moveta  r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::MOVEFA:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "movefa  r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "movefa  r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::MOVEI:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "movei   #--------,r%02d", reg2)] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "movei   #--------,r%02d", reg2);
     break;
   case DSPI::LOADB:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "loadb   (r%02d),r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "loadb   (r%02d),r%02d", reg1, reg2 );
     break;
   case DSPI::LOADW:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "loadw   (r%02d),r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "loadw   (r%02d),r%02d", reg1, reg2 );
     break;
   case DSPI::LOAD:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "load    (r%02d),r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "load    (r%02d),r%02d", reg1, reg2 );
     break;
   case DSPI::SAT32S:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "sat32s  r%02d", reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "sat32s  r%02d", reg2 );
     break;
   case DSPI::LOAD14N:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "load    (r14+#%02x),r%02d", tabAddSubQ[reg1] * 4, reg2)] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "load    (r14+#%02x),r%02d", tabAddSubQ[reg1] * 4, reg2);
     break;
   case DSPI::LOAD15N:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "load    (r15+#%02x),r%02d", tabAddSubQ[reg1], reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "load    (r15+#%02x),r%02d", tabAddSubQ[reg1], reg2 );
     break;
   case DSPI::STOREB:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "storeb  r%02d,(r%02d)", reg2, reg1 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "storeb  r%02d,(r%02d)", reg2, reg1 );
     break;
   case DSPI::STOREW:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "storew  r%02d,(r%02d)", reg2, reg1 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "storew  r%02d,(r%02d)", reg2, reg1 );
     break;
   case DSPI::STORE:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "store   r%02d,(r%02d)", reg2, reg1 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r%02d)", reg2, reg1 );
     break;
   case DSPI::MIRROR:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "mirror  r%02d", reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "mirror  r%02d", reg2 );
     break;
   case DSPI::STORE14N:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "store   r%02d,(r14+#%02x)", reg2, tabAddSubQ[reg1] * 4 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r14+#%02x)", reg2, tabAddSubQ[reg1] * 4 );
     break;
   case DSPI::STORE15N:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "store   r%02d,(r15+#%02x)", reg2, tabAddSubQ[reg1] * 4 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r15+#%02x)", reg2, tabAddSubQ[reg1] * 4 );
     break;
   case DSPI::MOVEPC:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "move    pc,r%02d",       reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "move    pc,r%02d",       reg2 );
     break;
   case DSPI::JUMP:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "jump    %s%s(r%02d)", kJumpConditions[reg2 & 31].name, kJumpConditions[reg2 & 31].size == 0 ? "" : ",", reg1)] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "jump    %s%s(r%02d)", kJumpConditions[reg2 & 31].name, kJumpConditions[reg2 & 31].size == 0 ? "" : ",", reg1);
     break;
   case DSPI::JR:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "jr      %s%s%s%d", kJumpConditions[reg2 & 31].name, kJumpConditions[reg2 & 31].size == 0 ? "" : ",", ( reg1 & 5 ) == 0?"+":"", ( ( int8_t )( reg1 << 3 ) / 8 ))] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "jr      %s%s%s%d", kJumpConditions[reg2 & 31].name, kJumpConditions[reg2 & 31].size == 0 ? "" : ",", ( reg1 & 5 ) == 0?"+":"", ( ( int8_t )( reg1 << 3 ) / 8 ));
     break;
   case DSPI::MMULT:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "mmult   r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "mmult   r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::MTOI:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "mtoi    r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "mtoi    r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::NORMI:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "normi   r%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "normi   r%02d,r%02d", reg1, reg2 );
     break;
   case DSPI::NOP:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "nop" )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "nop" );
     break;
   case DSPI::LOAD14R:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "load    (r14+r%02d),r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "load    (r14+r%02d),r%02d", reg1, reg2 );
     break;
   case DSPI::LOAD15R:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "load    (r15+#%02d),r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "load    (r15+#%02d),r%02d", reg1, reg2 );
     break;
   case DSPI::STORE14R:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "store   r%02d,(r14+r%02d)", reg2, reg1 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r14+r%02d)", reg2, reg1 );
     break;
   case DSPI::STORE15R:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "store   r%02d,(r15+r%02d)", reg2, reg1 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "store   r%02d,(r15+r%02d)", reg2, reg1 );
     break;
   case DSPI::ADDQMOD:
-    mBuffer[0x11 + sprintf( mBuffer + 0x11, "addqmod #%02d,r%02d", reg1, reg2 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x11, "addqmod #%02d,r%02d", reg1, reg2 );
     break;
   }
 }
@@ -275,13 +280,13 @@ void PipelineLog::decodeMOVEI( int stage, uint32_t data )
 {
   if ( stage == 0 )
   {
-    mBuffer[0x1a + sprintf( mBuffer + 0x1a, "----%04x", data )] = ' ';
-    mBuffer[0x31 + sprintf( mBuffer + 0x31, "#%04x", data )] = ' ';
+    stbsp_sprintf( mBuffer + 0x1a, "----%04x", data );
+    stbsp_sprintf( mBuffer + 0x31, "#%04x", data );
   }
   else
   {
-    mBuffer[0x1a + sprintf( mBuffer + 0x1a, "%04x----", data >> 16 )] = ' ';
-    mBuffer[0x31 + sprintf( mBuffer + 0x31, "#%04x", data >> 16 )] = ' ';
+    stbsp_sprintf( mBuffer + 0x1a, "%04x----", data >> 16 );
+    stbsp_sprintf( mBuffer + 0x31, "#%04x", data >> 16 );
   }
 
   tagUninterruptibleSequence();
@@ -289,19 +294,19 @@ void PipelineLog::decodeMOVEI( int stage, uint32_t data )
 
 void PipelineLog::decodeIMULTN( uint32_t reg, int width, int count )
 {
-  mBuffer[0x11 + sprintf( mBuffer + 0x11, "imultn  r%02d%c,m+%d", reg + 32 + count / 2, count & 1 ? 'h' : 'l', width * count )] = ' ';
+  stbsp_sprintf( mBuffer + 0x11, "imultn  r%02d%c,m+%d", reg + 32 + count / 2, count & 1 ? 'h' : 'l', width * count );
   tagUninterruptibleSequence();
 }
 
 void PipelineLog::decodeRESMAC( uint32_t reg2 )
 {
-  mBuffer[0x11 + sprintf( mBuffer + 0x11, "resmac  r%02d", reg2 )] = ' ';
+  stbsp_sprintf( mBuffer + 0x11, "resmac  r%02d", reg2 );
   tagUninterruptibleSequence();
 }
 
 void PipelineLog::decodeIMACN( uint32_t reg, int width, int count )
 {
-  mBuffer[0x11 + sprintf( mBuffer + 0x11, "imacn   r%02d%c,m+%d", reg + 32 + count / 2, count & 1 ? 'h' : 'l', width * count )] = ' ';
+  stbsp_sprintf( mBuffer + 0x11, "imacn   r%02d%c,m+%d", reg + 32 + count / 2, count & 1 ? 'h' : 'l', width * count );
   tagUninterruptibleSequence();
 }
 
@@ -310,7 +315,7 @@ void PipelineLog::portImm( uint32_t value )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  mBuffer[0x33 + sprintf( mBuffer + 0x33, "#%02x", value )] = ' ';
+  stbsp_sprintf( mBuffer + 0x33, "#%02x", value );
 }
 
 void PipelineLog::portCond( uint32_t value )
@@ -318,8 +323,7 @@ void PipelineLog::portCond( uint32_t value )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  int off = sprintf( mBuffer + 0x36 - kJumpConditions[value & 31].size, "%s", kJumpConditions[value & 31].name );
-  mBuffer[0x36 + off -kJumpConditions[value & 31].size] = ' ';
+  int off = stbsp_sprintf( mBuffer + 0x36 - kJumpConditions[value & 31].size, "%s", kJumpConditions[value & 31].name );
 }
 
 void PipelineLog::portReadSrc( uint32_t reg, uint32_t value )
@@ -327,7 +331,7 @@ void PipelineLog::portReadSrc( uint32_t reg, uint32_t value )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  mBuffer[0x29 + sprintf( mBuffer + 0x29, "R%02d%c:%08x", reg & 31, reg >= 32 ? '"' : '\'', value)] = ' ';
+  stbsp_sprintf( mBuffer + 0x29, "R%02d%c:%08x", reg & 31, reg >= 32 ? '"' : '\'', value);
 }
 
 void PipelineLog::portReadSrcMMULT( uint32_t reg, bool high, uint32_t value )
@@ -335,7 +339,7 @@ void PipelineLog::portReadSrcMMULT( uint32_t reg, bool high, uint32_t value )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  mBuffer[0x29 + sprintf( mBuffer + 0x29, "R%02d\"%c:    %04x", reg & 31, high ? 'h':'l', value )] = ' ';
+  stbsp_sprintf( mBuffer + 0x29, "R%02d\"%c:    %04x", reg & 31, high ? 'h':'l', value );
 }
 
 void PipelineLog::portReadDst( uint32_t reg, uint32_t value )
@@ -343,7 +347,7 @@ void PipelineLog::portReadDst( uint32_t reg, uint32_t value )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  mBuffer[0x37 + sprintf( mBuffer + 0x37, "R%02d%c:%08x", reg & 31, reg >= 32 ? '"' : '\'', value )] = ' ';
+  stbsp_sprintf( mBuffer + 0x37, "R%02d%c:%08x", reg & 31, reg >= 32 ? '"' : '\'', value );
 }
 
 void PipelineLog::portWriteDst( uint32_t reg, uint32_t value )
@@ -351,7 +355,7 @@ void PipelineLog::portWriteDst( uint32_t reg, uint32_t value )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  mBuffer[0x52 + sprintf( mBuffer + 0x52, "W%02d%c:%08x", reg & 31, reg >= 32 ? '"' : '\'', value )] = ' ';
+  stbsp_sprintf( mBuffer + 0x52, "W%02d%c:%08x", reg & 31, reg >= 32 ? '"' : '\'', value );
 }
 
 void PipelineLog::computeReg( RegFlags regFlags )
@@ -360,7 +364,7 @@ void PipelineLog::computeReg( RegFlags regFlags )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  mBuffer[0x47 + sprintf( mBuffer + 0x47, "%02d%c", reg & 31, reg >= 32 ? '"' : '\'' )] = ' ';
+  stbsp_sprintf( mBuffer + 0x47, "%02d%c", reg & 31, reg >= 32 ? '"' : '\'' );
 }
 
 void PipelineLog::computeRegFlags( RegFlags regFlags )
@@ -369,7 +373,7 @@ void PipelineLog::computeRegFlags( RegFlags regFlags )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  mBuffer[0x47 + sprintf( mBuffer + 0x47, "%02d%c %c%c%c", reg & 31, reg >= 32 ? '"' : '\'', NFlag[regFlags.n+1], CFlag[regFlags.c + 1], ZFlag[regFlags.z + 1] )] = ' ';
+  stbsp_sprintf( mBuffer + 0x47, "%02d%c %c%c%c", reg & 31, reg >= 32 ? '"' : '\'', NFlag[regFlags.n+1], CFlag[regFlags.c + 1], ZFlag[regFlags.z + 1] );
 }
 
 void PipelineLog::computeFlags( RegFlags flags )
@@ -377,7 +381,7 @@ void PipelineLog::computeFlags( RegFlags flags )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  mBuffer[0x4c + sprintf( mBuffer + 0x4c, "%c%c%c", NFlag[flags.n + 1], CFlag[flags.c + 1], ZFlag[flags.z + 1] )] = ' ';
+  stbsp_sprintf( mBuffer + 0x4c, "%c%c%c", NFlag[flags.n + 1], CFlag[flags.c + 1], ZFlag[flags.z + 1] );
 }
 
 void PipelineLog::jumpT()
@@ -409,7 +413,7 @@ void PipelineLog::computeMac( RegFlags flags )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  mBuffer[0x47 + sprintf( mBuffer + 0x47, "mac %c%c%c", NFlag[flags.n + 1], CFlag[flags.c + 1], ZFlag[flags.z + 1] )] = ' ';
+  stbsp_sprintf( mBuffer + 0x47, "mac %c%c%c", NFlag[flags.n + 1], CFlag[flags.c + 1], ZFlag[flags.z + 1] );
 }
 
 void PipelineLog::computeIndex()
@@ -426,7 +430,7 @@ void PipelineLog::computeIndex()
 
 void PipelineLog::div( int cycle )
 {
-  mBuffer[0x45 + sprintf( mBuffer + 0x45, "%x", cycle )] = ' ';
+  stbsp_sprintf( mBuffer + 0x45, "%x", cycle );
 }
 
 void PipelineLog::storeLong( uint32_t address, uint32_t value )
@@ -434,7 +438,7 @@ void PipelineLog::storeLong( uint32_t address, uint32_t value )
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567 | S(123456)=12345678
-  mBuffer[0x62 + sprintf( mBuffer + 0x62, "S(%06x)=%08x", address, value )] = ' ';
+  stbsp_sprintf( mBuffer + 0x62, "S(%06x)=%08x", address, value );
 }
 
 void PipelineLog::storeWord( uint32_t address, uint16_t value )
@@ -442,7 +446,7 @@ void PipelineLog::storeWord( uint32_t address, uint16_t value )
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567 | S(123456)=12345678
-  mBuffer[0x62 + sprintf( mBuffer + 0x62, "S(%06x)=%04x", address, value )] = ' ';
+  stbsp_sprintf( mBuffer + 0x62, "S(%06x)=%04x", address, value );
 }
 
 void PipelineLog::storeByte( uint32_t address, uint8_t value )
@@ -450,7 +454,7 @@ void PipelineLog::storeByte( uint32_t address, uint8_t value )
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567 | S(123456)=12345678
-  mBuffer[0x62 + sprintf( mBuffer + 0x62, "S(%06x)=%02x", address, value )] = ' ';
+  stbsp_sprintf( mBuffer + 0x62, "S(%06x)=%02x", address, value );
 }
 
 void PipelineLog::loadLong( uint32_t address, uint32_t value )
@@ -458,7 +462,7 @@ void PipelineLog::loadLong( uint32_t address, uint32_t value )
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567 | L(123456):12345678
-  mBuffer[0x62 + sprintf( mBuffer + 0x62, "L(%06x):%08x", address, value )] = ' ';
+  stbsp_sprintf( mBuffer + 0x62, "L(%06x):%08x", address, value );
 }
 
 void PipelineLog::loadWord( uint32_t address, uint16_t value )
@@ -466,7 +470,7 @@ void PipelineLog::loadWord( uint32_t address, uint16_t value )
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567 | L(123456):12345678
-  mBuffer[0x62 + sprintf( mBuffer + 0x62, "L(%06x):%04x", address, value )] = ' ';
+  stbsp_sprintf( mBuffer + 0x62, "L(%06x):%04x", address, value );
 }
 
 void PipelineLog::loadByte( uint32_t address, uint8_t value )
@@ -474,17 +478,17 @@ void PipelineLog::loadByte( uint32_t address, uint8_t value )
   //000000000000000011111111111111112222222222222222333333333333333344444444444444445555555555555555666666666666666777777777
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567 | L(123456):12345678
-  mBuffer[0x62 + sprintf( mBuffer + 0x62, "L(%06x):%02x", address, value )] = ' ';
+  stbsp_sprintf( mBuffer + 0x62, "L(%06x):%02x", address, value );
 }
 
 void PipelineLog::warnMemoryAccess()
 {
-  mBuffer[0x75 + sprintf( mBuffer + 0x75, "! memSize" )] = ' ';
+  stbsp_sprintf( mBuffer + 0x75, "? memSize\n" );
 }
 
 void PipelineLog::warnRegInUse()
 {
-  mBuffer[0x75 + sprintf( mBuffer + 0x75, "! regInUse" )] = ' ';
+  stbsp_sprintf( mBuffer + 0x75, "? regInUse\n" );
 }
 
 void PipelineLog::tagUninterruptibleSequence()
@@ -500,7 +504,8 @@ void PipelineLog::flush()
 
 void PipelineLog::init()
 {
-                   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555555566666666666666677777777777777777
-                   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-  sprintf( mBuffer, "       |                               |                             |          |               |                    |          \n" );
+                                      //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555555566666666666666677777777777777777
+                                      //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  static const char stringTemplate[] = "       |                               |                             |          |               |                    |\n\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\n";
+  memcpy( mBuffer, stringTemplate, sizeof( stringTemplate ) );
 }
