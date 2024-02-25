@@ -1523,7 +1523,7 @@ void Jerry::stageRead()
       mFlagsSemaphore += 1;
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.regDst = regDst;
-      mStageCompute.dataSrc = tabAddSubQ[ mStageRead.regSrc.idx ];
+      mStageCompute.dataSrc = tabAddSubQ[mStageRead.regSrc.idx];
       mStageCompute.dataDst = mStageRead.dataDst;
       lockReg( regDst );
     }
