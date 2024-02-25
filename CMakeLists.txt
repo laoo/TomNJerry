@@ -1,5 +1,7 @@
 ﻿cmake_minimum_required( VERSION 3.25 )
 
+option( ENABLE_LOGGING "Enable logging to stdout" OFF )
+
 project( TomNJerry )
 
 set( CMAKE_CXX_STANDARD 23 )
@@ -33,9 +35,11 @@ set_source_files_properties(wav.c PROPERTIES
   COMPILE_DEFINITIONS "__LITTLE_ENDIAN__"
 )
 
-set_target_properties( Jerry PROPERTIES
-  COMPILE_DEFINITIONS LOG_PIPELINE
-)
+if ( ENABLE_LOGGING)
+  set_target_properties( Jerry PROPERTIES
+    COMPILE_DEFINITIONS LOG_PIPELINE
+  )
+endif()
 
 target_precompile_headers( Tom PRIVATE
   <algorithm>
