@@ -1,0 +1,10 @@
+;-*-asm-*-
+
+	MACRO	STOP_DSP
+	movei	#D_CTRL,r30
+	moveq	#0,r31
+.\wait
+	store	r31,(r30)
+	jr	.\wait
+	nop
+	ENDM
