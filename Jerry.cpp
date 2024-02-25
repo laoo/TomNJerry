@@ -78,7 +78,7 @@ static constexpr std::array<int16_t,1024> gWaveTable =
   0xE4F3, 0x49EC, 0xF926, 0xF37F, 0x0ABC, 0xECFD, 0x0EAA, 0xFC53, 0xFBFD, 0xF058, 0x0291, 0xE383, 0x1880, 0xF135, 0xF30C, 0xE6D6
 };
 
-Jerry::Jerry( bool isNTSC, std::filesystem::path wavOut ) : mLog{ std::make_unique<PipelineLog>() }, mClock{ isNTSC ? 26590906u : 26593900u }, mWavOut{ wavOut }
+Jerry::Jerry( bool isNTSC, std::filesystem::path wavOut ) : mLog{ std::make_unique<PipelineLog>() }, mClock{ isNTSC ? 26590906u : 26593900u }, mWavePath{ std::move( wavOut ) }
 {
   std::ranges::fill( mLocalRAM, std::byteswap( (uint32_t)( (uint16_t)DSPI::NOP << 10 | ( uint16_t )DSPI::NOP << ( 10 + 16 ) ) ) );
 
@@ -87,11 +87,6 @@ Jerry::Jerry( bool isNTSC, std::filesystem::path wavOut ) : mLog{ std::make_uniq
 
 Jerry::~Jerry()
 {
-  if ( mWav )
-  {
-    wav_close( mWav );
-    mWav = nullptr;
-  }
 }
 
 void Jerry::debugWrite( uint32_t address, std::span<uint32_t const> data )
@@ -2717,31 +2712,16 @@ void Jerry::setTimer2( uint32_t period )
 
 void Jerry::reconfigureDAC()
 {
-  if ( !mSMODE.internal || !mSMODE.wsen || mWavOut.empty() )
+  if ( !mSMODE.internal || !mSMODE.wsen || mWavePath.empty() )
     return;
 
   if ( !mSMODE.rising || mSMODE.everyword || mSMODE.falling )
     LOG_WARN( WARN_UNIMPLEMENTED );
 
-  if ( mWav )
-  {
-    wav_close( mWav );
-  }
-
-  mWav = wav_open( mWavOut.string().c_str(), WAV_OPEN_WRITE );
-  if ( !mWav )
-  {
-    throw Ex{ "Failed to open " } << mWavOut;
-  }
-
   int period  = ( 64 * ( mSCLK + 1 ) );
-
   int serialClockFrequency = mClock / period;
-
-  wav_set_format( mWav, WAV_FORMAT_PCM );
-  wav_set_num_channels( mWav, 2 );
-  wav_set_valid_bits_per_sample( mWav, 16 );
-  wav_set_sample_rate( mWav, serialClockFrequency );
+  
+  mWaveOut = std::make_unique<WaveOut>( mWavePath, serialClockFrequency );
 
   setI2S( period );
 }
@@ -2760,8 +2740,8 @@ void Jerry::reconfigureTimer2()
 
 void Jerry::sample()
 {
-  if ( mJoystick.audioEnable )
-    wav_write( mWav, &mI2S, 1 );
+  if ( mJoystick.audioEnable && mWaveOut )
+    mWaveOut->put( std::bit_cast<int16_t*>( &mI2S ) );
   doInt( FLAGS::D_I2SENA );
 }
 

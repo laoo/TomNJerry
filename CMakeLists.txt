@@ -25,6 +25,7 @@ add_executable( Jerry
   ProgramOptions.cpp
   RAM.cpp
   wav.c
+  WaveOut.cpp
 )
 
 set_source_files_properties(wav.c PROPERTIES

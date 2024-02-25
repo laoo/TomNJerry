@@ -2,7 +2,7 @@
 #include "AdvanceResult.hpp"
 #include "Opcodes.hpp"
 #include "RegFlags.hpp"
-#include "wav.h"
+#include "WaveOut.hpp"
 
 class PipelineLog;
 
@@ -347,8 +347,8 @@ private:
 
   struct
   {
-    uint16_t left = 0;
     uint16_t right = 0;
+    uint16_t left = 0;
   } mI2S = {};
 
   uint32_t mMTXC = 0;
@@ -527,8 +527,8 @@ private:
   int mFlagsSemaphore = 0;
 
   std::unique_ptr<PipelineLog> mLog;
-  WavFile * mWav = nullptr;
-  std::filesystem::path mWavOut;
+  std::unique_ptr<WaveOut>  mWaveOut = {};
+  std::filesystem::path mWavePath;
   uint32_t mClock = 0;
   uint32_t mClocksPerSample = 0;
   uint32_t mInterruptVector = 0;

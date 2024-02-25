@@ -383,7 +383,7 @@ void PipelineLog::computeRegFlags( RegFlags regFlags )
   //00000000000000001111111111111111222222222222222233333333333333334444444444444444555555555555
   //0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
   //012345 | 012345: store   r31,(r31+r31) | R31':01234567 R31':01234567 | C31' NCZ | W31':01234567
-  stbsp_sprintf( mBuffer + 0x47, "%02d%c %c%c%c", reg & 31, reg >= 32 ? '"' : '\'', NFlag[regFlags.n+1], CFlag[regFlags.c + 1], ZFlag[regFlags.z + 1] );
+  stbsp_sprintf( mBuffer + 0x47, "C%02d%c %c%c%c", reg & 31, reg >= 32 ? '"' : '\'', NFlag[regFlags.n+1], CFlag[regFlags.c + 1], ZFlag[regFlags.z + 1] );
 }
 
 void PipelineLog::computeFlags( RegFlags flags )
