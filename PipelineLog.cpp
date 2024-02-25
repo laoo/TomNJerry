@@ -20,36 +20,36 @@ static constexpr JumpCondition kJumpConditions[32] =
   { "", 0 },
   { "!z", 2 },
   { "z", 1 },
-  { "?", 1 },
+  { "3?", 1 },
   { "!c", 2 },
   { "!c !z", 5 },
   { "!c z", 4 },
-  { "?", 1 },
+  { "7?", 1 },
 
   { "c", 1 },
   { "c !z", 4 },
   { "c z", 3 },
-  { "?", 1 },
-  { "?", 1 },
-  { "?", 1 },
-  { "?", 1 },
-  { "?", 1 },
+  { "11?", 1 },
+  { "12?", 1 },
+  { "13?", 1 },
+  { "14?", 1 },
+  { "15?", 1 },
 
-  { "?", 1 },
-  { "?", 1 },
-  { "?", 1 },
-  { "?", 1 },
+  { "16?", 1 },
+  { "17?", 1 },
+  { "18?", 1 },
+  { "19?", 1 },
   { "!n", 2 },
   { "!n !z", 5 },
   { "!n z", 4 },
-  { "?", 1 },
+  { "23?", 1 },
   { "n", 1 },
   { "n !z", 4 },
   { "n z", 3 },
-  { "?", 1 },
-  { "?", 1 },
-  { "?", 1 },
-  { "?", 1 },
+  { "27?", 1 },
+  { "28?", 1 },
+  { "29?", 1 },
+  { "30?", 1 },
   { "!", 1 }
 };
 
@@ -483,10 +483,17 @@ void PipelineLog::loadByte( uint32_t address, uint8_t value )
 
 void PipelineLog::warn( WarnReason reason )
 {
-  static constexpr std::array<char const*, 2> kWarnReasons =
+  static constexpr std::array<char const*, ( size_t )WARN__COUNT> kWarnReasons =
   {
-    "? memSize\n",
-    "? regInUse\n"
+    "? unImpl\n",
+    "? badSize\n",
+    "? regInUse\n",
+    "? badAddr\n",
+    "? illCond\n",
+    "? ioPend\n",
+    "? div2close\n",
+    "? badMTXA\n",
+    "? badMat\n"
   };
 
   assert( (size_t)reason < kWarnReasons.size() );

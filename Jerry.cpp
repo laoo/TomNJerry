@@ -166,7 +166,7 @@ void Jerry::busCycleAckReadByteRequest( uint8_t value )
   }
   else
   {
-    throw Ex{} << "Jerry::io: Unhandled read ack";
+    throw Ex{} << "Jerry::io: Unhandled read ack at $" << std::hex << std::setfill('0') << std::setw( 6 ) << mStageRead.address;
   }
 
   busCycleIdle();
@@ -186,7 +186,7 @@ void Jerry::busCycleAckReadWordRequest( uint16_t value )
   }
   else
   {
-    throw Ex{} << "Jerry::io: Unhandled read ack";
+    throw Ex{} << "Jerry::io: Unhandled read ack at $" << std::hex << std::setfill( '0' ) << std::setw( 6 ) << mStageRead.address;
   }
 
   busCycleIdle();
@@ -206,7 +206,7 @@ void Jerry::busCycleAckReadLongRequest( uint32_t value )
   }
   else
   {
-    throw Ex{} << "Jerry::io: Unhandled read ack";
+    throw Ex{} << "Jerry::io: Unhandled read ack at $" << std::hex << std::setfill( '0' ) << std::setw( 6 ) << mStageRead.address;
   }
 
   busCycleIdle();
@@ -233,7 +233,7 @@ void Jerry::busCycleAckWrite()
     LOG_STORELONG( mBusGate.getAddress(), mBusGate.getValue() );
     break;
   default:
-    throw Ex{ "Jerry::ackWrite: Unhandled size " };
+    assert( !"Jerry::ackWrite: Unhandled size " );
   }
   busGatePop();
 }
@@ -278,13 +278,13 @@ uint16_t Jerry::readWord( uint32_t address ) const
   case R_I2S:
     break;
   case ASICLK:
-    throw Ex{ "NYI" };
+    LOG_WARN( WARN_UNIMPLEMENTED );
     break;
   case ASICTRL:
-    throw Ex{ "NYI" };
+    LOG_WARN( WARN_UNIMPLEMENTED );
     break;
   case ASIDATA:
-    throw Ex{ "NYI" };
+    LOG_WARN( WARN_UNIMPLEMENTED );
     break;
   case D_FLAGS:
   case D_MTXC:
@@ -295,19 +295,22 @@ uint16_t Jerry::readWord( uint32_t address ) const
   case D_MOD:
   case D_DIVCTRL:
   case D_MACHI:
-    throw EmulationViolation{ "Reading word from DSP register" };
+    LOG_WARN( WARD_BAD_ADDRESS );
+    break;
   default:
     if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
     {
-      throw EmulationViolation{ "Reading word from DSP RAM" };
+      LOG_WARN( WARD_BAD_ADDRESS );
+      break;
     }
     else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
     {
-      throw EmulationViolation{ "Reading word from DSP ROM" };
+      LOG_WARN( WARD_BAD_ADDRESS );
+      break;
     }
     else
     {
-      throw Ex{ "Jerry::writeLongExternal: Unhandled address " } << std::hex << address;
+      LOG_WARN( WARD_BAD_ADDRESS );
     }
     break;
   }
@@ -342,7 +345,8 @@ uint32_t Jerry::readLong( uint32_t address ) const
   case D_MTXA:
     return mMTXA;
   case D_END:
-    throw EmulationViolation{ "Reading D_END" };
+    LOG_WARN( WARD_BAD_ADDRESS );
+    break;
   case D_PC:
     return mPC;
   case D_CTRL:
@@ -364,7 +368,7 @@ uint32_t Jerry::readLong( uint32_t address ) const
     }
     else
     {
-      throw Ex{ "Jerry::readLong: Unhandled address " } << std::hex << address;
+      LOG_WARN( WARD_BAD_ADDRESS );
     }
     break;
   }
@@ -437,7 +441,7 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
   case JPIT2R:
   case JPIT3R:
   case JPIT4R:
-    throw Ex{ "Writing RO PIT register." };
+    LOG_WARN( WARD_BAD_ADDRESS );
     break;
   case D_FLAGS:
   case D_MTXC:
@@ -448,19 +452,20 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
   case D_MOD:
   case D_DIVCTRL:
   case D_MACHI:
-    throw EmulationViolation{ "Writing word to DSP register" };
+    LOG_WARN( WARD_BAD_ADDRESS );
+    break;
   default:
     if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
     {
-      throw EmulationViolation{ "Writing word to DSP RAM" };
+      LOG_WARN( WARD_BAD_ADDRESS );
     }
     else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
     {
-      throw EmulationViolation{ "Writing to DSP ROM" };
+      LOG_WARN( WARD_BAD_ADDRESS );
     }
     else
     {
-      throw Ex{ "Jerry::writeLongExternal: Unhandled address " } << std::hex << address;
+      LOG_WARN( WARD_BAD_ADDRESS );
     }
     break;
   }
@@ -517,10 +522,8 @@ void Jerry::writeLong( uint32_t address, uint32_t data )
     mMTXA = data;
     break;
   case D_END:
-    if ( ( data & 1 ) == 0 )
-      throw Ex{ "DSP I/O set to unsupported little endian" };
-    if ( ( data & 4 ) == 0 )
-      throw Ex{ "DSP instruction fetch set to unsupported little endian" };
+    if ( ( data & 1 ) == 0 || ( data & 4 ) == 0 )
+      LOG_WARN( WARN_UNIMPLEMENTED );
     break;
   case D_PC:
     if ( data < RAM_BASE || data >= RAM_BASE + RAM_SIZE )
@@ -537,7 +540,8 @@ void Jerry::writeLong( uint32_t address, uint32_t data )
     mDivCtrl = data;
     break;
   case D_MACHI:
-    throw EmulationViolation{ "Writing RO DSP D_MACHI register" };
+    LOG_WARN( WARD_BAD_ADDRESS );
+    break;
   default:
     if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
     {
@@ -545,11 +549,11 @@ void Jerry::writeLong( uint32_t address, uint32_t data )
     }
     else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
     {
-      throw EmulationViolation{ "Writing to DSP rom" };
+      LOG_WARN( WARD_BAD_ADDRESS );
     }
     else
     {
-      throw Ex{ "Jerry::writeLongExternal: Unhandled address " } << std::hex << address;
+      LOG_WARN( WARD_BAD_ADDRESS );
     }
     break;
   }
@@ -567,7 +571,7 @@ void Jerry::localBus()
     LOG_STORELONG( mLocalBus.address, mLocalBus.data );
     break;
   case LocalBus::WRITE_WORD:
-    LOG_WARN( WARN_MEMORY_ACCESS );
+    LOG_WARN( WARN_BAD_SIZE );
     writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
     mLocalBus.state = LocalBus::IDLE;
     mStageIO.state = StageIO::IDLE;
@@ -575,7 +579,7 @@ void Jerry::localBus()
     LOG_STORELONG( mLocalBus.address, mLocalBus.data );
     break;
   case LocalBus::WRITE_BYTE:
-    LOG_WARN( WARN_MEMORY_ACCESS );
+    LOG_WARN( WARN_BAD_SIZE );
     writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
     mLocalBus.state = LocalBus::IDLE;
     mStageIO.state = StageIO::IDLE;
@@ -590,7 +594,7 @@ void Jerry::localBus()
     LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
     break;
   case LocalBus::READ_WORD:
-    LOG_WARN( WARN_MEMORY_ACCESS );
+    LOG_WARN( WARN_BAD_SIZE );
     mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) >> ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
     mStageIO.state = StageIO::IDLE;
     mStageIO.state = StageIO::IDLE;
@@ -598,7 +602,7 @@ void Jerry::localBus()
     LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
     break;
   case LocalBus::READ_BYTE:
-    LOG_WARN( WARN_MEMORY_ACCESS );
+    LOG_WARN( WARN_BAD_SIZE );
     mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) >> ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
     mLocalBus.state = LocalBus::IDLE;
     mStageIO.state = StageIO::IDLE;
@@ -750,7 +754,8 @@ bool Jerry::testCondition( uint32_t condition ) const
   case 0x1f:
     return false;
   default:
-    throw EmulationViolation{ "Illegal condition code " } << std::hex << condition;
+    LOG_WARN( WARN_ILLEGAL_CONDITION );
+    return true;
   }
 }
 
@@ -1369,7 +1374,7 @@ void Jerry::compute()
     break;
   case DSPI::MMULT:
     if ( mStageIO.state != StageIO::IDLE )
-      throw EmulationViolation{ "MMULT instruction executed while IO was in progress" };
+      LOG_WARN( WARN_IO_PENDING ); //MMULT instruction executed while IO was in progress
     mStageCompute.instruction = DSPI::EMPTY;
     break;
   case DSPI::MTOI:
@@ -1718,7 +1723,7 @@ void Jerry::stageRead()
     if ( mDivideUnit.cycle <= 0 && portReadBoth( regSrc, regDst ) )
     {
       if ( mDivideUnit.cycle == 0 && ( mDivideUnit.reg == regDst || mDivideUnit.reg == regSrc ) )
-        throw EmulationViolation{ "Two consecutive DIV instructions are too close to each other" };
+        LOG_WARN( WARN_DIV_TOO_CLOSE ); //Two consecutive DIV instructions are too close to each other
 
       dualPortCommit();
       mStageRead.instruction = DSPI::EMPTY;
@@ -2075,12 +2080,13 @@ void Jerry::decode()
   {
   case Prefetch::OPCODE:
   case Prefetch::MACSEQ:
+    mStageRead.address = pull.address();
     mStageRead.instruction = pull.opcode();
     mStageRead.regSrc = pull.regSrc();
     mStageRead.regDst = pull.regDst();
     LOG_DECODEDSP( mStageRead.instruction, mStageRead.regSrc.idx, mStageRead.regDst.idx );
-    if ( auto addr = pull.address() )
-      LOG_INSTRADDR( addr );
+    if ( mStageRead.address )
+      LOG_INSTRADDR( mStageRead.address );
     break;
   case Prefetch::MOVEI1:
     mStageRead.dataSrc = pull.data();
@@ -2092,6 +2098,7 @@ void Jerry::decode()
     LOG_DECODEMOVEI( 1, mStageRead.dataSrc );
     break;
   case Prefetch::IMULTN:
+    mStageRead.address = pull.address();
     mStageRead.instruction = DSPI::MM_IMULTN;
     LOG_DECODEIMULTN( mStageCompute.regSrc.idx, 4 * ( ( mMTXC & 16 ) ? mMacStage.size : 1 ), mMacStage.cnt );
     break;
@@ -2152,11 +2159,13 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
         mMacStage.addr = mMTXA;
         if ( mMacStage.addr < 0xf1b000 || mMacStage.addr > 0xf1bffc )
         {
-          throw EmulationViolation{ "Invalid D_MTXA address of " } << mMacStage.addr;
+          mMacStage.addr = 0xf1b000;
+          LOG_WARN( WARN_BAD_MTXA ); //Invalid D_MTXA address
         }
         if ( mMacStage.size < 3 )
         {
-          throw EmulationViolation{ "MMULT with invalid size of " } << mMacStage.size;
+          mMacStage.size = 3;
+          LOG_WARN( WARN_BAD_MATRIX_SIZE ); //MMULT with invalid size
         }
         break;
       case DSPI::IMULTN:
@@ -2383,7 +2392,7 @@ void Jerry::portReadDstAndHiddenCommit( GlobalReg regDst )
   {
     if ( mPortWriteDstReg != mPortReadDstReg )
     {
-      throw EmulationViolation{ "Indexed store of data from a long latency instruction" };
+      LOG_WARN( WARN_REG_IN_USE );
     }
     else
     {
@@ -2524,10 +2533,10 @@ void Jerry::ctrlSet( uint16_t value )
     forceint0();
 
   if ( value & ( CTRL::SINGLE_STEP | CTRL::SINGLE_GO ) )
-    throw Ex{ "Single step not implemented" };
+    LOG_WARN( WARN_UNIMPLEMENTED );
 
   if ( value & CTRL::BUS_HOG )
-    throw EmulationViolation{ "DSP Bus hog triggered" };
+    LOG_WARN( WARN_UNIMPLEMENTED );
 
   if ( !mCtrl.dspgo )
     mBusGate = AdvanceResult::finish();
@@ -2554,7 +2563,7 @@ void Jerry::flagsSet( uint16_t value )
   mFlags.regpage = ( value & FLAGS::REGPAGE ) != 0;
 
   if ( value & FLAGS::DMAEN )
-    throw EmulationViolation{ "DSP DMAEN triggered" };
+    LOG_WARN( WARN_UNIMPLEMENTED );
 
   mRegisterFile = mFlags.regpage ? 32 : 0;
 
@@ -2650,7 +2659,7 @@ void Jerry::launchInt( int priority )
 void Jerry::cpuint()
 {
   mJIntCtrl.dsppend = mJIntCtrl.dspena;
-  throw Ex{ "No CPU at the moment" };
+  LOG_WARN( WARN_UNIMPLEMENTED );
 }
 
 void Jerry::forceint0()
@@ -2712,7 +2721,7 @@ void Jerry::reconfigureDAC()
     return;
 
   if ( !mSMODE.rising || mSMODE.everyword || mSMODE.falling )
-    throw Ex{ "Only SMODE RISING supported" };
+    LOG_WARN( WARN_UNIMPLEMENTED );
 
   if ( mWav )
   {
