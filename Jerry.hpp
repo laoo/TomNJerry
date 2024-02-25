@@ -316,7 +316,6 @@ private:
   bool stageWriteReg();
   bool stageWriteRegL();
   void stageWriteFlags();
-  void stageWriteFlagsL();
   bool portWriteDst( GlobalReg reg, uint32_t data );
   bool portReadSrc( GlobalReg regSrc );
   bool portReadDst( GlobalReg regDst );

@@ -824,7 +824,15 @@ bool Jerry::stageWriteReg()
 {
   assert( mStageWrite.regFlags.reg >= 0 );
 
-  return portWriteDst( GlobalReg( mStageWrite.regFlags.reg ), mStageWrite.data );
+  if ( portWriteDst( GlobalReg( mStageWrite.regFlags.reg ), mStageWrite.data ) )
+  {
+    mStageWrite.regFlags.reg = -1;
+    return true;
+  }
+  else
+  {
+    return false;
+  }
 }
 
 bool Jerry::stageWriteRegL()
@@ -839,46 +847,20 @@ void Jerry::stageWriteFlags()
   if ( mStageWrite.regFlags.z >= 0 )
   {
     mFlags.z = mStageWrite.regFlags.z > 0;
+    mStageWrite.regFlags.z = -1;
   }
 
   if ( mStageWrite.regFlags.c >= 0 )
   {
     mFlags.c = mStageWrite.regFlags.c > 0;
+    mStageWrite.regFlags.c = -1;
   }
 
   if ( mStageWrite.regFlags.n >= 0 )
   {
     mFlags.n = mStageWrite.regFlags.n > 0;
+    mStageWrite.regFlags.n = -1;
   }
-
-  // stageWriteReg must be called ALWAYES before stageWriteFlags
-  mStageWrite.regFlags = RegFlags();
-
-  mFlagsSemaphore -= 1;
-  assert( mFlagsSemaphore >= 0 );
-}
-
-void Jerry::stageWriteFlagsL()
-{
-  if ( mStageWrite.regFlags.z >= 0 )
-  {
-    mFlags.z = mStageWrite.regFlags.z > 0;
-  }
-
-  if ( mStageWrite.regFlags.c >= 0 )
-  {
-    mFlags.c = mStageWrite.regFlags.c > 0;
-  }
-
-  if ( mStageWrite.regFlags.n >= 0 )
-  {
-    mFlags.n = mStageWrite.regFlags.n > 0;
-  }
-
-  auto reg = mStageWrite.regFlags.reg;
-  mStageWrite.regFlags = RegFlags();
-  mStageWrite.regFlags.reg = reg;
-
   mFlagsSemaphore -= 1;
   assert( mFlagsSemaphore >= 0 );
 }
@@ -910,7 +892,7 @@ void Jerry::stageWrite()
     break;
   case ( StageWrite::UPDATE_REG_L | StageWrite::UPDATE_REG | StageWrite::UPDATE_FLAGS ):
     mStageWrite.updateMask = stageWriteRegL() ? StageWrite::UPDATE_REG : StageWrite::UPDATE_REG_L;
-    stageWriteFlagsL();
+    stageWriteFlags();
     break;
   default:
     break;
@@ -2343,6 +2325,7 @@ bool Jerry::portWriteDst( GlobalReg reg, uint32_t data )
 
   mPortWriteDstReg = reg;
   mPortWriteDstData = data;
+  assert( mPortWriteDstReg.idx >= 0 );
   return true;
 }
 
@@ -2765,6 +2748,7 @@ void Jerry::StageWrite::updateReg( GlobalReg reg, uint32_t value )
 {
   updateMask |= UPDATE_REG;
   regFlags.reg = (int8_t)reg.idx;
+  assert( regFlags.reg >= 0 );
   data = value;
 }
 
