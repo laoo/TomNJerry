@@ -1127,7 +1127,7 @@ void Jerry::compute()
         mStageWrite.updateReg( mStageCompute.regDst,(int32_t) mStageCompute.dataDst < 0 ? (~mStageCompute.dataDst)+1 : mStageCompute.dataDst );
         mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
         mStageWrite.regFlags.n = 0;
-        mStageWrite.regFlags.c = mStageCompute.dataDst < 0 ? 1 : 0;
+        mStageWrite.regFlags.c = (mStageCompute.dataDst >> 31) & 1 ? 1 : 0;
       }
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
