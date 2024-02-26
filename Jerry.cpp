@@ -1137,7 +1137,9 @@ void Jerry::compute()
   case DSPI::SH:
     if ( mStageWrite.canUpdateReg() )
     {
-      mStageWrite.updateReg( mStageCompute.regDst, mStageCompute.dataSrc > 0 ? mStageCompute.dataDst >> mStageCompute.dataSrc : mStageCompute.dataDst << mStageCompute.dataSrc );
+      mStageWrite.updateReg( mStageCompute.regDst, (int32_t)mStageCompute.dataSrc > 0 ?
+                             mStageCompute.dataDst >> mStageCompute.dataSrc : mStageCompute.dataDst << (-mStageCompute.dataSrc) );
+
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.regFlags.c = mStageCompute.dataSrc > 0 ? ( mStageCompute.dataDst & 1 ) : ( mStageCompute.dataDst >> 31 );
@@ -2654,18 +2656,18 @@ void Jerry::checkInterrupt()
 
   if ( mInterruptor.cycleMin == mInterruptor.cycleI2S )
   {
-    sample();
     mInterruptor.cycleI2S += mInterruptor.periodI2S;
+    sample();
   }
   if ( mInterruptor.cycleMin == mInterruptor.cycleTimer1 )
   {
-    doInt( FLAGS::D_TIM1ENA );
     mInterruptor.cycleTimer1 += mInterruptor.periodTimer1;
+    doInt( FLAGS::D_TIM1ENA );
   }
   if ( mInterruptor.cycleMin == mInterruptor.cycleTimer2 )
   {
-    doInt( FLAGS::D_TIM2ENA );
     mInterruptor.cycleTimer2 += mInterruptor.periodTimer2;
+    doInt( FLAGS::D_TIM2ENA );
   }
 
   mInterruptor.cycleMin = std::min( std::min( mInterruptor.cycleI2S, mInterruptor.cycleTimer1 ), mInterruptor.cycleTimer2 );
@@ -2725,9 +2727,9 @@ void Jerry::reconfigureTimer2()
 
 void Jerry::sample()
 {
+  doInt( FLAGS::D_I2SENA );
   if ( mJoystick.audioEnable && mWaveOut )
     mWaveOut->put( std::bit_cast<int16_t*>( &mI2S ) );
-  doInt( FLAGS::D_I2SENA );
 }
 
 uint16_t Jerry::FLAGS::get() const
