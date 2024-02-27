@@ -1358,6 +1358,7 @@ void Jerry::compute()
       break;
     if ( testCondition( mStageCompute.regDst.idx ) )
     {
+      //Should be done a cycle later so that move pc,rx that follows read the address of move pc,rx
       mPC = mStageCompute.dataSrc;
       mPrefetch.queueSize = 0;
       LOG_JUMPT();
