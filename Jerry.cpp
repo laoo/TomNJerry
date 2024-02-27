@@ -120,6 +120,7 @@ uint16_t Jerry::busCycleRequestReadWord( uint32_t address )
   busCycleIdle();
 
   mLastLocalRAMAccessCycle = mCycle;
+  //TODO: read word from DSP RAM should work even od address not aligned to long word
   return readWord( address );
 }
 
@@ -136,6 +137,7 @@ void Jerry::busCycleRequestWriteWord( uint32_t address, uint16_t data )
   busCycleIdle();
 
   mLastLocalRAMAccessCycle = mCycle;
+  //TODO: write word to DSP RAM should be ignored
   writeWord( address, data );
 }
 
