@@ -288,6 +288,11 @@ private:
 
       uint64_t value;
     };
+
+    bool needsPrefetching() const
+    {
+      return queueSize < 1;
+    }
   };
 
 

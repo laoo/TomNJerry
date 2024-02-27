@@ -2051,7 +2051,7 @@ void Jerry::decode()
 {
   if ( mStageRead.instruction != DSPI::EMPTY )
   {
-    mPrefetch.doPrefetch = mPrefetch.queueSize < 3 && mPrefetch.status < Prefetch::NO_PREFETCH;
+    mPrefetch.doPrefetch = mPrefetch.needsPrefetching() && mPrefetch.status < Prefetch::NO_PREFETCH;
     return;
   }
 
@@ -2158,7 +2158,7 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
       }
       mPrefetch.queue <<= 16;
       mPrefetch.queueSize -= 1;
-      mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
+      mPrefetch.doPrefetch = mPrefetch.needsPrefetching();
       mPrefetch.decodedAddress += 2;
       return { Prefetch::OPCODE, mPrefetch.decodedAddress - 2, fetch };
     }
@@ -2173,7 +2173,7 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
       uint16_t fetch = mPrefetch.queue >> 48;
       mPrefetch.queue <<= 16;
       mPrefetch.queueSize -= 1;
-      mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
+      mPrefetch.doPrefetch = mPrefetch.needsPrefetching();
       mPrefetch.decodedAddress += 2;
       Prefetch::Pull result{ Prefetch::OPCODE, mPrefetch.decodedAddress - 2, fetch };
       if ( result.opcode() == DSPI::RESMAC )
@@ -2195,7 +2195,7 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
       mPrefetch.queue <<= 16;
       mPrefetch.queueSize -= 1;
       mPrefetch.decodedAddress += 2;
-      mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
+      mPrefetch.doPrefetch = mPrefetch.needsPrefetching();
       return { Prefetch::MOVEI1, 0, fetch };
     }
   case Prefetch::MOVEI2:
@@ -2210,7 +2210,7 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
       mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
       mPrefetch.queue <<= 16;
       mPrefetch.queueSize -= 1;
-      mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
+      mPrefetch.doPrefetch = mPrefetch.needsPrefetching();
       mPrefetch.decodedAddress += 2;
       return { Prefetch::MOVEI2, 0, fetch };
     }
@@ -2227,7 +2227,7 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
     else
     {
       mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
-      mPrefetch.doPrefetch = mPrefetch.queueSize < 3 && mInterruptVector == 0;
+      mPrefetch.doPrefetch = mPrefetch.needsPrefetching() && mInterruptVector == 0;
       return { Prefetch::RESMAC, 0, 0 };
     }
   case Prefetch::INT0:
@@ -2273,7 +2273,7 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
     LOG_TAGUNINTERRUPTIBLESEQUENCE();
     return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::NOP << 10 ) };
   default:
-    mPrefetch.doPrefetch = mPrefetch.queueSize < 3;
+    mPrefetch.doPrefetch = mPrefetch.needsPrefetching();
     assert( false );
     return { Prefetch::EMPTY, 0, 0 };
   }
@@ -2306,7 +2306,7 @@ int Jerry::prefetchFill()
     mPrefetch.queueSize += 1;
     return 2;
   }
-  else if ( mPrefetch.queueSize < 3 )
+  else if ( mPrefetch.needsPrefetching() )
   {
     auto pCode = ( uint16_t const* )mLocalRAM.data() + ( ( mPC - RAM_BASE ) >> 1 );
 
