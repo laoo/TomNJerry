@@ -236,7 +236,11 @@ void Jerry::busCycleAckWrite()
 uint16_t Jerry::readWord( uint32_t address ) const
 {
   assert( ( address & 0xff0000 ) == 0xf10000 );
-  assert( ( address & 1 ) == 0 );
+  if ( ( address & 1 ) != 0 )
+  {
+    LOG_WARN( WARN_BAD_ADDRESS );
+    address &= ~1;
+  }
 
   switch ( address )
   {
@@ -290,22 +294,22 @@ uint16_t Jerry::readWord( uint32_t address ) const
   case D_MOD:
   case D_DIVCTRL:
   case D_MACHI:
-    LOG_WARN( WARD_BAD_ADDRESS );
+    LOG_WARN( WARN_BAD_ADDRESS );
     break;
   default:
     if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
     {
-      LOG_WARN( WARD_BAD_ADDRESS );
+      LOG_WARN( WARN_BAD_ADDRESS );
       break;
     }
     else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
     {
-      LOG_WARN( WARD_BAD_ADDRESS );
+      LOG_WARN( WARN_BAD_ADDRESS );
       break;
     }
     else
     {
-      LOG_WARN( WARD_BAD_ADDRESS );
+      LOG_WARN( WARN_BAD_ADDRESS );
     }
     break;
   }
@@ -316,7 +320,11 @@ uint16_t Jerry::readWord( uint32_t address ) const
 uint32_t Jerry::readLong( uint32_t address ) const
 {
   assert( ( address & 0xff0000 ) == 0xf10000 );
-  assert( ( address & 3 ) == 0 );
+  if ( ( address & 3 ) != 0 )
+  {
+    LOG_WARN( WARN_BAD_ADDRESS );
+    address &= ~3;
+  }
 
   switch ( address )
   {
@@ -340,7 +348,7 @@ uint32_t Jerry::readLong( uint32_t address ) const
   case D_MTXA:
     return mMTXA;
   case D_END:
-    LOG_WARN( WARD_BAD_ADDRESS );
+    LOG_WARN( WARN_BAD_ADDRESS );
     break;
   case D_PC:
     return mPC;
@@ -363,7 +371,7 @@ uint32_t Jerry::readLong( uint32_t address ) const
     }
     else
     {
-      LOG_WARN( WARD_BAD_ADDRESS );
+      LOG_WARN( WARN_BAD_ADDRESS );
     }
     break;
   }
@@ -374,7 +382,11 @@ uint32_t Jerry::readLong( uint32_t address ) const
 void Jerry::writeWord( uint32_t address, uint16_t data )
 {
   assert( ( address & 0xff0000 ) == 0xf10000 );
-  assert( ( address & 1 ) == 0 );
+  if ( ( address & 1 ) != 0 )
+  {
+    LOG_WARN( WARN_BAD_ADDRESS );
+    address &= ~1;
+  }
 
   switch ( address )
   {
@@ -436,7 +448,7 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
   case JPIT2R:
   case JPIT3R:
   case JPIT4R:
-    LOG_WARN( WARD_BAD_ADDRESS );
+    LOG_WARN( WARN_BAD_ADDRESS );
     break;
   case D_FLAGS:
   case D_MTXC:
@@ -447,20 +459,20 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
   case D_MOD:
   case D_DIVCTRL:
   case D_MACHI:
-    LOG_WARN( WARD_BAD_ADDRESS );
+    LOG_WARN( WARN_BAD_ADDRESS );
     break;
   default:
     if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
     {
-      LOG_WARN( WARD_BAD_ADDRESS );
+      LOG_WARN( WARN_BAD_ADDRESS );
     }
     else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
     {
-      LOG_WARN( WARD_BAD_ADDRESS );
+      LOG_WARN( WARN_BAD_ADDRESS );
     }
     else
     {
-      LOG_WARN( WARD_BAD_ADDRESS );
+      LOG_WARN( WARN_BAD_ADDRESS );
     }
     break;
   }
@@ -469,7 +481,11 @@ void Jerry::writeWord( uint32_t address, uint16_t data )
 void Jerry::writeLong( uint32_t address, uint32_t data )
 {
   assert( ( address & 0xff0000 ) == 0xf10000 );
-  assert( ( address & 3 ) == 0 );
+  if ( ( address & 3 ) != 0 )
+  {
+    LOG_WARN( WARN_BAD_ADDRESS );
+    address &= ~3;
+  }
 
   switch ( address )
   {
@@ -535,7 +551,7 @@ void Jerry::writeLong( uint32_t address, uint32_t data )
     mDivCtrl = data;
     break;
   case D_MACHI:
-    LOG_WARN( WARD_BAD_ADDRESS );
+    LOG_WARN( WARN_BAD_ADDRESS );
     break;
   default:
     if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
@@ -544,11 +560,11 @@ void Jerry::writeLong( uint32_t address, uint32_t data )
     }
     else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
     {
-      LOG_WARN( WARD_BAD_ADDRESS );
+      LOG_WARN( WARN_BAD_ADDRESS );
     }
     else
     {
-      LOG_WARN( WARD_BAD_ADDRESS );
+      LOG_WARN( WARN_BAD_ADDRESS );
     }
     break;
   }
