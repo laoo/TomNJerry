@@ -9,48 +9,40 @@ void loop( Jerry & jerry, RAM & ram, uint64_t cycles, int finish )
 {
   static constexpr uint64_t LATENCY = 3;
 
-  AdvanceResult req = AdvanceResult::nop();
-  for ( uint64_t i = 0; i < cycles; ++i )
+  for ( uint64_t i = 0; i < cycles; i+=4 )
   {
-    switch ( i & 0x3 )
-    {
-    case 1:
-      req = jerry.busCycleGetRequest();
-      break;
-    case 3:
+    jerry.busCycle();
+    jerry.busCycle();
+    jerry.busCycle();
+    auto req = jerry.busCycle();
       switch ( req.getOperation() )
       {
       case AdvanceResult::kByteFlag:
-        jerry.busCycleAckReadByteRequest( ram.b( req.getAddress() ) );
+      jerry.ackReadByteRequest( ram.b( req.getAddress() ) );
         break;
       case AdvanceResult::kWordFlag:
-        jerry.busCycleAckReadWordRequest( ram.w( req.getAddress() ) );
+      jerry.ackReadWordRequest( ram.w( req.getAddress() ) );
         break;
       case AdvanceResult::kLongFlag:
-        jerry.busCycleAckReadLongRequest( ram.l( req.getAddress() ) );
+      jerry.ackReadLongRequest( ram.l( req.getAddress() ) );
         break;
       case AdvanceResult::kWriteFlag | AdvanceResult::kByteFlag:
         ram.b()[req.getAddress()] = ( uint8_t )req.getValue();
-        jerry.busCycleAckWrite();
+      jerry.ackWrite();
         break;
       case AdvanceResult::kWriteFlag | AdvanceResult::kWordFlag:
         ram.w()[req.getAddress() >> 1] = ( uint16_t )req.getValue();
-        jerry.busCycleAckWrite();
+      jerry.ackWrite();
         break;
       case AdvanceResult::kWriteFlag | AdvanceResult::kLongFlag:
         ram.l()[req.getAddress() >> 2] = req.getValue();
-        jerry.busCycleAckWrite();
+      jerry.ackWrite();
         break;
       case AdvanceResult::kFinishFlag:
         if ( finish )
           return;
         break;
       }
-      break;
-    default:
-      jerry.busCycleIdle();
-      break;
-    }
   }
 }
 

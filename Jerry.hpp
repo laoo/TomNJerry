@@ -184,18 +184,16 @@ public:
 
   void debugWrite( uint32_t address, std::span<uint32_t const> data );
 
-  void busCycleIdle();
-
-  AdvanceResult busCycleGetRequest();
+  AdvanceResult busCycle();
   uint16_t busCycleRequestReadWord( uint32_t address );
   uint32_t busCycleRequestReadLong( uint32_t address );
   void busCycleRequestWriteWord( uint32_t address, uint16_t data );
   void busCycleRequestWriteLong( uint32_t address, uint32_t data );
 
-  void busCycleAckWrite();
-  void busCycleAckReadByteRequest( uint8_t value );
-  void busCycleAckReadWordRequest( uint16_t value );
-  void busCycleAckReadLongRequest( uint32_t value );
+  void ackWrite();
+  void ackReadByteRequest( uint8_t value );
+  void ackReadWordRequest( uint16_t value );
+  void ackReadLongRequest( uint32_t value );
 
   uint32_t getReg( int32_t index ) const;
 

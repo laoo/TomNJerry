@@ -100,24 +100,19 @@ void Jerry::debugWrite( uint32_t address, std::span<uint32_t const> data )
   std::copy( data.begin(), data.end(), mLocalRAM.begin() + ( address - RAM_BASE ) / sizeof( uint32_t ) );
 }
 
-void Jerry::busCycleIdle()
+AdvanceResult Jerry::busCycle()
 {
   if ( mCtrl.dspgo )
   {
     halfCycle();
     halfCycle();
   }
-}
-
-AdvanceResult Jerry::busCycleGetRequest()
-{
-  busCycleIdle();
   return mBusGate;
 }
 
 uint16_t Jerry::busCycleRequestReadWord( uint32_t address )
 {
-  busCycleIdle();
+  busCycle();
 
   mLastLocalRAMAccessCycle = mCycle;
   //TODO: read word from DSP RAM should work even od address not aligned to long word
@@ -126,7 +121,7 @@ uint16_t Jerry::busCycleRequestReadWord( uint32_t address )
 
 uint32_t Jerry::busCycleRequestReadLong( uint32_t address )
 {
-  busCycleIdle();
+  busCycle();
 
   mLastLocalRAMAccessCycle = mCycle;
   return readLong( address );
@@ -134,7 +129,7 @@ uint32_t Jerry::busCycleRequestReadLong( uint32_t address )
 
 void Jerry::busCycleRequestWriteWord( uint32_t address, uint16_t data )
 {
-  busCycleIdle();
+  busCycle();
 
   mLastLocalRAMAccessCycle = mCycle;
   //TODO: write word to DSP RAM should be ignored
@@ -143,13 +138,13 @@ void Jerry::busCycleRequestWriteWord( uint32_t address, uint16_t data )
 
 void Jerry::busCycleRequestWriteLong( uint32_t address, uint32_t data )
 {
-  busCycleIdle();
+  busCycle();
 
   mLastLocalRAMAccessCycle = mCycle;
   writeLong( address, data );
 }
 
-void Jerry::busCycleAckReadByteRequest( uint8_t value )
+void Jerry::ackReadByteRequest( uint8_t value )
 {
   assert( mBusGate );
   assert( mBusGate.getOperation() > 0 );
@@ -163,13 +158,12 @@ void Jerry::busCycleAckReadByteRequest( uint8_t value )
   }
   else
   {
-    throw Ex{} << "Jerry::io: Unhandled read ack at $" << std::hex << std::setfill('0') << std::setw( 6 ) << mStageRead.address;
+    throw Ex{} << "Jerry::io: Unhandled read ack at $" << std::hex << std::setfill( '0' ) << std::setw( 6 ) << mStageRead.address;
   }
 
-  busCycleIdle();
 }
 
-void Jerry::busCycleAckReadWordRequest( uint16_t value )
+void Jerry::ackReadWordRequest( uint16_t value )
 {
   assert( mBusGate );
   assert( mBusGate.getOperation() > 0 );
@@ -185,11 +179,9 @@ void Jerry::busCycleAckReadWordRequest( uint16_t value )
   {
     throw Ex{} << "Jerry::io: Unhandled read ack at $" << std::hex << std::setfill( '0' ) << std::setw( 6 ) << mStageRead.address;
   }
-
-  busCycleIdle();
 }
 
-void Jerry::busCycleAckReadLongRequest( uint32_t value )
+void Jerry::ackReadLongRequest( uint32_t value )
 {
   assert( mBusGate );
   assert( mBusGate.getOperation() > 0 );
@@ -206,7 +198,6 @@ void Jerry::busCycleAckReadLongRequest( uint32_t value )
     throw Ex{} << "Jerry::io: Unhandled read ack at $" << std::hex << std::setfill( '0' ) << std::setw( 6 ) << mStageRead.address;
   }
 
-  busCycleIdle();
 }
 
 uint32_t Jerry::getReg( int32_t index ) const
@@ -214,7 +205,7 @@ uint32_t Jerry::getReg( int32_t index ) const
   return mRegs[GlobalReg{ index }];
 }
 
-void Jerry::busCycleAckWrite()
+void Jerry::ackWrite()
 {
   assert( mBusGate );
 
