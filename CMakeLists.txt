@@ -19,6 +19,7 @@ add_executable( Tom
 
 add_executable( Jerry
   BS94.cpp
+  Bus.cpp
   DSPRaw.cpp
   Jerry.cpp
   JerryMain.cpp

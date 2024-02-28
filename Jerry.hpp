@@ -197,6 +197,8 @@ public:
 
   uint32_t getReg( int32_t index ) const;
 
+  uint64_t clock() const;
+
 private:
 
   uint16_t readWord( uint32_t address ) const;

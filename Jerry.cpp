@@ -205,6 +205,11 @@ uint32_t Jerry::getReg( int32_t index ) const
   return mRegs[GlobalReg{ index }];
 }
 
+uint64_t Jerry::clock() const
+{
+  return mClock;
+}
+
 void Jerry::ackWrite()
 {
   assert( mBusGate );
