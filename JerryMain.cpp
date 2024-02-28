@@ -9,7 +9,7 @@ void loop( Bus & bus, uint64_t cycles )
 {
   auto clock = bus.jerry().clock();
 
-  for ( uint64_t cycle = 0; cycle < cycles; )
+  for ( uint64_t cycle = 0;; )
   {
     uint64_t size = std::min( cycles - cycle, clock );
 
@@ -17,14 +17,13 @@ void loop( Bus & bus, uint64_t cycles )
     int64_t slice = bus.advance( size );
     std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 
-    if ( slice == clock )
-    {
-      const std::chrono::duration<double, std::milli> fp_ms = end - start;
-      std::cout << "Speed: " << 1000.0 / fp_ms.count() << "%" << std::endl;
-    }
+    if ( slice != clock || end == start )
+      break;
+
+    const std::chrono::duration<double, std::milli> fp_ms = end - start;
+    std::cout << "Time: " << fp_ms.count() << " ms\tSpeed: " << 1000.0 / fp_ms.count() << " %" << std::endl;
 
     cycle += slice;
-    
   }
 }
 
