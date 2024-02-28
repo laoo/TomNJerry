@@ -23,7 +23,7 @@ uint32_t RAM::load( std::filesystem::path const& path, uint32_t address )
   return size;
 }
 
-uint8_t RAM::b( uint32_t address ) const
+uint8_t RAM::readByte( uint32_t address ) const
 {
   if ( address >= mRAM.size() )
     throw Ex{} << "Address " << address << " is out of range";
@@ -31,7 +31,7 @@ uint8_t RAM::b( uint32_t address ) const
   return mRAM[address];
 }
 
-uint16_t RAM::w( uint32_t address ) const
+uint16_t RAM::readWord( uint32_t address ) const
 {
   if ( address >= mRAM.size() )
     throw Ex{} << "Address " << address << " is out of range";
@@ -42,7 +42,7 @@ uint16_t RAM::w( uint32_t address ) const
   return *( (uint16_t const*)mRAM.data() + ( address >> 1 ) );
 }
 
-uint32_t RAM::l( uint32_t address ) const
+uint32_t RAM::readLong( uint32_t address ) const
 {
   if ( address >= mRAM.size() )
     throw Ex{} << "Address " << address << " is out of range";
@@ -53,7 +53,7 @@ uint32_t RAM::l( uint32_t address ) const
   return *( ( uint32_t const* )mRAM.data() + ( address >> 2 ) );
 }
 
-void RAM::b( uint32_t address, uint8_t value )
+void RAM::writeByte( uint32_t address, uint8_t value )
 {
   if ( address >= mRAM.size() )
     throw Ex{} << "Address " << address << " is out of range";
@@ -61,7 +61,7 @@ void RAM::b( uint32_t address, uint8_t value )
   mRAM[address] = value;
 }
 
-void RAM::w( uint32_t address, uint16_t value )
+void RAM::writeWord( uint32_t address, uint16_t value )
 {
   if ( address >= mRAM.size() )
     throw Ex{} << "Address " << address << " is out of range";
@@ -69,10 +69,10 @@ void RAM::w( uint32_t address, uint16_t value )
   if ( address & 1 )
     throw Ex{} << "Odd address " << address;
 
-  *( (uint16_t*)mRAM.data() + ( address >> 1 ) ) = value;
+  *( (uint16_t*)( mRAM.data() + address ) ) = value;
 }
 
-void RAM::l( uint32_t address, uint32_t value )
+void RAM::writeLong( uint32_t address, uint32_t value )
 {
   if ( address >= mRAM.size() )
     throw Ex{} << "Address " << address << " is out of range";
@@ -80,20 +80,20 @@ void RAM::l( uint32_t address, uint32_t value )
   if ( address & 3 )
     throw Ex{} << "Odd address " << address;
 
-  *( ( uint32_t* )mRAM.data() + ( address >> 2 ) ) = value;
+  *( ( uint32_t* )( mRAM.data() + address ) ) = value;
 }
 
-std::span<uint8_t> RAM::b()
+std::span<uint8_t> RAM::bytes()
 {
   return mRAM;
 }
 
-std::span<uint16_t> RAM::w()
+std::span<uint16_t> RAM::words()
 {
   return std::span<uint16_t>( (uint16_t*)mRAM.data(), mRAM.size() >> 1 );
 }
 
-std::span<uint32_t> RAM::l()
+std::span<uint32_t> RAM::longs()
 {
   return std::span<uint32_t>( ( uint32_t* )mRAM.data(), mRAM.size() >> 2 );
 }

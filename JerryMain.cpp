@@ -18,24 +18,24 @@ void loop( Jerry & jerry, RAM & ram, uint64_t cycles, int finish )
       switch ( req.getOperation() )
       {
       case AdvanceResult::kByteFlag:
-      jerry.ackReadByteRequest( ram.b( req.getAddress() ) );
+      jerry.ackReadByteRequest( ram.readByte( req.getAddress() ) );
         break;
       case AdvanceResult::kWordFlag:
-      jerry.ackReadWordRequest( ram.w( req.getAddress() ) );
+      jerry.ackReadWordRequest( ram.readWord( req.getAddress() ) );
         break;
       case AdvanceResult::kLongFlag:
-      jerry.ackReadLongRequest( ram.l( req.getAddress() ) );
+      jerry.ackReadLongRequest( ram.readLong( req.getAddress() ) );
         break;
       case AdvanceResult::kWriteFlag | AdvanceResult::kByteFlag:
-        ram.b()[req.getAddress()] = ( uint8_t )req.getValue();
+      ram.writeByte( req.getAddress(), ( uint8_t )req.getValue() );
       jerry.ackWrite();
         break;
       case AdvanceResult::kWriteFlag | AdvanceResult::kWordFlag:
-        ram.w()[req.getAddress() >> 1] = ( uint16_t )req.getValue();
+      ram.writeWord( req.getAddress(), ( uint16_t )req.getValue() );
       jerry.ackWrite();
         break;
       case AdvanceResult::kWriteFlag | AdvanceResult::kLongFlag:
-        ram.l()[req.getAddress() >> 2] = req.getValue();
+      ram.writeLong( req.getAddress(), req.getValue() );
       jerry.ackWrite();
         break;
       case AdvanceResult::kFinishFlag:
@@ -62,8 +62,8 @@ int main( int argc, char const* argv[] )
     ram.load( "d:\\home\\yarc_reloaded\\mod\\my.lsmusic", musicAddr );
     ram.load( "d:\\home\\yarc_reloaded\\mod\\my.lsbank", bankAddr );
 
-    ram.l( 0x20 - 8, std::byteswap( musicAddr ) );
-    ram.l( 0x20 - 4, std::byteswap( bankAddr ) );
+    ram.writeLong( 0x20 - 8, std::byteswap( musicAddr ) );
+    ram.writeLong( 0x20 - 4, std::byteswap( bankAddr ) );
 
     Jerry jerry{ options.isNTSC(), options.wavOut() };
 
