@@ -327,7 +327,7 @@ private:
   void portReadDstAndHiddenCommit( GlobalReg regDst ); //to be used with indexed addressing modes
   bool portReadBoth( GlobalReg regSrc, GlobalReg regDst );
   void dualPortCommit();
-  void lockReg( GlobalReg reg );
+  inline void lockReg( GlobalReg reg );
   void dualPortCommitMMULT( bool high );
   void busGatePush( AdvanceResult result );
   void busGatePop();
@@ -402,9 +402,9 @@ private:
     GlobalReg regL = GlobalReg{};
     uint32_t dataL = {};
 
-    void updateReg( GlobalReg reg, uint32_t data );
-    void updateRegL( GlobalReg reg, uint32_t data );
-    bool canUpdateReg() const;
+    inline void updateReg( GlobalReg reg, uint32_t data );
+    inline void updateRegL( GlobalReg reg, uint32_t data );
+    inline bool canUpdateReg() const;
 
   } mStageWrite = {};
 
