@@ -11,4 +11,5 @@ public:
 
 private:
   WavFile* mWav = nullptr;
+  std::vector<uint32_t> mData;
 };

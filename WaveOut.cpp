@@ -13,6 +13,8 @@ WaveOut::WaveOut( std::filesystem::path const& path, int sps )
   wav_set_num_channels( mWav, 2 );
   wav_set_valid_bits_per_sample( mWav, 16 );
   wav_set_sample_rate( mWav, sps );
+
+  mData.reserve( 65536 );
 }
 
 WaveOut::~WaveOut()
@@ -26,5 +28,10 @@ WaveOut::~WaveOut()
 
 void WaveOut::put( int16_t samples[2] )
 {
-  wav_write( mWav, samples, 1 );
+  mData.push_back( *std::bit_cast<uint32_t const*>( samples ) );
+  if ( mData.size() >= 65536 )
+  {
+    wav_write( mWav, mData.data(), mData.size() );
+    mData.clear();
+  }
 }

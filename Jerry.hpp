@@ -249,7 +249,7 @@ private:
       INT6,
       INT7
     } status = OPCODE;
-    uint64_t queue = 0;
+    uint32_t queue = 0;
     uint32_t queueSize = 0;
     uint32_t decodedAddress = 0;
     bool doPrefetch = false;
@@ -291,7 +291,7 @@ private:
 
     bool needsPrefetching() const
     {
-      return queueSize < 1;
+      return queueSize == 0;
     }
   };
 

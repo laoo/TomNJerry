@@ -2141,7 +2141,7 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
     }
     else
     {
-      uint16_t fetch = mPrefetch.queue >> 48;
+      uint16_t fetch = mPrefetch.queue & 0xffff;
 
       switch ( ( DSPI )( fetch >> 10 ) )
       {
@@ -2171,7 +2171,7 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
       default:
         break;
       }
-      mPrefetch.queue <<= 16;
+      mPrefetch.queue >>= 16;
       mPrefetch.queueSize -= 1;
       mPrefetch.doPrefetch = mPrefetch.needsPrefetching();
       mPrefetch.decodedAddress += 2;
@@ -2185,8 +2185,8 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
     }
     else
     {
-      uint16_t fetch = mPrefetch.queue >> 48;
-      mPrefetch.queue <<= 16;
+      uint16_t fetch = mPrefetch.queue & 0xffff;
+      mPrefetch.queue >>= 16;
       mPrefetch.queueSize -= 1;
       mPrefetch.doPrefetch = mPrefetch.needsPrefetching();
       mPrefetch.decodedAddress += 2;
@@ -2205,9 +2205,9 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
     }
     else
     {
-      uint16_t fetch = mPrefetch.queue >> 48;
+      uint16_t fetch = mPrefetch.queue & 0xffff;
       mPrefetch.status = Prefetch::MOVEI2;
-      mPrefetch.queue <<= 16;
+      mPrefetch.queue >>= 16;
       mPrefetch.queueSize -= 1;
       mPrefetch.decodedAddress += 2;
       mPrefetch.doPrefetch = mPrefetch.needsPrefetching();
@@ -2221,9 +2221,9 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
     }
     else
     {
-      uint16_t fetch = mPrefetch.queue >> 48;
+      uint16_t fetch = mPrefetch.queue & 0xffff;
       mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
-      mPrefetch.queue <<= 16;
+      mPrefetch.queue >>= 16;
       mPrefetch.queueSize -= 1;
       mPrefetch.doPrefetch = mPrefetch.needsPrefetching();
       mPrefetch.decodedAddress += 2;
@@ -2296,40 +2296,28 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
 
 int Jerry::prefetchFill()
 {
-  static constexpr std::array<uint64_t, 4> mask = {
-    0x0000000000000000,
-    0xffff000000000000,
-    0xffffffff00000000,
-    0xffffffffffff0000
-  };
-
   assert( mPrefetch.queueSize < 4 );
   assert( ( mPC & 1 ) == 0 );
 
-  if ( mPrefetch.queueSize == 0 )
-  {
-    mPrefetch.decodedAddress = mPC;
-  }
+  mPrefetch.decodedAddress = mPC;
 
   if ( mPC & 2 )
   {
     auto pCode = ( uint16_t const* )mLocalRAM.data() + ( ( mPC - RAM_BASE ) >> 1 );
 
     //fetching word from odd address
-    mPrefetch.queue &= mask[mPrefetch.queueSize];
-    mPrefetch.queue |= ( uint64_t )std::byteswap( *pCode ) << ( 48 - mPrefetch.queueSize * 16 );
-    mPrefetch.queueSize += 1;
+    mPrefetch.queue = std::byteswap( *pCode );
+    mPrefetch.queueSize = 1;
     return 2;
   }
-  else if ( mPrefetch.needsPrefetching() )
+  else
   {
-    auto pCode = ( uint16_t const* )mLocalRAM.data() + ( ( mPC - RAM_BASE ) >> 1 );
+    auto pCode = (uint16_t const*)( ( uint8_t const* )mLocalRAM.data() + ( mPC - RAM_BASE ) );
 
-    mPrefetch.queue &= mask[mPrefetch.queueSize];
-    mPrefetch.queue |= ( uint64_t )std::byteswap( pCode[0] ) << ( 48 - mPrefetch.queueSize * 16 );
-    mPrefetch.queue |= ( uint64_t )std::byteswap( pCode[1] ) << ( 32 - mPrefetch.queueSize * 16 );
+    mPrefetch.queue = std::byteswap( pCode[0] );
+    mPrefetch.queue |= ( uint32_t )std::byteswap( pCode[1] ) << 16;
 
-    mPrefetch.queueSize += 2;
+    mPrefetch.queueSize = 2;
     return 4;
   }
 
