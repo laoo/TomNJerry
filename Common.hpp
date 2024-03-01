@@ -1,5 +1,15 @@
 #pragma once
-#include <span>
+
+class NonCopyable
+{
+public:
+  NonCopyable( NonCopyable const& ) = delete;
+  NonCopyable& operator=( NonCopyable const& ) = delete;
+
+protected:
+  NonCopyable() = default;
+  ~NonCopyable() = default;
+};
 
 //Global register index translated by the register file
 struct GlobalReg
@@ -20,6 +30,7 @@ struct LocalReg
     return GlobalReg{ idx >= 0 ? idx + file : idx };
   }
 };
+
 
 class AdvanceResult
 {
@@ -82,3 +93,61 @@ private:
   AdvanceResult( uint64_t data ) : mData( data ) {}
   uint64_t mData;
 };
+
+static constexpr int32_t REG_STATUS_FREE = -1;
+
+struct RegStatus : protected std::array<int32_t, 64>
+{
+  RegStatus()
+  {
+    std::fill( begin(), end(), REG_STATUS_FREE );
+  }
+  int32_t& operator[]( GlobalReg index ) noexcept
+  {
+    assert( index.idx < 64 );
+    return std::array<int32_t, 64>::operator[]( index.idx );
+  }
+
+  int32_t operator[]( GlobalReg index ) const noexcept
+  {
+    assert( index.idx < 64 );
+    return std::array<int32_t, 64>::operator[]( index.idx );
+  }
+};
+
+struct Regs : protected std::array<uint32_t, 64>
+{
+  Regs()
+  {
+    std::fill( begin(), end(), 0 );
+  }
+
+  uint32_t& operator[]( GlobalReg index ) noexcept
+  {
+    assert( index.idx < 64 );
+    return std::array<uint32_t, 64>::operator[]( index.idx );
+  }
+
+  uint32_t operator[]( GlobalReg index ) const noexcept
+  {
+    assert( index.idx < 64 );
+    return std::array<uint32_t, 64>::operator[]( index.idx );
+  }
+};
+
+struct RegFlags
+{
+  int8_t reg;
+  int8_t z;
+  int8_t n;
+  int8_t c;
+
+  RegFlags()
+  {
+    *std::bit_cast< uint32_t* >( this ) = ~0;
+  }
+};
+
+
+static constexpr uint64_t NTSC_CLOCK = 26590906ull;
+static constexpr uint64_t PAL_CLOCK = 26593900ull;

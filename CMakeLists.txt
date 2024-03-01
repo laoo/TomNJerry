@@ -42,29 +42,8 @@ if ( ENABLE_LOGGING)
   )
 endif()
 
-target_precompile_headers( Tom PRIVATE
-  <algorithm>
-  <atomic>
-  <array>
-  <bit>
-  <cassert>
-  <chrono>
-  <climits>
-  <cstddef>
-  <cstdint>
-  <exception>
-  <filesystem>
-  <fstream>
-  <functional>
-  <iostream>
-  <memory>
-  <span>
-  <string>
-  <thread>
-  <vector>
-)
 
-target_precompile_headers( Jerry PRIVATE
+set ( PCH
   <algorithm>
   <atomic>
   <array>
@@ -88,3 +67,6 @@ target_precompile_headers( Jerry PRIVATE
   <thread>
   <vector>
 )
+
+target_precompile_headers( Jerry PRIVATE ${PCH} )
+target_precompile_headers( Tom PRIVATE ${PCH} )

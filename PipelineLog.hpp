@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Opcodes.hpp"
-#include "RegFlags.hpp"
+#include "Common.hpp"
 
 enum WarnReason
 {

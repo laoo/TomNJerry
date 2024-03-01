@@ -1,7 +1,6 @@
 #pragma once
-#include "AdvanceResult.hpp"
+#include "Common.hpp"
 #include "Opcodes.hpp"
-#include "RegFlags.hpp"
 #include "WaveOut.hpp"
 
 class PipelineLog;
@@ -489,44 +488,8 @@ private:
 
   static constexpr int32_t FREE = -1;
 
-  struct RegStatus : protected std::array<int32_t, 64>
-  {
-    RegStatus()
-    {
-      std::fill( begin(), end(), FREE );
-    }
-    int32_t& operator[]( GlobalReg index ) noexcept
-    {
-      assert( index.idx < 64 );
-      return std::array<int32_t, 64>::operator[]( index.idx );
-    }
-
-    int32_t operator[]( GlobalReg index ) const noexcept
-    {
-      assert( index.idx < 64 );
-      return std::array<int32_t, 64>::operator[]( index.idx );
-    }
-  } mRegStatus = {};
-
-  struct Regs : protected std::array<uint32_t, 64>
-  {
-    Regs()
-    {
-      std::fill( begin(), end(), 0 );
-    }
-
-    uint32_t& operator[]( GlobalReg index ) noexcept
-    {
-      assert( index.idx < 64 );
-      return std::array<uint32_t, 64>::operator[]( index.idx );
-    }
-
-    uint32_t operator[]( GlobalReg index ) const noexcept
-    {
-      assert( index.idx < 64 );
-      return std::array<uint32_t, 64>::operator[]( index.idx );
-    }
-  } mRegs = {};
+  RegStatus mRegStatus = {};
+  Regs mRegs = {};
 
   int mFlagsSemaphore = 0;
 

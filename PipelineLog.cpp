@@ -1,5 +1,5 @@
 #include "PipelineLog.hpp"
-#include "RegFlags.hpp"
+#include "Common.hpp"
 #define STB_SPRINTF_IMPLEMENTATION
 #define STB_SPRINTF_NOFLOAT
 #define STB_SPRINTF_STATIC

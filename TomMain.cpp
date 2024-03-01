@@ -2,6 +2,6 @@
 
 int main()
 {
-    Tom tom;
-    return 0;
+  Tom tom{ false };
+  return 0;
 }

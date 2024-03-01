@@ -78,7 +78,7 @@ static constexpr std::array<int16_t,1024> gWaveTable =
   0xE4F3, 0x49EC, 0xF926, 0xF37F, 0x0ABC, 0xECFD, 0x0EAA, 0xFC53, 0xFBFD, 0xF058, 0x0291, 0xE383, 0x1880, 0xF135, 0xF30C, 0xE6D6
 };
 
-Jerry::Jerry( bool isNTSC, std::filesystem::path wavOut ) : mLog{ std::make_unique<PipelineLog>() }, mClock{ isNTSC ? 26590906u : 26593900u }, mWavePath{ std::move( wavOut ) }
+Jerry::Jerry( bool isNTSC, std::filesystem::path wavOut ) : mLog{ std::make_unique<PipelineLog>() }, mClock{ isNTSC ? NTSC_CLOCK : PAL_CLOCK }, mWavePath{ std::move( wavOut ) }
 {
   std::ranges::fill( mLocalRAM, std::byteswap( (uint32_t)( (uint16_t)DSPI::NOP << 10 | ( uint16_t )DSPI::NOP << ( 10 + 16 ) ) ) );
 
