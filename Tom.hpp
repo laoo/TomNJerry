@@ -47,12 +47,20 @@ public:
   static constexpr uint32_t LBUFB     = 0xF01000;   // Line Buffer B
   static constexpr uint32_t LBUFC     = 0xF01800;   // Line Buffer Current
 
-
+  static constexpr uint32_t G_FLAGS   = 0xF02100;   //GPU Flags
+  static constexpr uint32_t G_MTXC    = 0xF02104;   //GPU Matrix Control
+  static constexpr uint32_t G_MTXA    = 0xF02108;   //GPU Matrix Address
+  static constexpr uint32_t G_END     = 0xF0210C;   //GPU Data Organization
+  static constexpr uint32_t G_PC      = 0xF02110;   //GPU Program Counter
+  static constexpr uint32_t G_CTRL    = 0xF02114;   //GPU Operation Control / Status
+  static constexpr uint32_t G_HIDATA  = 0xF02118;   //GPU Bus Interface high data
+  static constexpr uint32_t G_REMAIN  = 0xF0211C;   //GPU Division Remainder
+  static constexpr uint32_t G_DIVCTRL = 0xF0211C;   //GPU Divider control
+  
   static constexpr uint32_t GPU_BASE  = 0xf02000;
   static constexpr uint32_t CTR_BASE  = 0xf02100;
   static constexpr uint32_t RAM_BASE  = 0xf03000;
   static constexpr uint32_t RAM_SIZE  = 0x001000;
-
 
   struct CTRL
   {
@@ -117,10 +125,8 @@ public:
   AdvanceResult busCycle();
   uint16_t busCycleRequestReadWord( uint32_t address );
   uint32_t busCycleRequestReadLong( uint32_t address );
-  uint64_t busCycleRequestReadPhrase( uint32_t address );
   void busCycleRequestWriteWord( uint32_t address, uint16_t data );
   void busCycleRequestWriteLong( uint32_t address, uint32_t data );
-  void busCycleRequestWritePhrase( uint32_t address, uint64_t data );
 
   void ackWrite();
   void ackReadByteRequest( uint8_t value );
@@ -134,6 +140,17 @@ public:
 
 private:
 
+  void checkInterrupt();
+  void divideUnit();
+  void io();
+  void stageWrite();
+  void compute();
+  void stageRead();
+  void decode();
+  void prefetch();
+  void halfCycle();
+  void ctrlSet( uint16_t value );
+  void flagsSet( uint16_t value );
   uint16_t readWord( uint32_t address ) const;
   uint32_t readLong( uint32_t address ) const;
   uint64_t readPhrase( uint32_t address ) const;
@@ -142,6 +159,15 @@ private:
   void writePhrase( uint32_t address, uint64_t data );
 
 private:
+
+  uint32_t mMTXC = 0;
+  uint32_t mMTXA = 0;
+  uint32_t mPC = 0;
+  CTRL mCtrl = {};
+  FLAGS mFlags = {};
+  int32_t mRemain = 0;
+  uint32_t mDivCtrl = 0;
+  uint32_t mHiData = 0;
 
   std::array<uint32_t, RAM_SIZE / sizeof( uint32_t )> mLocalRAM;
   uint64_t mLastLocalRAMAccessCycle = ~0;

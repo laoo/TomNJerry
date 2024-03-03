@@ -43,7 +43,8 @@ public:
   static constexpr uint64_t kByteFlag     = 0x0100000000000000ull;
   static constexpr uint64_t kWordFlag     = 0x0200000000000000ull;
   static constexpr uint64_t kLongFlag     = 0x0300000000000000ull;
-  static constexpr uint64_t kFinishFlag   = 0x0400000000000000ull;
+  static constexpr uint64_t kPhraseFlag   = 0x0400000000000000ull;
+  static constexpr uint64_t kFinishFlag   = 0x0500000000000000ull;
   static constexpr uint64_t kWriteFlag    = 0x8000000000000000ull;
 
   static AdvanceResult readByte( uint32_t addres, GlobalReg reg )
@@ -58,6 +59,10 @@ public:
   {
     return AdvanceResult{ kLongFlag | ( (uint64_t)addres << 32 ) & kAddressMask | ( uint64_t )reg.idx };
   }
+  static AdvanceResult readPhrase( uint32_t addres, GlobalReg reg )
+  {
+    return AdvanceResult{ kPhraseFlag | ( (uint64_t)addres << 32 ) & kAddressMask | ( uint64_t )reg.idx };
+  }
   static AdvanceResult writeByte( uint32_t addres, uint8_t value )
   {
     return AdvanceResult{ kByteFlag | kWriteFlag | ( (uint64_t)addres << 32 ) & kAddressMask | (uint64_t)value };
@@ -69,6 +74,10 @@ public:
   static AdvanceResult writeLong( uint32_t addres, uint32_t value )
   {
     return AdvanceResult{ kLongFlag | kWriteFlag | ( (uint64_t)addres << 32 ) & kAddressMask | (uint64_t)value };
+  }
+  static AdvanceResult writePhrase( uint32_t addres, uint32_t value )
+  {
+    return AdvanceResult{ kPhraseFlag | kWriteFlag | ( (uint64_t)addres << 32 ) & kAddressMask | (uint64_t)value };
   }
   static AdvanceResult nop()
   {
