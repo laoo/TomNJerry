@@ -1009,7 +1009,8 @@ void Jerry::compute()
       auto result = mStageCompute.dataSrc & mStageCompute.dataDst;
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
-      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      //"and" copies bit 31 of the result into C flag
+      mStageWrite.regFlags.c = mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
@@ -1021,7 +1022,7 @@ void Jerry::compute()
       auto result = mStageCompute.dataSrc | mStageCompute.dataDst;
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
-      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.regFlags.c = mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
@@ -1034,6 +1035,7 @@ void Jerry::compute()
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.regFlags.c = mStageWrite.regFlags.n ^ 1;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
@@ -1046,6 +1048,8 @@ void Jerry::compute()
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      //r0 is 1 as NOT sets C, r1 == 0 = > C == 0
+      mStageWrite.regFlags.c = mStageWrite.regFlags.z ^ 1;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
@@ -1055,6 +1059,10 @@ void Jerry::compute()
     if ( mStageWrite.canUpdateReg() )
     {
       mStageWrite.regFlags.z = ( mStageCompute.dataDst & ( 1 << mStageCompute.dataSrc ) ) == 0 ? 1 : 0;
+      //BTST clears N bit, no matter if bit 31 is tested value is set or not.
+      mStageWrite.regFlags.n = 0;
+      //same for C flag
+      mStageWrite.regFlags.c = 0;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEFLAGS( mStageWrite.regFlags );
@@ -1067,6 +1075,8 @@ void Jerry::compute()
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      //bset clears C flag
+      mStageWrite.regFlags.c = 0;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
@@ -1078,7 +1088,7 @@ void Jerry::compute()
       auto result = mStageCompute.dataDst & ~( 1 << mStageCompute.dataSrc );
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
-      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.regFlags.c = mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
