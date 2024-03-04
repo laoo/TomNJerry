@@ -1102,6 +1102,7 @@ void Jerry::compute()
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      // mStageWrite.regFlags.c not affected !
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
@@ -1113,7 +1114,7 @@ void Jerry::compute()
       auto result = (int16_t)mStageCompute.dataSrc * (int16_t)mStageCompute.dataDst;
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
-      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.regFlags.c = mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
@@ -1278,6 +1279,7 @@ void Jerry::compute()
       mStageWrite.updateReg( mStageCompute.regDst, ( ( int32_t )mStageCompute.dataDst < -32768 ) ? -32768 : ( ( int32_t )mStageCompute.dataDst > 32767 ) ? 32767 : ( int32_t )mStageCompute.dataDst );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.regFlags.c = 0;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
@@ -1290,6 +1292,7 @@ void Jerry::compute()
       mStageWrite.updateReg( mStageCompute.regDst, ( temp < -1 ) ? ( int32_t )0x80000000 : ( temp > 0 ) ? ( int32_t )0x7FFFFFFF : mStageCompute.dataDst );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.regFlags.c = 0;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
