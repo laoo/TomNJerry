@@ -1022,7 +1022,8 @@ void Jerry::compute()
       auto result = mStageCompute.dataSrc | mStageCompute.dataDst;
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
-      mStageWrite.regFlags.c = mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.regFlags.n = mStageWrite.data >> 31;
+      mStageWrite.regFlags.c = ( mStageCompute.dataSrc & mStageCompute.dataDst ) >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
@@ -1035,7 +1036,7 @@ void Jerry::compute()
       mStageWrite.updateReg( mStageCompute.regDst, result );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
-      mStageWrite.regFlags.c = mStageWrite.regFlags.n ^ 1;
+      mStageWrite.regFlags.c = ( mStageCompute.dataSrc & mStageCompute.dataDst ) >> 31;
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
