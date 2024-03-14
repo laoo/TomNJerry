@@ -1381,8 +1381,7 @@ void Jerry::compute()
     if ( mStageWrite.canUpdateReg() )
     {
       mStageWrite.updateReg( mStageCompute.regDst, (int32_t)mStageCompute.dataSrc > 0 ?
-                             mStageCompute.dataDst >> mStageCompute.dataSrc : mStageCompute.dataDst << (-mStageCompute.dataSrc) );
-
+                             (uint64_t)mStageCompute.dataDst >> mStageCompute.dataSrc : (uint64_t)mStageCompute.dataDst << (-mStageCompute.dataSrc) );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.regFlags.c = mStageCompute.dataSrc > 0 ? ( mStageCompute.dataDst & 1 ) : ( mStageCompute.dataDst >> 31 );
@@ -1418,7 +1417,7 @@ void Jerry::compute()
   case DSPI::SHA:
     if ( mStageWrite.canUpdateReg() )
     {
-      mStageWrite.updateReg( mStageCompute.regDst, mStageCompute.dataSrc > 0 ? ( uint32_t )( ( int64_t )(int32_t)( mStageCompute.dataDst ) >> mStageCompute.dataSrc ) : mStageCompute.dataDst << mStageCompute.dataSrc );
+      mStageWrite.updateReg( mStageCompute.regDst, mStageCompute.dataSrc > 0 ? ( uint32_t )( ( int64_t )(int32_t)( mStageCompute.dataDst ) >> mStageCompute.dataSrc ) : (uint64_t)mStageCompute.dataDst << mStageCompute.dataSrc );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
       mStageWrite.regFlags.c = mStageCompute.dataSrc > 0 ? ( mStageCompute.dataDst & 1 ) : ( mStageCompute.dataDst >> 31 );
