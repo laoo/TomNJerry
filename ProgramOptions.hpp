@@ -28,7 +28,7 @@ private:
 
   std::filesystem::path mInput = {};
   std::filesystem::path mWavOut = {};
-  int mCycles = 0;
+  int mCycles = std::numeric_limits<int>::max();
   int mDumpRegisters = 0;
   int mFinish = 0;
 };
