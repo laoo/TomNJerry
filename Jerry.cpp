@@ -1380,11 +1380,14 @@ void Jerry::compute()
   case DSPI::SH:
     if ( mStageWrite.canUpdateReg() )
     {
-      mStageWrite.updateReg( mStageCompute.regDst, (int32_t)mStageCompute.dataSrc > 0 ?
-                             (uint64_t)mStageCompute.dataDst >> mStageCompute.dataSrc : (uint64_t)mStageCompute.dataDst << (-mStageCompute.dataSrc) );
+      const bool shiftRight = ( int32_t )mStageCompute.dataSrc >= 0;
+      const uint32_t absShift = shiftRight ? mStageCompute.dataSrc : -mStageCompute.dataSrc;
+      const uint32_t shiftResult = shiftRight ? mStageCompute.dataDst >> absShift : mStageCompute.dataDst << absShift;
+      //limit amount of shift to 31, shift of 32 and above will shift out all bits and we don't want to stumble upon a problem that CPU is using only 5 lsbs to do 32-bit shift
+      mStageWrite.updateReg( mStageCompute.regDst, absShift < 32 ? shiftResult : 0 );
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
-      mStageWrite.regFlags.c = mStageCompute.dataSrc > 0 ? ( mStageCompute.dataDst & 1 ) : ( mStageCompute.dataDst >> 31 );
+      mStageWrite.regFlags.c = mStageCompute.dataSrc >= 0 ? ( mStageCompute.dataDst & 1 ) : ( mStageCompute.dataDst >> 31 );
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
@@ -1417,10 +1420,24 @@ void Jerry::compute()
   case DSPI::SHA:
     if ( mStageWrite.canUpdateReg() )
     {
-      mStageWrite.updateReg( mStageCompute.regDst, mStageCompute.dataSrc > 0 ? ( uint32_t )( ( int64_t )(int32_t)( mStageCompute.dataDst ) >> mStageCompute.dataSrc ) : (uint64_t)mStageCompute.dataDst << mStageCompute.dataSrc );
+      if ( ( int32_t )mStageCompute.dataSrc >= 0 )
+      {
+        //shift right
+        const uint32_t absShift = mStageCompute.dataSrc;
+        const int32_t shiftArg = ( int32_t )mStageCompute.dataDst;
+        //limit amount of shift to 31, shift of 32 and above will shift out all bits and we don't want to stumble upon a problem that CPU is using only 5 lsbs to do 32-bit shift
+        mStageWrite.updateReg( mStageCompute.regDst, absShift > 31 ? ( shiftArg >> 31 ) : ( shiftArg >> absShift ) );
+      }
+      else
+      {
+        // shift left
+        const uint32_t absShift = -mStageCompute.dataSrc;
+        //limit amount of shift to 31, shift of 32 and above will shift out all bits and we don't want to stumble upon a problem that CPU is using only 5 lsbs to do 32-bit shift
+        mStageWrite.updateReg( mStageCompute.regDst, absShift > 31 ? 0 : ( mStageCompute.dataDst << absShift ) );
+      }
       mStageWrite.regFlags.z = mStageWrite.data == 0 ? 1 : 0;
       mStageWrite.regFlags.n = mStageWrite.data >> 31;
-      mStageWrite.regFlags.c = mStageCompute.dataSrc > 0 ? ( mStageCompute.dataDst & 1 ) : ( mStageCompute.dataDst >> 31 );
+      mStageWrite.regFlags.c = mStageCompute.dataSrc >= 0 ? ( mStageCompute.dataDst & 1 ) : ( mStageCompute.dataDst >> 31 );
       mStageWrite.updateMask |= StageWrite::UPDATE_FLAGS;
       mStageCompute.instruction = DSPI::EMPTY;
       LOG_COMPUTEREGFLAGS( mStageWrite.regFlags );
