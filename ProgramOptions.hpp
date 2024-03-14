@@ -17,7 +17,7 @@ public:
 
   std::filesystem::path input() const;
   std::filesystem::path wavOut() const;
-  uint64_t cycles() const;
+  int cycles() const;
   bool isNTSC() const;
   int dumpRegisters() const;
   int finish() const;
@@ -28,7 +28,7 @@ private:
 
   std::filesystem::path mInput = {};
   std::filesystem::path mWavOut = {};
-  uint64_t mCycles = std::numeric_limits<uint64_t>::max();
+  int mCycles = 0;
   int mDumpRegisters = 0;
   int mFinish = 0;
 };
