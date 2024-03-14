@@ -262,7 +262,7 @@ uint8_t Jerry::readByte( uint32_t address ) const
   case JPIT4R+1:
     return mJPIT4R & 0xff;
   case J_INT:
-    return mJIntCtrl.get() >> 16;
+    return mJIntCtrl.get() >> 8;
   case J_INT + 2:
     break;
   case JOYSTICK:
