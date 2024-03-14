@@ -818,10 +818,9 @@ void Jerry::localBus()
       mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) >> ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
       LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
     }
-    mStageIO.state = StageIO::IDLE;
+    mLocalBus.state = LocalBus::IDLE;
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-
     break;
   case LocalBus::READ_BYTE:
     if ( mLocalBus.address < D_FLAGS ){
