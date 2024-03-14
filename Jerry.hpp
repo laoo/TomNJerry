@@ -200,8 +200,10 @@ public:
 
 private:
 
+  uint8_t readByte( uint32_t address ) const;
   uint16_t readWord( uint32_t address ) const;
   uint32_t readLong( uint32_t address ) const;
+  void writeByte( uint32_t address, uint8_t data );
   //must write little endian word
   void writeWord( uint32_t address, uint16_t data );
   //must write little endian long

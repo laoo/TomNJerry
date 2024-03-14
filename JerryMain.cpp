@@ -1,5 +1,5 @@
 #include "Jerry.hpp"
-#include "ProgramOptions.hpp" 
+#include "ProgramOptions.hpp"
 #include "BS94.hpp"
 #include "DSPRaw.hpp"
 #include "RAM.hpp"
@@ -27,29 +27,40 @@ void loop( Bus & bus, uint64_t cycles )
   }
 }
 
+#define ROOT_DIR "/Users/bastian/jaguar/"
+
 int main( int argc, char const* argv[] )
 {
   try
   {
+    auto ram = std::make_shared<RAM>();
     ProgramOptions options{ "Jerry", "DSP pipeline symulator", argc, argv};
 
-    //BS94 input{ options.input() };
-    DSPRaw input{ "d:\\home\\yarc_reloaded\\lsp_v15.bin" };
+//->    BS94 input{ options.input() };
+//->    DSPRaw input{ "/Users/bastian/jaguar/cube_no68k/lsp_v15.bin" };
+//->    uint32_t musicAddr = 0x6ad8;
+//->    uint32_t bankAddr = 0x10C34;
+//->    ram->load( "/Users/Bastian/jaguar/cube_no68k/mod/my.lsmusic", musicAddr );
+//->    ram->load( "/Users/Bastian/jaguar/cube_no68k/mod/my.lsbank", bankAddr );
+//->    ram->writeLong( 0x20 - 8, std::byteswap( musicAddr ) );
+//->    ram->writeLong( 0x20 - 4, std::byteswap( bankAddr ) );
 
-    auto ram = std::make_shared<RAM>();
-    uint32_t musicAddr = 0x6ad8;
-    uint32_t bankAddr = 0x10C34;
-    
-    ram->load( "d:\\home\\yarc_reloaded\\mod\\my.lsmusic", musicAddr );
-    ram->load( "d:\\home\\yarc_reloaded\\mod\\my.lsbank", bankAddr );
+    DSPRaw input{ ROOT_DIR "JagHivelyPlayer/player/hively_player.bin"};
 
-    ram->writeLong( 0x20 - 8, std::byteswap( musicAddr ) );
-    ram->writeLong( 0x20 - 4, std::byteswap( bankAddr ) );
+    ram->load(ROOT_DIR "JagHivelyPlayer/player/AHX_panning.bin", 0x5000);
+    ram->load(ROOT_DIR "JagHivelyPlayer/player/AHX_FilterPrecalc.bin", 0x5400);
+    ram->load(ROOT_DIR "hively/streams/gone.ahx.streambits", 0x6000);
 
     auto jerry = std::make_shared<Jerry>( options.isNTSC(), options.wavOut() );
 
+    jerry->busCycleRequestWriteLong(0xf1d000-4, 0x6000);
+    jerry->busCycleRequestWriteLong(0xf1d000-8, 0x100);
+    jerry->busCycleRequestWriteLong(0xf1d000-12, 0x5400);
+    jerry->busCycleRequestWriteLong(0xf1d000-16, 0x5000);
+    jerry->busCycleRequestWriteLong(0xf1d000-20, 0);
+
     jerry->debugWrite( input.address(), input.data() );
-    jerry->busCycleRequestWriteLong( Jerry::JOYSTICK, 0x1000000 );
+    jerry->busCycleRequestWriteLong( Jerry::JOYSTICK, 0x000100 );
     jerry->busCycleRequestWriteLong( Jerry::D_FLAGS, Jerry::FLAGS::REGPAGE );
     jerry->busCycleRequestWriteLong( Jerry::D_PC, input.address() );
     jerry->busCycleRequestWriteLong( Jerry::D_CTRL, Jerry::CTRL::DSPGO );
@@ -61,7 +72,6 @@ int main( int argc, char const* argv[] )
 #else
     loop( *bus, static_cast<uint64_t>( options.cycles() ) );
 #endif
-
     if ( options.dumpRegisters() ){
       int i;
       printf("Bank 0");
@@ -85,6 +95,5 @@ int main( int argc, char const* argv[] )
   {
     std::cout << e.what() << std::endl;
   }
-
   return 0;
 }

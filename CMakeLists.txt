@@ -7,7 +7,7 @@ project( TomNJerry )
 set( CMAKE_CXX_STANDARD 23 )
 
 if ( NOT WIN32 )
-  set( CMAKE_CXX_FLAGS "-Wno-c++11-narrowing")
+  set( CMAKE_CXX_FLAGS "-Wno-c++11-narrowing -O3")
 endif()
 
 add_executable( Tom

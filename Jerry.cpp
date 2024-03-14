@@ -231,6 +231,97 @@ void Jerry::ackWrite()
   busGatePop();
 }
 
+uint8_t Jerry::readByte( uint32_t address ) const
+{
+  assert( ( address & 0xff0000 ) == 0xf10000 );
+
+  switch ( address )
+  {
+  case JPIT1:
+    break;
+  case JPIT2:
+    break;
+  case JPIT3:
+    break;
+  case JPIT4:
+    break;
+  case JPIT1R:
+    return mJPIT1R >> 8;
+  case JPIT1R+1:
+    return mJPIT1R & 0xff;
+  case JPIT2R:
+    return mJPIT2R  >> 8;
+  case JPIT2R+1:
+    return mJPIT2R & 0xff;
+  case JPIT3R:
+    return mJPIT3R >> 8;
+  case JPIT3R+1:
+    return mJPIT3R & 0xff;
+  case JPIT4R:
+    return mJPIT4R >> 8;
+  case JPIT4R+1:
+    return mJPIT4R & 0xff;
+  case J_INT:
+    return mJIntCtrl.get() >> 16;
+  case J_INT + 2:
+    break;
+  case JOYSTICK:
+    return mJoystick.getJoy() >> 8;
+  case JOYSTICK+1:
+    return mJoystick.getJoy() & 0xff;
+  case JOYBUTS:
+    return mJoystick.getBut() >> 8;
+  case JOYBUTS+1:
+    return mJoystick.getBut() & 0xff;
+  case SCLK:
+    break;
+  case SMODE:
+    break;
+  case L_I2S:
+    break;
+  case R_I2S:
+    break;
+  case ASICLK:
+    LOG_WARN( WARN_UNIMPLEMENTED );
+    break;
+  case ASICTRL:
+    LOG_WARN( WARN_UNIMPLEMENTED );
+    break;
+  case ASIDATA:
+    LOG_WARN( WARN_UNIMPLEMENTED );
+    break;
+  case D_FLAGS:
+  case D_MTXC:
+  case D_MTXA:
+  case D_END:
+  case D_PC:
+  case D_CTRL:
+  case D_MOD:
+  case D_DIVCTRL:
+  case D_MACHI:
+    LOG_WARN( WARN_BAD_ADDRESS );
+    break;
+  default:
+    if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
+    {
+      LOG_WARN( WARN_BAD_ADDRESS );
+      break;
+    }
+    else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
+    {
+      LOG_WARN( WARN_BAD_ADDRESS );
+      break;
+    }
+    else
+    {
+      LOG_WARN( WARN_BAD_ADDRESS );
+    }
+    break;
+  }
+
+  return 0;
+}
+
 uint16_t Jerry::readWord( uint32_t address ) const
 {
   assert( ( address & 0xff0000 ) == 0xf10000 );
@@ -375,6 +466,105 @@ uint32_t Jerry::readLong( uint32_t address ) const
   }
 
   return 0;
+}
+
+void Jerry::writeByte( uint32_t address, uint8_t data )
+{
+  assert( ( address & 0xff0000 ) == 0xf10000 );
+  if ( ( address & 1 ) != 0 )
+  {
+    LOG_WARN( WARN_BAD_ADDRESS );
+    address &= ~1;
+  }
+
+  switch ( address )
+  {
+  case JPIT1:
+    mJPIT1R = mJPIT1 = data;
+    reconfigureTimer1();
+    break;
+  case JPIT2:
+    mJPIT2R = mJPIT2 = data;
+    reconfigureTimer1();
+    break;
+  case JPIT3:
+    mJPIT3R = mJPIT3 = data;
+    reconfigureTimer1();
+    break;
+  case JPIT4:
+    mJPIT4R = mJPIT4 = data;
+    reconfigureTimer1();
+    break;
+  case J_INT:
+    mJIntCtrl.set( data );
+    break;
+  case J_INT + 2:
+    break;
+  case JOYSTICK:
+    mJoystick.setJoy( data );
+    break;
+  case JOYBUTS:
+    break;
+  case SCLK:
+    mSCLK = data & 0xff;
+    reconfigureDAC();
+    break;
+  case SCLK + 2:
+    break;
+  case SMODE:
+    smodeSet( data );
+    reconfigureDAC();
+    break;
+  case SMODE + 2:
+    break;
+  case L_I2S:
+    mI2S.left = data;
+    break;
+  case L_I2S + 2:
+    break;
+  case R_I2S:
+    mI2S.right = data;
+    break;
+  case R_I2S + 2:
+    break;
+  case ASIDATA:
+    break;
+  case ASICTRL:
+    break;
+  case ASICLK:
+    break;
+  case JPIT1R:
+  case JPIT2R:
+  case JPIT3R:
+  case JPIT4R:
+    LOG_WARN( WARN_BAD_ADDRESS );
+    break;
+  case D_FLAGS:
+  case D_MTXC:
+  case D_MTXA:
+  case D_END:
+  case D_PC:
+  case D_CTRL:
+  case D_MOD:
+  case D_DIVCTRL:
+  case D_MACHI:
+    LOG_WARN( WARN_BAD_ADDRESS );
+    break;
+  default:
+    if ( address >= RAM_BASE && address < RAM_BASE + RAM_SIZE )
+    {
+      LOG_WARN( WARN_BAD_ADDRESS );
+    }
+    else if ( address >= ROM_BASE && address < ROM_BASE + ROM_SIZE )
+    {
+      LOG_WARN( WARN_BAD_ADDRESS );
+    }
+    else
+    {
+      LOG_WARN( WARN_BAD_ADDRESS );
+    }
+    break;
+  }
 }
 
 void Jerry::writeWord( uint32_t address, uint16_t data )
@@ -580,20 +770,37 @@ void Jerry::localBus()
     LOG_STORELONG( mLocalBus.address, mLocalBus.data );
     break;
   case LocalBus::WRITE_WORD:
-    LOG_WARN( WARN_BAD_SIZE );
-    writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
-    mLocalBus.state = LocalBus::IDLE;
-    mStageIO.state = StageIO::IDLE;
-    mLastLocalRAMAccessCycle = mCycle;
-    LOG_STORELONG( mLocalBus.address, mLocalBus.data );
+    if ( mLocalBus.address < D_FLAGS ){
+      writeWord( mLocalBus.address & 0xfffffe, mLocalBus.data );
+      mLocalBus.state = LocalBus::IDLE;
+      mStageIO.state = StageIO::IDLE;
+      mLastLocalRAMAccessCycle = mCycle;
+      LOG_STOREWORD( mLocalBus.address, mLocalBus.data );
+    } else {
+      LOG_WARN( WARN_BAD_SIZE );
+      writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
+      mLocalBus.state = LocalBus::IDLE;
+      mStageIO.state = StageIO::IDLE;
+      mLastLocalRAMAccessCycle = mCycle;
+      LOG_STORELONG( mLocalBus.address, mLocalBus.data );
+    }
     break;
   case LocalBus::WRITE_BYTE:
-    LOG_WARN( WARN_BAD_SIZE );
-    writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
-    mLocalBus.state = LocalBus::IDLE;
-    mStageIO.state = StageIO::IDLE;
-    mLastLocalRAMAccessCycle = mCycle;
-    LOG_STORELONG( mLocalBus.address, mLocalBus.data );
+    if ( mLocalBus.address < D_FLAGS ){
+      writeByte( mLocalBus.address, mLocalBus.data );
+      mLocalBus.state = LocalBus::IDLE;
+      mStageIO.state = StageIO::IDLE;
+      mLastLocalRAMAccessCycle = mCycle;
+      LOG_STOREBYTE( mLocalBus.address, mLocalBus.data );
+    } else {
+      LOG_WARN( WARN_BAD_SIZE );
+      writeLong( mLocalBus.address & 0xfffffc, mLocalBus.data << ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
+      mLocalBus.state = LocalBus::IDLE;
+      mStageIO.state = StageIO::IDLE;
+      mLastLocalRAMAccessCycle = mCycle;
+      LOG_STORELONG( mLocalBus.address, mLocalBus.data );
+    }
+
     break;
   case LocalBus::READ_LONG:
     mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address ) );
@@ -603,20 +810,31 @@ void Jerry::localBus()
     LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
     break;
   case LocalBus::READ_WORD:
-    LOG_WARN( WARN_BAD_SIZE );
-    mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) >> ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
+    if ( mLocalBus.address < D_FLAGS ){
+      mStageWrite.updateRegL( mLocalBus.reg, readWord( mLocalBus.address & 0xfffffe ) );
+      LOG_LOADWORD( mLocalBus.address, mStageWrite.dataL );
+    } else {
+      LOG_WARN( WARN_BAD_SIZE );
+      mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) >> ( ( ( mLocalBus.address & 1 ) ^ 1 ) * 16 ) );
+      LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
+    }
     mStageIO.state = StageIO::IDLE;
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-    LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
+
     break;
   case LocalBus::READ_BYTE:
-    LOG_WARN( WARN_BAD_SIZE );
-    mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) >> ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
+    if ( mLocalBus.address < D_FLAGS ){
+      mStageWrite.updateRegL( mLocalBus.reg, readByte( mLocalBus.address ) );
+      LOG_LOADBYTE( mLocalBus.address, mStageWrite.dataL );
+    } else {
+      LOG_WARN( WARN_BAD_SIZE );
+      mStageWrite.updateRegL( mLocalBus.reg, readLong( mLocalBus.address & 0xfffffc ) >> ( ( 3 - ( mLocalBus.address & 3 ) ) * 8 ) );
+      LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
+    }
     mLocalBus.state = LocalBus::IDLE;
     mStageIO.state = StageIO::IDLE;
     mLastLocalRAMAccessCycle = mCycle;
-    LOG_LOADLONG( mLocalBus.address, mStageWrite.dataL );
     break;
   default:
     break;
