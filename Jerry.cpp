@@ -1856,12 +1856,25 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::IMULTN:
-  case DSPI::IMACN:
-    //TODO: make instruction after either of these atomic
+    //TODO: make instruction after it atomic
     if ( portReadBoth( regSrc, regDst ) )
     {
       dualPortCommit();
       mFlagsSemaphore += 1;
+      std::swap( mStageRead.instruction, mStageCompute.instruction );
+      mStageCompute.dataSrc = mStageRead.dataSrc;
+      mStageCompute.dataDst = mStageRead.dataDst;
+    }
+    else
+    {
+      dualPortCommit();
+    }
+    break;
+  case DSPI::IMACN:
+    //TODO: make instruction after it atomic
+    if ( portReadBoth( regSrc, regDst ) )
+    {
+      dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
       mStageCompute.dataSrc = mStageRead.dataSrc;
       mStageCompute.dataDst = mStageRead.dataDst;
