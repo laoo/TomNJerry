@@ -8,7 +8,7 @@ ProgramOptions::ProgramOptions( char const* name, char const* desc, int argc, ch
     ( "h,help", "produce help message" )
     ( "i,input", "input file, first implicit agrument", cxxopts::value<std::string>(), "input" )
     ( "w,wav", "wave output file", cxxopts::value<std::string>(), "wav" )
-    ( "c,cycles", "number of bus cycles to analyzem -1 for infinite", cxxopts::value<int>()->default_value("-1") )
+    ( "c,cycles", "number of bus cycles to analyze, no limit by default" )
     ( "system", "PAL or NTSC", cxxopts::value<std::string>()->default_value("PAL") )
     ( "r,regdump","dump register when finished" )
     ( "f,finish","exit when DSP clears DSPGO" )
@@ -35,7 +35,7 @@ ProgramOptions::ProgramOptions( char const* name, char const* desc, int argc, ch
 
   if ( mRes->count( "cycles" ) )
   {
-    mCycles = ( *mRes )["cycles"].as<int>();
+    mCycles = ( *mRes )["cycles"].as<uint64_t>();
   }
 
   if ( !mRes->count( "input" ) )
@@ -84,7 +84,7 @@ std::filesystem::path ProgramOptions::wavOut() const
   return mWavOut;
 }
 
-int ProgramOptions::cycles() const
+uint64_t ProgramOptions::cycles() const
 {
   return mCycles;
 }
