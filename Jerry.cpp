@@ -2679,7 +2679,16 @@ void Jerry::dualPortCommit()
 {
   if ( mPortWriteDstReg.idx >= 0 )
   {
-    mRegStatus[mPortWriteDstReg] = FREE;
+    if ( mRegStatus[mPortWriteDstReg] != mRegisterFile && mRegStatus[GlobalReg{ mPortWriteDstReg.idx ^ 32 }] == ( mRegisterFile ^ 32 ) )
+    {
+      //regpage has been changed after register lock and before write-back
+      mRegStatus[GlobalReg{ mPortWriteDstReg.idx ^ 32 }] = FREE;
+      LOG_WARN( WARN_REGPAGE_HAZARD );
+    }
+    else
+    {
+      mRegStatus[mPortWriteDstReg] = FREE;
+    }
     mRegs[mPortWriteDstReg] = mPortWriteDstData;
     LOG_PORTWRITEDST( mPortWriteDstReg.idx, mPortWriteDstData );
     mPortWriteDstReg = GlobalReg{};
@@ -2705,7 +2714,7 @@ void Jerry::lockReg( GlobalReg reg )
   if ( mRegStatus[reg] != FREE )
     LOG_WARN( WARN_REG_IN_USE );
 
-  mRegStatus[reg] = 1;
+  mRegStatus[reg] = mRegisterFile;
 }
 
 void Jerry::dualPortCommitMMULT( bool high )
@@ -2914,9 +2923,6 @@ void Jerry::forceint0()
 
 void Jerry::checkInterrupt()
 {
-  if ( mCycle == 800 )
-    int k = 42;
-
   if ( mCycle < mInterruptor.cycleMin )
     return;
 

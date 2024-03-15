@@ -503,7 +503,8 @@ void PipelineLog::warn( WarnReason reason )
     "? ioPend\n",
     "? div2close\n",
     "? badMTXA\n",
-    "? badMat\n"
+    "? badMat\n",
+    "? regPage\n"
   };
 
   assert( (size_t)reason < kWarnReasons.size() );
