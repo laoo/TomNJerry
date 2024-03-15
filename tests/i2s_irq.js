@@ -4,7 +4,6 @@
 
 DSP_Audio_frequence     equ 32000
 SCLK_PAL        equ ((26593900*4/DSP_Audio_frequence+128)>>8)-1
-DSP_frequence_de_replay_PAL equ 26593900/(SCLK_PAL+1)/64
 
 	dsp
 
@@ -29,7 +28,7 @@ i2s:
 
 	addqt  #2,r1
 	addqt   #4,r31		; crash
-	addq	#4,r31		; ok
+//->	addq	#4,r31		; ok
 	jump   (r1)
 	store  r29,(R30)
 
@@ -37,7 +36,6 @@ init:
 	movei	#SP_TOP,r31
 	moveta	r31,r31
 	movei  #SCLK_PAL,r11
-	movei  #DSP_frequence_de_replay_PAL,r10
 	movei  #SCLK,r0
 	moveq  #%001101,r13     ; SMODE bascule sur RISING
 	store  r11,(r0)         ; SCLK
