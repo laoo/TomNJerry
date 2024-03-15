@@ -48,6 +48,8 @@ init:
 	movei  #D_FLAGS,r24
 	movei  #D_I2SENA|REGPAGE,r29
 	store  r29,(r24)
+	nop
+	nop
 
 loop:
 	movei	#1000,r0
