@@ -1705,8 +1705,8 @@ void Jerry::stageRead()
     return;
   }
 
-  auto regSrc = mStageRead.regSrc.translate( mStageRead.regFile );
-  auto regDst = mStageRead.regDst.translate( mStageRead.regFile );
+  auto regSrc = mStageRead.regSrc.translate( mRegisterFile );
+  auto regDst = mStageRead.regDst.translate( mRegisterFile );
 
   switch ( mStageRead.instruction )
   {
@@ -1961,7 +1961,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::MOVEFA:
-    if ( mStageWrite.canUpdateReg() && portReadSrc( mStageRead.regSrc.translate( mStageRead.regFile ^ 32 ) ) )
+    if ( mStageWrite.canUpdateReg() && portReadSrc( mStageRead.regSrc.translate( mRegisterFile ^ 32 ) ) )
     {
       if ( mRegStatus[regDst] != FREE )
         LOG_WARN( WARN_REG_IN_USE );
@@ -2021,7 +2021,7 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() && portReadSrc( regSrc ) )
     {
       dualPortCommit();
-      mStageWrite.updateReg( mStageRead.regDst.translate( mStageRead.regFile ^ 32 ), mStageRead.dataSrc );
+      mStageWrite.updateReg( mStageRead.regDst.translate( mRegisterFile ^ 32 ), mStageRead.dataSrc );
       mStageRead.instruction = DSPI::EMPTY;
     }
     else
@@ -2089,7 +2089,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOAD14R:
-    if ( portReadBoth( LocalReg{ 14 }.translate( mStageRead.regFile ), regSrc ) )
+    if ( portReadBoth( LocalReg{ 14 }.translate( mRegisterFile ), regSrc ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -2104,7 +2104,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOAD15R:
-    if ( portReadBoth( LocalReg{ 15 }.translate( mStageRead.regFile ), regSrc) )
+    if ( portReadBoth( LocalReg{ 15 }.translate( mRegisterFile ), regSrc) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -2119,7 +2119,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOAD14N:
-    if ( portReadSrc( LocalReg{ 14 }.translate( mStageRead.regFile ) ) )
+    if ( portReadSrc( LocalReg{ 14 }.translate( mRegisterFile ) ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -2134,7 +2134,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::LOAD15N:
-    if ( portReadSrc( LocalReg{ 15 }.translate( mStageRead.regFile ) ) )
+    if ( portReadSrc( LocalReg{ 15 }.translate( mRegisterFile ) ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -2191,7 +2191,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STORE14R:
-    if ( portReadBoth( LocalReg{ 14 }.translate( mStageRead.regFile ), regSrc ) )
+    if ( portReadBoth( LocalReg{ 14 }.translate( mRegisterFile ), regSrc ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -2205,7 +2205,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STORE15R:
-    if ( portReadBoth( LocalReg{ 15 }.translate( mStageRead.regFile ), regSrc ) )
+    if ( portReadBoth( LocalReg{ 15 }.translate( mRegisterFile ), regSrc ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -2219,7 +2219,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STORE14N:
-    if ( portReadSrc( LocalReg{ 14 }.translate( mStageRead.regFile ) ) )
+    if ( portReadSrc( LocalReg{ 14 }.translate( mRegisterFile ) ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -2233,7 +2233,7 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::STORE15N:
-    if ( portReadSrc( LocalReg{ 15 }.translate( mStageRead.regFile ) ) )
+    if ( portReadSrc( LocalReg{ 15 }.translate( mRegisterFile ) ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
@@ -2340,7 +2340,6 @@ void Jerry::decode()
     mStageRead.instruction = pull.opcode();
     mStageRead.regSrc = pull.regSrc();
     mStageRead.regDst = pull.regDst();
-    mStageRead.regFile = mRegisterFile;
     LOG_DECODEDSP( mStageRead.instruction, mStageRead.regSrc.idx, mStageRead.regDst.idx );
     if ( mStageRead.address )
       LOG_INSTRADDR( mStageRead.address );
@@ -2351,7 +2350,7 @@ void Jerry::decode()
     break;
   case Prefetch::MOVEI2:
     mStageRead.dataSrc |= pull.data() << 16;
-    mStageWrite.updateReg( mStageRead.regDst.translate( mStageRead.regFile ), mStageRead.dataSrc );
+    mStageWrite.updateReg( mStageRead.regDst.translate( mRegisterFile ), mStageRead.dataSrc );
     LOG_DECODEMOVEI( 1, mStageRead.dataSrc );
     break;
   case Prefetch::IMULTN:

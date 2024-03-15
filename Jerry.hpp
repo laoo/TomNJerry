@@ -375,7 +375,6 @@ private:
   {
     uint32_t address = 0;
     DSPI instruction = DSPI::EMPTY;
-    uint32_t regFile = 0;
     uint32_t dataSrc = 0;
     uint32_t dataDst = 0;
     LocalReg regSrc = LocalReg{};
