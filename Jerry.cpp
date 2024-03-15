@@ -2021,8 +2021,10 @@ void Jerry::stageRead()
     if ( mStageWrite.canUpdateReg() && portReadSrc( regSrc ) )
     {
       dualPortCommit();
-      mStageWrite.updateReg( mStageRead.regDst.translate( mRegisterFile ^ 32 ), mStageRead.dataSrc );
+      auto altReg = mStageRead.regDst.translate( mRegisterFile ^ 32 );
+      mStageWrite.updateReg( altReg, mStageRead.dataSrc );
       mStageRead.instruction = DSPI::EMPTY;
+      lockReg( altReg );
     }
     else
     {
@@ -2679,7 +2681,7 @@ void Jerry::dualPortCommit()
 {
   if ( mPortWriteDstReg.idx >= 0 )
   {
-    if ( mRegStatus[mPortWriteDstReg] != mRegisterFile && mRegStatus[GlobalReg{ mPortWriteDstReg.idx ^ 32 }] == ( mRegisterFile ^ 32 ) )
+    if ( mRegStatus[mPortWriteDstReg] != mRegisterFile && mRegStatus[GlobalReg{mPortWriteDstReg.idx ^ 32}] == ( mRegisterFile ^ 32 ) )
     {
       //regpage has been changed after register lock and before write-back
       mRegStatus[GlobalReg{ mPortWriteDstReg.idx ^ 32 }] = FREE;
