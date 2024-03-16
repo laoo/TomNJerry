@@ -2525,7 +2525,7 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
     }
     case Prefetch::JUMP2:
       mPrefetch.doPrefetch = false;
-      mPrefetch.status = Prefetch::OPCODE;
+      mPrefetch.status = mInterruptVector ? Prefetch::INT0 : Prefetch::OPCODE;
       return { Prefetch::EMPTY, 0, 0 };
     case Prefetch::MOVEI1:
     if ( mPrefetch.queueSize == 0 )
@@ -2614,7 +2614,7 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
     return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::JUMP << 10 ) | ( 30 << 5 ) };
   case Prefetch::INT7:
     mPrefetch.doPrefetch = false;
-    mPrefetch.status = Prefetch::OPCODE;
+    mPrefetch.status = Prefetch::JUMP2;
     LOG_TAGUNINTERRUPTIBLESEQUENCE();
     return { Prefetch::OPCODE, 0, ( ( uint16_t )DSPI::NOP << 10 ) };
   default:
