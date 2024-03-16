@@ -2307,7 +2307,8 @@ void Jerry::stageRead()
     }
     break;
   case DSPI::JUMP:
-    if ( mFlagsSemaphore == 0 && portReadDst( regSrc ) )
+    //JUMP w/o condition does not wait for flags
+    if ( ( mFlagsSemaphore == 0 || mStageRead.regDst.idx == 0 ) && portReadDst( regSrc ) )
     {
       dualPortCommit();
       std::swap( mStageRead.instruction, mStageCompute.instruction );
