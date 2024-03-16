@@ -322,6 +322,7 @@ private:
   bool stageWriteReg();
   bool stageWriteRegL();
   void stageWriteFlags();
+  void stageWritePC();
   bool portWriteDst( GlobalReg reg, uint32_t data );
   bool portReadSrc( GlobalReg regSrc );
   bool portReadDst( GlobalReg regDst );
@@ -396,12 +397,14 @@ private:
     static const uint32_t UPDATE_REG    = 0x01;
     static const uint32_t UPDATE_FLAGS  = 0x02;
     static const uint32_t UPDATE_REG_L  = 0x04;
+    static const uint32_t UPDATE_PC     = 0x08;
 
     uint32_t updateMask = UPDATE_NONE;
     RegFlags regFlags = {};
     uint32_t data = 0;
     GlobalReg regL = GlobalReg{};
     uint32_t dataL = {};
+    uint32_t pc = {};
 
     inline void updateReg( GlobalReg reg, uint32_t data );
     inline void updateRegL( GlobalReg reg, uint32_t data );

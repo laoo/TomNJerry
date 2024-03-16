@@ -1097,6 +1097,12 @@ void Jerry::stageWriteFlags()
   assert( mFlagsSemaphore >= 0 );
 }
 
+void Jerry::stageWritePC()
+{
+  mPC = mStageWrite.pc;
+  mPrefetch.queueSize = 0;
+}
+
 void Jerry::stageWrite()
 {
   switch ( mStageWrite.updateMask )
@@ -1125,6 +1131,42 @@ void Jerry::stageWrite()
   case ( StageWrite::UPDATE_REG_L | StageWrite::UPDATE_REG | StageWrite::UPDATE_FLAGS ):
     mStageWrite.updateMask = stageWriteRegL() ? StageWrite::UPDATE_REG : StageWrite::UPDATE_REG_L;
     stageWriteFlags();
+    break;
+  case StageWrite::UPDATE_PC:
+    mStageWrite.updateMask = StageWrite::UPDATE_NONE;
+    stageWritePC();
+    break;
+  case ( StageWrite::UPDATE_REG | StageWrite::UPDATE_PC ):
+    mStageWrite.updateMask = stageWriteReg() ? StageWrite::UPDATE_NONE : StageWrite::UPDATE_REG;
+    stageWritePC();
+    break;
+  case ( StageWrite::UPDATE_FLAGS | StageWrite::UPDATE_PC ):
+    mStageWrite.updateMask = StageWrite::UPDATE_NONE;
+    stageWriteFlags();
+    stageWritePC();
+    break;
+  case ( StageWrite::UPDATE_REG | StageWrite::UPDATE_FLAGS | StageWrite::UPDATE_PC ):
+    mStageWrite.updateMask = stageWriteReg() ? StageWrite::UPDATE_NONE : StageWrite::UPDATE_REG;
+    stageWriteFlags();
+    stageWritePC();
+    break;
+  case ( StageWrite::UPDATE_REG_L | StageWrite::UPDATE_PC ):
+    mStageWrite.updateMask = stageWriteRegL() ? StageWrite::UPDATE_NONE : StageWrite::UPDATE_REG_L;
+    stageWritePC();
+    break;
+  case ( StageWrite::UPDATE_REG_L | StageWrite::UPDATE_REG | StageWrite::UPDATE_PC ):
+    mStageWrite.updateMask = stageWriteRegL() ? StageWrite::UPDATE_REG : StageWrite::UPDATE_REG_L;
+    stageWritePC();
+    break;
+  case ( StageWrite::UPDATE_REG_L | StageWrite::UPDATE_FLAGS | StageWrite::UPDATE_PC ):
+    mStageWrite.updateMask = stageWriteRegL() ? StageWrite::UPDATE_NONE : StageWrite::UPDATE_REG_L;
+    stageWriteFlags();
+    stageWritePC();
+    break;
+  case ( StageWrite::UPDATE_REG_L | StageWrite::UPDATE_REG | StageWrite::UPDATE_FLAGS | StageWrite::UPDATE_PC ):
+    mStageWrite.updateMask = stageWriteRegL() ? StageWrite::UPDATE_REG : StageWrite::UPDATE_REG_L;
+    stageWriteFlags();
+    stageWritePC();
     break;
   default:
     break;
@@ -1587,8 +1629,9 @@ void Jerry::compute()
       break;
     if ( testCondition( mStageCompute.regDst.idx ) )
     {
-      mPC = mStageCompute.dataDst;
+      mStageWrite.pc = mStageCompute.dataDst;
       mPrefetch.queueSize = 0;
+      mStageWrite.updateMask |= StageWrite::UPDATE_PC;
       LOG_JUMPT();
     }
     else
@@ -1603,9 +1646,9 @@ void Jerry::compute()
       break;
     if ( testCondition( mStageCompute.regDst.idx ) )
     {
-      //Should be done a cycle later so that move pc,rx that follows read the address of move pc,rx
-      mPC = mStageCompute.dataSrc;
+      mStageWrite.pc = mStageCompute.dataSrc;
       mPrefetch.queueSize = 0;
+      mStageWrite.updateMask |= StageWrite::UPDATE_PC;
       LOG_JUMPT();
     }
     else
