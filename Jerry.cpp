@@ -1630,7 +1630,6 @@ void Jerry::compute()
     if ( testCondition( mStageCompute.regDst.idx ) )
     {
       mStageWrite.pc = mStageCompute.dataDst;
-      mPrefetch.queueSize = 0;
       mStageWrite.updateMask |= StageWrite::UPDATE_PC;
       LOG_JUMPT();
     }
@@ -1647,7 +1646,6 @@ void Jerry::compute()
     if ( testCondition( mStageCompute.regDst.idx ) )
     {
       mStageWrite.pc = mStageCompute.dataSrc;
-      mPrefetch.queueSize = 0;
       mStageWrite.updateMask |= StageWrite::UPDATE_PC;
       LOG_JUMPT();
     }
@@ -2475,6 +2473,10 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
         //Only difference between MACSEQ and OPCODE is that MACSEQ is uniterruptible
         mPrefetch.status = Prefetch::MACSEQ;
         break;
+      case DSPI::JUMP:
+      case DSPI::JR:
+        mPrefetch.status = Prefetch::JUMP1;
+        break;
       default:
         break;
       }
@@ -2504,7 +2506,28 @@ Jerry::Prefetch::Pull Jerry::prefetchPull()
       }
       return result;
     }
-  case Prefetch::MOVEI1:
+  case Prefetch::JUMP1:
+    if ( mPrefetch.queueSize == 0 )
+    {
+      mPrefetch.doPrefetch = true;
+      return { Prefetch::EMPTY, 0, 0 };
+    }
+    else
+    {
+      uint16_t fetch = mPrefetch.queue & 0xffff;
+      mPrefetch.queue >>= 16;
+      mPrefetch.queueSize -= 1;
+      mPrefetch.doPrefetch = mPrefetch.needsPrefetching();
+      mPrefetch.decodedAddress += 2;
+      Prefetch::Pull result{ Prefetch::OPCODE, mPrefetch.decodedAddress - 2, fetch };
+      mPrefetch.status = Prefetch::JUMP2;
+      return result;
+    }
+    case Prefetch::JUMP2:
+      mPrefetch.doPrefetch = false;
+      mPrefetch.status = Prefetch::OPCODE;
+      return { Prefetch::EMPTY, 0, 0 };
+    case Prefetch::MOVEI1:
     if ( mPrefetch.queueSize == 0 )
     {
       mPrefetch.doPrefetch = true;

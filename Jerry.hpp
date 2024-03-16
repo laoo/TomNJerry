@@ -241,6 +241,8 @@ private:
       IMULTN = NO_PREFETCH,
       IMACN,
       RESMAC,
+      JUMP1,
+      JUMP2,
       INT0,
       INT1,
       INT2,
