@@ -15,8 +15,11 @@ add_executable( Tom
   TomMain.cpp
   Log.cpp
   RAM.cpp
-  RISC.cpp
-  RISC.hpp
+  ExecutionUnit.cpp
+  ExecutionUnit.hpp
+  #for testing only
+  DSP.cpp
+  DSP.hpp
 )
 
 add_executable( Jerry

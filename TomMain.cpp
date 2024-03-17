@@ -1,9 +1,8 @@
 #include "Tom.hpp"
-#include "RISC.hpp"
+#include "DSP.hpp"
 
 int main()
 {
-  RISC risc;
-  risc.run();
+  DSP dsp;
   return 0;
 }
