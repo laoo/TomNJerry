@@ -15,6 +15,8 @@ add_executable( Tom
   TomMain.cpp
   Log.cpp
   RAM.cpp
+  RISC.cpp
+  RISC.hpp
 )
 
 add_executable( Jerry
@@ -49,6 +51,7 @@ set ( PCH
   <array>
   <bit>
   <cassert>
+  <coroutine>
   <chrono>
   <climits>
   <cstddef>
@@ -61,6 +64,7 @@ set ( PCH
   <memory>
   <optional>
   <sstream>
+  <stack>
   <stdexcept>
   <string>
   <span>

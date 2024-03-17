@@ -1,7 +1,9 @@
 #include "Tom.hpp"
+#include "RISC.hpp"
 
 int main()
 {
-  Tom tom{ false };
+  RISC risc;
+  risc.run();
   return 0;
 }
