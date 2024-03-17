@@ -85,27 +85,90 @@ class Coroutine
   {
   }
 
-  struct Decode {};
+  struct Decode
+  {
+  };
 
-  struct ReadAlternateSrcGetDst { uint8_t src; uint8_t dst; };
+  struct ReadAlternateSrcGetDst
+  {
+    uint8_t src;
+    uint8_t dst;
+  };
 
-  struct ReadSrcGetDst { uint8_t src; uint8_t dst; };
+  struct ReadSrcGetDst
+  {
+    uint8_t src;
+    uint8_t dst;
+  };
 
-  struct ReadSrcGetAlternateDst { uint8_t src; uint8_t dst; };
+  struct ReadSrcGetAlternateDst
+  {
+    uint8_t src;
+    uint8_t dst;
+  };
 
-  struct ReadSrcLockReadDstLockFlags { uint8_t src; uint8_t dst; };
+  struct ReadSrcLockReadDstLockFlags
+  {
+    uint8_t src;
+    uint8_t dst;
+  };
 
-  struct ReadSrcLockReadDstLockReadFlags { uint8_t src; uint8_t dst; };
+  struct ReadSrcsGetDst
+  {
+    uint8_t src1;
+    uint8_t src2;
+  };
 
-  struct LockReadDstLockFlags { uint8_t dst; };
+  struct ReadSrcLockReadDstLockReadFlags
+  { 
+    uint8_t src;
+    uint8_t dst;
+  };
 
-  struct ReadDstLockFlags { uint8_t dst; };
+  struct ReadSrcReadDst
+  {
+    uint8_t src;
+    uint8_t dst;
+  };
 
-  struct LockReadDst { uint8_t dst; };
+  struct LockReadDstLockFlags
+  {
+    uint8_t dst;
+  };
 
-  struct GetDst { uint8_t dst; };
+  struct ReadDstLockFlags
+  {
+    uint8_t dst;
+  };
 
-  struct Compute {};
+  struct LockReadDst
+  {
+    uint8_t dst;
+  };
+
+  struct GetDst
+  { 
+    uint8_t dst;
+  };
+
+  struct Compute
+  {
+  };
+
+  struct NOP
+  {
+  };
+
+  struct MemoryLoadLong
+  {
+    uint32_t src;
+  };
+
+  struct MemoryStoreLong
+  {
+    uint32_t addr;
+    uint32_t value;
+  };
 
   struct UnlockWriteDstUnlockWriteFlags
   {
@@ -167,11 +230,16 @@ public:
          READ_SRC_GET_ALTERNATE_DST,
          READ_SRC_LOCK_READ_DST_LOCK_FLAGS,
          READ_SRC_LOCK_READ_DST_LOCK_READ_FLAGS,
+         READ_SRC_READ_DST,
          READ_DST_LOCK_FLAGS,
+         READ_SRCS_GET_DST,
          LOCK_READ_DST_LOCK_FLAGS,
          LOCK_READ_DST,
          GET_DST,
          COMPUTE,
+         NOP,
+         MEMORY_LOAD_LONG,
+         MEMORY_STORE_LONG,
          UNLOCK_WRITE_DST_UNLOCK_WRITE_FLAGS,
          UNLOCK_WRITE_DST,
          UNLOCK_WRITE_FLAGS,
@@ -245,6 +313,17 @@ public:
           Res await_resume() { return res; }
         } readSrcLockDstLockReadFlagsAwaiter;
 
+        struct ReadSrcReadDstAwaiter : BaseAwaiter
+        {
+          ReadSrcReadDst arg;
+          struct Res
+          {
+            uint32_t src;
+            uint32_t dst;
+          } res;
+          Res await_resume() { return res; }
+        } readSrcReadDstAwaiter;
+
         struct ReadDstLockFlagsAwaiter : BaseAwaiter
         {
           ReadDstLockFlags arg;
@@ -255,6 +334,18 @@ public:
           } res;
           Res await_resume() { return res; }
         } readDstLockFlagsAwaiter;
+
+        struct ReadSrcsGetDstAwaiter : BaseAwaiter
+        {
+          ReadSrcsGetDst arg;
+          struct Res
+          {
+            uint32_t src1;
+            uint32_t src2;
+            uint16_t dstReg;
+          } res;
+          Res await_resume() { return res; }
+        } readSrcsGetDstAwaiter;
 
         struct LockReadDstLockFlagsAwaiter : BaseAwaiter
         {
@@ -291,6 +382,25 @@ public:
         struct ComputeAwaiter : BaseAwaiter
         {
         } computeAwaiter;
+
+        struct NOPAwaiter : BaseAwaiter
+        {
+        } nopAwaiter;
+
+        struct MemoryLoadLongAwaiter : BaseAwaiter
+        {
+          MemoryLoadLong arg;
+          struct Res
+          {
+            uint32_t value;
+          } res;
+          Res await_resume() { return res; }
+        } memoryLoadLongAwaiter;
+
+        struct MemoryStoreLongAwaiter : BaseAwaiter
+        {
+          MemoryStoreLong arg;
+        } memoryStoreLongAwaiter;
 
         struct UnlockWriteDstUnlockWriteFlagsAwaiter : BaseAwaiter
         {
@@ -361,11 +471,25 @@ public:
       return await.u.readSrcLockDstLockReadFlagsAwaiter;
     }
 
+    Awaiter::U::ReadSrcReadDstAwaiter& await_transform( ReadSrcReadDst const& arg )
+    {
+      await.type = Awaiter::Type::READ_SRC_READ_DST;
+      await.u.readSrcReadDstAwaiter.arg = arg;
+      return await.u.readSrcReadDstAwaiter;
+    }
+
     Awaiter::U::ReadDstLockFlagsAwaiter& await_transform( ReadDstLockFlags const& arg )
     {
       await.type = Awaiter::Type::READ_DST_LOCK_FLAGS;
       await.u.readDstLockFlagsAwaiter.arg = arg;
       return await.u.readDstLockFlagsAwaiter;
+    }
+
+    Awaiter::U::ReadSrcsGetDstAwaiter& await_transform( ReadSrcsGetDst const& arg )
+    {
+      await.type = Awaiter::Type::READ_SRCS_GET_DST;
+      await.u.readSrcsGetDstAwaiter.arg = arg;
+      return await.u.readSrcsGetDstAwaiter;
     }
 
     Awaiter::U::LockReadDstLockFlagsAwaiter& await_transform( LockReadDstLockFlags const& arg )
@@ -393,6 +517,26 @@ public:
     {
       await.type = Awaiter::Type::COMPUTE;
       return await.u.computeAwaiter;
+    }
+
+    Awaiter::U::NOPAwaiter& await_transform( NOP const& arg )
+    {
+      await.type = Awaiter::Type::NOP;
+      return await.u.nopAwaiter;
+    }
+
+    Awaiter::U::MemoryLoadLongAwaiter& await_transform( MemoryLoadLong const& arg )
+    {
+      await.type = Awaiter::Type::MEMORY_LOAD_LONG;
+      await.u.memoryLoadLongAwaiter.arg = arg;
+      return await.u.memoryLoadLongAwaiter;
+    }
+
+    Awaiter::U::MemoryStoreLongAwaiter& await_transform( MemoryStoreLong const& arg )
+    {
+      await.type = Awaiter::Type::MEMORY_LOAD_LONG;
+      await.u.memoryStoreLongAwaiter.arg = arg;
+      return await.u.memoryStoreLongAwaiter;
     }
 
     Awaiter::U::UnlockWriteDstUnlockWriteFlagsAwaiter& await_transform( UnlockWriteDstUnlockWriteFlags const& arg )
@@ -622,15 +766,63 @@ Coroutine Coroutine::create()
     case RISCOpcode::JUMP:
       throw Ex{} << "NYI";
     case RISCOpcode::LOAD:
-      throw Ex{} << "NYI";
+    {
+      auto [src, reg] = co_await ReadSrcGetDst{ .src = opcode.src, .dst = opcode.dst };
+      auto [value] = co_await MemoryLoadLong{ .src = src };
+      co_await WriteDst{
+        .value = value,
+        .reg = reg
+      };
+      break;
+    }
     case RISCOpcode::LOAD14N:
-      throw Ex{} << "NYI";
+    {
+      auto [base, reg] = co_await ReadSrcGetDst{ .src = 14, .dst = opcode.dst };
+      auto addr = base + ( opcode.src == 0 ? 32 : opcode.src ) * 4;
+      co_await Compute{};
+      auto [value] = co_await MemoryLoadLong{ .src = addr };
+      co_await WriteDst{
+        .value = value,
+        .reg = reg
+      };
+      break;
+    }
     case RISCOpcode::LOAD14R:
-      throw Ex{} << "NYI";
+    {
+      auto [base, off, reg] = co_await ReadSrcsGetDst{ .src1 = 14, .src2 = opcode.src };
+      auto addr = base + off;
+      co_await Compute{};
+      auto [value] = co_await MemoryLoadLong{ .src = addr };
+      co_await WriteDst{
+        .value = value,
+        .reg = reg
+      };
+      break;
+    }
     case RISCOpcode::LOAD15N:
-      throw Ex{} << "NYI";
+    {
+      auto [base, reg] = co_await ReadSrcGetDst{ .src = 15, .dst = opcode.dst };
+      auto addr = base + ( opcode.src == 0 ? 32 : opcode.src ) * 4;
+      co_await Compute{};
+      auto [value] = co_await MemoryLoadLong{ .src = addr };
+      co_await WriteDst{
+        .value = value,
+        .reg = reg
+      };
+      break;
+    }
     case RISCOpcode::LOAD15R:
-      throw Ex{} << "NYI";
+    {
+      auto [base, off, reg] = co_await ReadSrcsGetDst{ .src1 = 15, .src2 = opcode.src };
+      auto addr = base + off;
+      co_await Compute{};
+      auto [value] = co_await MemoryLoadLong{ .src = addr };
+      co_await WriteDst{
+        .value = value,
+        .reg = reg
+      };
+      break;
+    }
     case RISCOpcode::LOADB:
       throw Ex{} << "NYI";
     case RISCOpcode::LOADW:
@@ -686,7 +878,10 @@ Coroutine Coroutine::create()
     case RISCOpcode::NEG:
       throw Ex{} << "NYI";
     case RISCOpcode::NOP:
-      throw Ex{} << "NYI";
+    {
+      co_await NOP{};
+      break;
+    }
     case RISCOpcode::NORMI:
       throw Ex{} << "NYI";
     case RISCOpcode::NOT:
@@ -714,7 +909,12 @@ Coroutine Coroutine::create()
     case RISCOpcode::SHRQ:
       throw Ex{} << "NYI";
     case RISCOpcode::STORE:
-      throw Ex{} << "NYI";
+    {
+      auto [src, dst] = co_await ReadSrcReadDst{ .src = opcode.src, .dst = opcode.dst };
+      co_await NOP{};
+      co_await MemoryStoreLong{ .addr = dst, .value = src };
+      break;
+    }
     case RISCOpcode::STORE14N:
       throw Ex{} << "NYI";
     case RISCOpcode::STORE14R:
