@@ -20,6 +20,7 @@ add_executable( Tom
   #for testing only
   DSP.cpp
   DSP.hpp
+  BS94.cpp
 )
 
 add_executable( Jerry

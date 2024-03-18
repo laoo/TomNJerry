@@ -1,5 +1,6 @@
 #pragma once
 #include "ExecutionUnit.hpp"
+#include "Prefetcher.hpp"
 
 class DSP
 {
@@ -24,8 +25,13 @@ public:
   static constexpr uint32_t ROM_SIZE  = 0x001000;
 
   DSP();
+  ~DSP();
 
-  void advanve();
+  void advance();
+  void debugWrite( uint32_t address, std::span<uint32_t const> data );
+  void debugWrite( uint32_t address, uint32_t data );
+
+  static RISCOpcode mapOpcode( uint16_t );
 
 private:
   struct CTRL
@@ -86,15 +92,91 @@ private:
     bool regpage = false;
   };
 
+  struct Prefetch
+  {
+    uint32_t queue = 0;
+    uint32_t queueSize = 0;
+    uint32_t decodedAddress = 0;
+    bool doPrefetch = false;
+
+    bool needsPrefetching() const
+    {
+      return queueSize == 0;
+    }
+
+    struct Pull
+    {
+      uint32_t address() const
+      {
+        return value >> 32;
+      }
+      uint16_t opcode() const
+      {
+        return ( value >> 26 ) & 63;
+      }
+      uint16_t regSrc() const
+      {
+        return ( value >> ( 16 + 5 ) ) & 31;
+      }
+      uint16_t regDst() const
+      {
+        return ( value >> 16 ) & 31;
+      }
+      uint32_t data() const
+      {
+        return ( value >> 16 ) & 0xffff;
+      }
+
+      explicit operator bool() const
+      {
+        return value != 0;
+      }
+
+      Pull( uint16_t status = 0, uint32_t address = 0, uint16_t data = 0 )
+      {
+        value = ( static_cast< uint64_t >( status ) & 0xffff ) | ( static_cast< uint64_t >( data ) << 16 ) | ( static_cast< uint64_t >( address ) << 32 );
+      }
+
+      uint64_t value;
+    };
+  };
+
+
 private:
   void storeLong( uint32_t address, uint32_t data );
   uint32_t loadLong( uint32_t address );
+  void processCycle();
+  void prefetch();
+  int prefetchFill();
+  Prefetch::Pull prefetchPull();
+  void ctrlSet( uint16_t value );
+  void flagsSet( uint16_t value );
 
 private:
+  Prefetcher mPrefetcher;
+
+  std::array<ExecutionUnit, 8> mExecutionUnitPool = {};
+  uint32_t mPoolTop = 7;
   std::array<ExecutionUnit, 8> mPipeline = {};
-  uint32_t mPipelineTop = 7;
+
 
   std::array<uint32_t, RAM_SIZE / sizeof( uint32_t )> mLocalRAM;
   std::array<uint32_t, 64> mRegs = {};
   std::array<bool, 64> mRegLocks = {};
+
+  FLAGS mFlags = {};
+  uint32_t mMTXC = 0;
+  uint32_t mMTXA = 0;
+  uint32_t mPC = 0;
+  CTRL mCtrl = {};
+  uint32_t mMod = ~0;
+  int32_t mRemain = 0;
+  uint32_t mDivCtrl = 0;
+  uint32_t mMachi = 0;
+
+  Prefetch mPrefetch = {};
+  uint64_t mCycle = ~0;
+  uint64_t mLastLocalRAMAccessCycle = ~0;
+  uint32_t mRegisterFile = 0;
+
 };
