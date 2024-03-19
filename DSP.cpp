@@ -120,6 +120,7 @@ uint32_t DSP::loadLong( uint32_t address )
   return 0;
 }
 
+
 void DSP::processCycle()
 {
   mCycle += 1;
@@ -131,12 +132,15 @@ void DSP::processCycle()
   {
     if ( *inIt )
     {
-      switch ( inIt->getType() )
+      if ( inIt->getType() == ExecutionUnit::Type::DECODE )
       {
-      case ExecutionUnit::Type::DECODE:
-        assert( false );
-        break;
-      case ExecutionUnit::Type::GET_CODE:
+        mExecutionUnitPool[++mPoolTop] = std::move( *inIt );
+      }
+      else
+      {
+        switch ( inIt->getType() )
+        {
+        case ExecutionUnit::Type::GET_CODE:
         {
           if ( !mPrefetcher )
           {
@@ -145,60 +149,67 @@ void DSP::processCycle()
               mPrefetcher.put( pull.data() );
             }
             else
+            {
+              readSlotEmpty = false;
               break;
+            }
           }
           assert( mPrefetcher );
           uint16_t code = mPrefetcher.getCode();
+          auto [pass] = inIt->getCode();
           inIt->getCode( code );
         }
         readSlotEmpty = false;
         break;
-      case ExecutionUnit::Type::READ_SRC:
+        case ExecutionUnit::Type::READ_SRC:
         {
           auto [src] = inIt->readSrc();
-          inIt->readSrc( { mRegs[mRegisterFile + src] } );
+          inIt->readSrc( { mRegs[src] } );
         }
-        readSlotEmpty = false;
         break;
-      case ExecutionUnit::Type::READ_SRC_LOCK_READ_DST_LOCK_FLAGS:
+        case ExecutionUnit::Type::READ_SRC_LOCK_READ_DST_LOCK_FLAGS:
+          break;
+        case ExecutionUnit::Type::READ_SRC_LOCK_READ_DST_LOCK_READ_FLAGS:
+          break;
+        case ExecutionUnit::Type::READ_SRC_READ_DST:
+          break;
+        case ExecutionUnit::Type::READ_DST_LOCK_FLAGS:
+          break;
+        case ExecutionUnit::Type::READ_SRCS:
+          break;
+        case ExecutionUnit::Type::LOCK_READ_DST_LOCK_FLAGS:
+          break;
+        case ExecutionUnit::Type::LOCK_READ_DST:
+          break;
+        case ExecutionUnit::Type::COMPUTE:
+          break;
+        case ExecutionUnit::Type::NOP:
+          break;
+        case ExecutionUnit::Type::MEMORY_LOAD_LONG:
+          break;
+        case ExecutionUnit::Type::MEMORY_STORE_LONG:
+          break;
+        case ExecutionUnit::Type::UNLOCK_WRITE_DST_UNLOCK_WRITE_FLAGS:
+          break;
+        case ExecutionUnit::Type::UNLOCK_WRITE_DST:
+          break;
+        case ExecutionUnit::Type::UNLOCK_WRITE_FLAGS:
+          break;
+        case ExecutionUnit::Type::WRITE_DST:
+        {
+          auto [value, reg] = inIt->writeDst();
+          mRegs[reg] = value;
+        }
         break;
-      case ExecutionUnit::Type::READ_SRC_LOCK_READ_DST_LOCK_READ_FLAGS:
-        break;
-      case ExecutionUnit::Type::READ_SRC_READ_DST:
-        break;
-      case ExecutionUnit::Type::READ_DST_LOCK_FLAGS:
-        break;
-      case ExecutionUnit::Type::READ_SRCS:
-        break;
-      case ExecutionUnit::Type::LOCK_READ_DST_LOCK_FLAGS:
-        break;
-      case ExecutionUnit::Type::LOCK_READ_DST:
-        break;
-      case ExecutionUnit::Type::COMPUTE:
-        break;
-      case ExecutionUnit::Type::NOP:
-        break;
-      case ExecutionUnit::Type::MEMORY_LOAD_LONG:
-        break;
-      case ExecutionUnit::Type::MEMORY_STORE_LONG:
-        break;
-      case ExecutionUnit::Type::UNLOCK_WRITE_DST_UNLOCK_WRITE_FLAGS:
-        break;
-      case ExecutionUnit::Type::UNLOCK_WRITE_DST:
-        break;
-      case ExecutionUnit::Type::UNLOCK_WRITE_FLAGS:
-        break;
-      case ExecutionUnit::Type::WRITE_DST:
-        break;
-      case ExecutionUnit::Type::WRITE_ALTERNATE_DST:
-        break;
-      default:
-        assert( false );
-      }
-
-      if ( outIt != inIt )
-      {
-        *outIt++ = std::move( *inIt );
+        case ExecutionUnit::Type::WRITE_ALTERNATE_DST:
+          break;
+        default:
+          assert( false );
+        }
+        if ( outIt != inIt )
+        {
+          *outIt++ = std::move( *inIt );
+        }
       }
     }
     else

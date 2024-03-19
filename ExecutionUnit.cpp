@@ -60,7 +60,8 @@ ExecutionUnit ExecutionUnit::create()
     {
       auto src = opcode.src == 0 ? 32 : opcode.src;
       auto [dst] = co_await LockReadDstLockFlags{ .dst = opcode.dst };
-      auto result = src + dst;
+      auto [mod] = co_await GetMod{};
+      auto result = ( dst & mod ) | ( ( src + dst ) & ( ~mod ) );
       co_await UnlockWriteDstUnlockWriteFlags{
         .valuenz = result,
         .c = ( uint16_t )( result < src ? 1 : 0 ),
@@ -69,7 +70,17 @@ ExecutionUnit ExecutionUnit::create()
       break;
     }
     case RISCOpcode::ADDQMOD:
-      throw Ex{} << "NYI";
+    {
+      auto src = opcode.src == 0 ? 32 : opcode.src;
+      auto [dst] = co_await LockReadDstLockFlags{ .dst = opcode.dst };
+      auto result = src + dst;
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = ( uint16_t )( result < src ? 1 : 0 ),
+        .reg = opcode.translatedDst
+      };
+      break;
+    }
     case RISCOpcode::ADDQT:
     {
       auto src = opcode.src == 0 ? 32 : opcode.src;
@@ -201,10 +212,10 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::MOVEI:
     {
-      auto low = co_await GetCode{};
-      auto high = co_await GetCode{};
+      auto [low] = co_await GetCode{ .pass = 0 };
+      auto [high] = co_await GetCode{ .pass = 1 };
       co_await WriteDst{
-        .value = ( uint32_t )low.code | ( ( uint32_t )high.code << 16 ),
+        .value = ( uint32_t )low | ( ( uint32_t )high << 16 ),
         .reg = opcode.translatedDst
       };
       break;
