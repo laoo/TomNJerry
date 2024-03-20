@@ -46,13 +46,13 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::ADDC:
     {
-      auto [src, dst, reg, c] = co_await ReadSrcLockReadDstLockReadFlags{ .src = opcode.src, .dst = opcode.dst };
+      auto [src, dst, c] = co_await ReadSrcLockReadDstLockReadFlags{ .src = opcode.src, .dst = opcode.dst };
       auto result = src + dst + c;
       co_await Compute{};
       co_await UnlockWriteDstUnlockWriteFlags{
         .valuenz = result,
         .c = ( uint16_t )( result < src ? 1 : 0 ),
-        .reg = reg
+        .reg = opcode.translatedDst
       };
       break;
     }
@@ -94,24 +94,64 @@ ExecutionUnit ExecutionUnit::create()
       break;
     }
     case RISCOpcode::AND:
-      throw Ex{} << "NYI";
+    {
+      auto [src, dst] = co_await ReadSrcLockReadDstLockFlags{ .src = opcode.src, .dst = opcode.dst };
+      auto result = src & dst;
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        //"and" copies bit 31 of the result into C flag
+        .c = ( uint16_t )( result >> 31 ),
+        .reg = opcode.translatedDst
+      };
+      break;
+    }
     case RISCOpcode::BCLR:
-      throw Ex{} << "NYI";
+    {
+      auto [dst] = co_await LockReadDstLockFlags{ .dst = opcode.dst };
+      auto result = dst & ~( 1 << opcode.src );
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = ( uint16_t )( result >> 31 ),
+      };
+      break;
+    }
     case RISCOpcode::BSET:
-      throw Ex{} << "NYI";
+    {
+      auto [dst] = co_await LockReadDstLockFlags{ .dst = opcode.dst };
+      auto result = dst | ( 1 << opcode.src );
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = 0,
+      };
+      break;
+    }
     case RISCOpcode::BTST:
     {
-      auto [dst, reg] = co_await ReadDstLockFlags{ .dst = opcode.dst };
+      auto [dst] = co_await ReadDstLockFlags{ .dst = opcode.dst };
+      auto result = dst & ( 1 << opcode.src );
       co_await Compute{};
       co_await UnlockWriteFlags{
         //BTST clears N bit, no matter if bit 31 is tested value is set or not.
-        .nz = dst & ( 1 << opcode.src ),
-        .c = reg
+        .nz = result ? 1u : 0u,
+        .c = 0
       };
       break;
     }
     case RISCOpcode::CMP:
-      throw Ex{} << "NYI";
+    {
+      auto [src, dst] = co_await ReadSrcLockReadDstLockFlags{ .src = opcode.src, .dst = opcode.dst };
+      auto result = src + dst;
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = ( uint16_t )( result < src ? 1 : 0 ),
+        .reg = opcode.translatedDst
+      };
+      break;
+    }
     case RISCOpcode::CMPQ:
       throw Ex{} << "NYI";
     case RISCOpcode::DIV:
@@ -129,11 +169,22 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::LOAD:
     {
       auto [src] = co_await ReadSrc{ .src = opcode.src };
-      auto [value] = co_await MemoryLoadLong{ .src = src };
-      co_await WriteDst{
-        .value = value,
-        .reg = opcode.translatedDst
-      };
+      auto [value, success] = co_await MemoryLoadLong{ .src = src };
+      if ( success )
+      {
+        co_await WriteDst{
+          .value = value,
+          .reg = opcode.translatedDst
+        };
+      }
+      else
+      {
+        auto [value] = co_await MemoryLoadLongExternal{ .src = src };
+        co_await WriteDst{
+          .value = value,
+          .reg = opcode.translatedDst
+        };
+      }
       break;
     }
     case RISCOpcode::LOAD14N:
@@ -141,23 +192,45 @@ ExecutionUnit ExecutionUnit::create()
       auto [base] = co_await ReadSrc{ .src = 14 };
       auto addr = base + ( opcode.src == 0 ? 32 : opcode.src ) * 4;
       co_await Compute{};
-      auto [value] = co_await MemoryLoadLong{ .src = addr };
-      co_await WriteDst{
-        .value = value,
-        .reg = opcode.translatedDst
-      };
+      auto [value,success] = co_await MemoryLoadLong{ .src = addr };
+      if ( success )
+      {
+        co_await WriteDst{
+          .value = value,
+          .reg = opcode.translatedDst
+        };
+      }
+      else
+      {
+        auto [value] = co_await MemoryLoadLongExternal{ .src = addr };
+        co_await WriteDst{
+          .value = value,
+          .reg = opcode.translatedDst
+        };
+      }
       break;
     }
     case RISCOpcode::LOAD14R:
     {
-      auto [base, off] = co_await ReadSrcs{ .src1 = 14, .src2 = opcode.src };
+      auto [base, off] = co_await ReadSrcReadDst{ .src = 14, .dst = opcode.src };
       auto addr = base + off;
       co_await Compute{};
-      auto [value] = co_await MemoryLoadLong{ .src = addr };
-      co_await WriteDst{
-        .value = value,
-        .reg = opcode.translatedDst
-      };
+      auto [value, success] = co_await MemoryLoadLong{ .src = addr };
+      if ( success )
+      {
+        co_await WriteDst{
+          .value = value,
+          .reg = opcode.translatedDst
+        };
+      }
+      else
+      {
+        auto [value] = co_await MemoryLoadLongExternal{ .src = addr };
+        co_await WriteDst{
+          .value = value,
+          .reg = opcode.translatedDst
+        };
+      }
       break;
     }
     case RISCOpcode::LOAD15N:
@@ -165,23 +238,45 @@ ExecutionUnit ExecutionUnit::create()
       auto [base] = co_await ReadSrc{ .src = 15 };
       auto addr = base + ( opcode.src == 0 ? 32 : opcode.src ) * 4;
       co_await Compute{};
-      auto [value] = co_await MemoryLoadLong{ .src = addr };
-      co_await WriteDst{
-        .value = value,
-        .reg = opcode.translatedDst
-      };
+      auto [value, success] = co_await MemoryLoadLong{ .src = addr };
+      if ( success )
+      {
+        co_await WriteDst{
+          .value = value,
+          .reg = opcode.translatedDst
+        };
+      }
+      else
+      {
+        auto [value] = co_await MemoryLoadLongExternal{ .src = addr };
+        co_await WriteDst{
+          .value = value,
+          .reg = opcode.translatedDst
+        };
+      }
       break;
     }
     case RISCOpcode::LOAD15R:
     {
-      auto [base, off] = co_await ReadSrcs{ .src1 = 15, .src2 = opcode.src };
+      auto [base, off] = co_await ReadSrcReadDst{ .src = 15, .dst = opcode.src };
       auto addr = base + off;
       co_await Compute{};
-      auto [value] = co_await MemoryLoadLong{ .src = addr };
-      co_await WriteDst{
-        .value = value,
-        .reg = opcode.translatedDst
-      };
+      auto [value, success] = co_await MemoryLoadLong{ .src = addr };
+      if ( success )
+      {
+        co_await WriteDst{
+          .value = value,
+          .reg = opcode.translatedDst
+        };
+      }
+      else
+      {
+        auto [value] = co_await MemoryLoadLongExternal{ .src = addr };
+        co_await WriteDst{
+          .value = value,
+          .reg = opcode.translatedDst
+        };
+      }
       break;
     }
     case RISCOpcode::LOADB:
@@ -236,7 +331,7 @@ ExecutionUnit ExecutionUnit::create()
       auto [src] = co_await ReadSrc{ .src = opcode.src };
       co_await WriteDst{
         .value = src,
-        .reg = (uint16_t)( opcode.translatedDst ^ 32 )
+        .reg = (uint8_t)( opcode.translatedDst ^ 32 )
       };
       break;
     }
@@ -256,7 +351,17 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::NOT:
       throw Ex{} << "NYI";
     case RISCOpcode::OR:
-      throw Ex{} << "NYI";
+    {
+      auto [src, dst] = co_await ReadSrcLockReadDstLockFlags{ .src = opcode.src, .dst = opcode.dst };
+      auto result = src | dst;
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = ( uint16_t )( ( src & dst ) >> 31 ),
+        .reg = opcode.translatedDst
+      };
+      break;
+    }
     case RISCOpcode::RESMAC:
       throw Ex{} << "NYI";
     case RISCOpcode::ROR:
@@ -281,7 +386,11 @@ ExecutionUnit ExecutionUnit::create()
     {
       auto [src, dst] = co_await ReadSrcReadDst{ .src = opcode.src, .dst = opcode.dst };
       co_await NOP{};
-      co_await MemoryStoreLong{ .addr = dst, .value = src };
+      auto [success] = co_await MemoryStoreLong{ .addr = dst, .value = src };
+      if ( !success )
+      {
+        co_await MemoryStoreLongExternal{ .addr = dst, .value = src };
+      }
       break;
     }
     case RISCOpcode::STORE14N:
@@ -307,7 +416,17 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::SUBQT:
       throw Ex{} << "NYI";
     case RISCOpcode::XOR:
-      throw Ex{} << "NYI";
+    {
+      auto [src, dst] = co_await ReadSrcLockReadDstLockFlags{ .src = opcode.src, .dst = opcode.dst };
+      auto result = src ^ dst;
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = ( uint16_t )( ( src & dst ) >> 31 ),
+        .reg = opcode.translatedDst
+      };
+      break;
+    }
     default: throw Ex{} << "NYI";
     }
   }

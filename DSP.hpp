@@ -155,9 +155,15 @@ private:
 private:
   Prefetcher mPrefetcher;
 
-  std::array<ExecutionUnit, 8> mExecutionUnitPool = {};
-  uint32_t mPoolTop = 7;
-  std::array<ExecutionUnit, 8> mPipeline = {};
+  std::array<ExecutionUnit, 6> mExecutionUnitPool = {};
+  uint32_t mPoolTop = 5;
+  
+  ExecutionUnit mReadUnit{};
+  ExecutionUnit mComputeUnit{};
+  ExecutionUnit mWriteUnit{};
+  ExecutionUnit mInternalMemoryUnit{};
+  ExecutionUnit mExternalMemoryUnit{};
+  ExecutionUnit mDivideUnit{};
 
 
   std::array<uint32_t, RAM_SIZE / sizeof( uint32_t )> mLocalRAM;

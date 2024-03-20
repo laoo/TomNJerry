@@ -5,7 +5,6 @@
 DSP::DSP() : mPrefetcher{ Prefetcher::create<DSP>() }
 {
   std::ranges::generate( mExecutionUnitPool, ExecutionUnit::create );
-  std::ranges::generate( mPipeline, [](){ return ExecutionUnit{}; } );
 
   std::ranges::fill( mLocalRAM, std::byteswap( ( ( uint32_t )0xe400 | ( uint32_t )0xe400 << 16 ) ) );
   std::ranges::fill( mRegs, 0 );
@@ -125,100 +124,13 @@ void DSP::processCycle()
 {
   mCycle += 1;
 
-  bool readSlotEmpty = true;
-  auto outIt = mPipeline.begin();
-
-  for ( auto inIt = mPipeline.begin(); inIt != mPipeline.end(); ++inIt )
+  if ( mWriteUnit )
   {
-    if ( *inIt )
-    {
-      if ( inIt->getType() == ExecutionUnit::Type::DECODE )
-      {
-        mExecutionUnitPool[++mPoolTop] = std::move( *inIt );
-      }
-      else
-      {
-        switch ( inIt->getType() )
-        {
-        case ExecutionUnit::Type::GET_CODE:
-        {
-          if ( !mPrefetcher )
-          {
-            if ( auto pull = prefetchPull() )
-            {
-              mPrefetcher.put( pull.data() );
-            }
-            else
-            {
-              readSlotEmpty = false;
-              break;
-            }
-          }
-          assert( mPrefetcher );
-          uint16_t code = mPrefetcher.getCode();
-          auto [pass] = inIt->getCode();
-          inIt->getCode( code );
-        }
-        readSlotEmpty = false;
-        break;
-        case ExecutionUnit::Type::READ_SRC:
-        {
-          auto [src] = inIt->readSrc();
-          inIt->readSrc( { mRegs[src] } );
-        }
-        break;
-        case ExecutionUnit::Type::READ_SRC_LOCK_READ_DST_LOCK_FLAGS:
-          break;
-        case ExecutionUnit::Type::READ_SRC_LOCK_READ_DST_LOCK_READ_FLAGS:
-          break;
-        case ExecutionUnit::Type::READ_SRC_READ_DST:
-          break;
-        case ExecutionUnit::Type::READ_DST_LOCK_FLAGS:
-          break;
-        case ExecutionUnit::Type::READ_SRCS:
-          break;
-        case ExecutionUnit::Type::LOCK_READ_DST_LOCK_FLAGS:
-          break;
-        case ExecutionUnit::Type::LOCK_READ_DST:
-          break;
-        case ExecutionUnit::Type::COMPUTE:
-          break;
-        case ExecutionUnit::Type::NOP:
-          break;
-        case ExecutionUnit::Type::MEMORY_LOAD_LONG:
-          break;
-        case ExecutionUnit::Type::MEMORY_STORE_LONG:
-          break;
-        case ExecutionUnit::Type::UNLOCK_WRITE_DST_UNLOCK_WRITE_FLAGS:
-          break;
-        case ExecutionUnit::Type::UNLOCK_WRITE_DST:
-          break;
-        case ExecutionUnit::Type::UNLOCK_WRITE_FLAGS:
-          break;
-        case ExecutionUnit::Type::WRITE_DST:
-        {
-          auto [value, reg] = inIt->writeDst();
-          mRegs[reg] = value;
-        }
-        break;
-        case ExecutionUnit::Type::WRITE_ALTERNATE_DST:
-          break;
-        default:
-          assert( false );
-        }
-        if ( outIt != inIt )
-        {
-          *outIt++ = std::move( *inIt );
-        }
-      }
-    }
-    else
-    {
-      break;
-    }
+
   }
 
-  if ( readSlotEmpty )
+
+  if ( !mReadUnit )
   {
     if ( !mPrefetcher )
     {
@@ -235,8 +147,8 @@ void DSP::processCycle()
     auto opcode = mPrefetcher.get();
     opcode.translatedSrc = mRegisterFile + opcode.src;
     opcode.translatedDst = mRegisterFile + opcode.dst;
-    *outIt = std::move( mExecutionUnitPool[mPoolTop--] );
-    outIt->decode( opcode );
+    mReadUnit = std::move( mExecutionUnitPool[mPoolTop--] );
+    mReadUnit.decode( opcode );
   }
 }
 
