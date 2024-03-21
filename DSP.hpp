@@ -169,6 +169,7 @@ private:
   std::array<uint32_t, RAM_SIZE / sizeof( uint32_t )> mLocalRAM;
   std::array<uint32_t, 64> mRegs = {};
   std::array<bool, 64> mRegLocks = {};
+  int mFlagsSemaphore = 0;
 
   FLAGS mFlags = {};
   uint32_t mMTXC = 0;

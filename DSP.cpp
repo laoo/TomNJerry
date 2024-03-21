@@ -124,9 +124,198 @@ void DSP::processCycle()
 {
   mCycle += 1;
 
-  if ( mWriteUnit )
-  {
+  int8_t writeSlot = -1;
+  int32_t divideCycle = -1;
 
+  if ( mDivideUnit )
+  {
+    switch ( mDivideUnit.getType() )
+    {
+    case ExecutionUnit::AwaiterType::DIVIDE_INIT:
+      mDivideUnit.divideInit( ( mDivCtrl & 1 ) != 0 );
+      break;
+    case ExecutionUnit::AwaiterType::DIVIDE_CYCLE:
+      {
+        auto [cycle] = mDivideUnit.divideCycle();
+        divideCycle = cycle;
+        mDivideUnit.advance();
+      }
+      break;
+    case ExecutionUnit::AwaiterType::UNLOCK_WRITE_DST_REMAIN:
+      {
+        auto [quotient, remain, reg] = mDivideUnit.unlockWriteDstRemain();
+        mRegLocks[reg] = false;
+        mRegs[reg] = quotient;
+        mRemain = remain;
+        mDivideUnit.advance();
+        assert( mDivideUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mDivideUnit );
+      }
+      break;
+    default:
+      throw Ex{} << "Unexpected divide unit type " << (int)mDivideUnit.getType();
+    }
+  }
+
+  if ( mReadUnit )
+  {
+    switch( mReadUnit.getType() )
+    {
+    case ExecutionUnit::AwaiterType::GET_CODE_LO:
+      {
+        if ( !mPrefetcher )
+        {
+          if ( auto pull = prefetchPull() )
+          {
+            mPrefetcher.put( pull.data() );
+          }
+          else
+          {
+            break;
+          }
+        }
+        assert( mPrefetcher );
+        mReadUnit.getCodeLo( mPrefetcher.getCode() );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::GET_CODE_HI:
+      if ( !mWriteUnit )
+      {
+        if ( !mPrefetcher )
+        {
+          if ( auto pull = prefetchPull() )
+          {
+            mPrefetcher.put( pull.data() );
+          }
+          else
+          {
+            break;
+          }
+        }
+        assert( mPrefetcher );
+        mReadUnit.getCodeHi( mPrefetcher.getCode() );
+        mWriteUnit = std::move( mReadUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_DST_LOCK_FLAGS:
+      if ( !mComputeUnit )
+      {
+        auto [dst] = mReadUnit.readDstLockFlags();
+        if ( !mRegLocks[dst] )
+        {
+          mReadUnit.readDstLockFlags( { mRegs[dst] } );
+          mFlagsSemaphore += 1;
+          mComputeUnit = std::move( mReadUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_LOCK_DST:
+      if ( !mComputeUnit )
+      {
+        auto [dst] = mReadUnit.readLockDst();
+        if ( !mRegLocks[dst] )
+        {
+          mRegLocks[dst] = true;
+          mReadUnit.readLockDst( { mRegs[dst] } );
+          mComputeUnit = std::move( mReadUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_LOCK_DST_LOCK_FLAGS:
+      if ( !mComputeUnit )
+      {
+        auto [dst] = mReadUnit.readLockDstLockFlags();
+        if ( !mRegLocks[dst] )
+        {
+          mRegLocks[dst] = true;
+          mFlagsSemaphore += 1;
+          mReadUnit.readLockDstLockFlags( { mRegs[dst] } );
+          mComputeUnit = std::move( mReadUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_SRC:
+      if ( !mComputeUnit )
+      {
+        auto [src] = mReadUnit.readSrc();
+        if ( !mRegLocks[src] )
+        {
+          mReadUnit.readSrc( { mRegs[src] } );
+          mComputeUnit = std::move( mReadUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_SRC_READ_DST:
+      if ( !mComputeUnit )
+      {
+        auto [src, dst] = mReadUnit.readSrcReadDst();
+        if ( !mRegLocks[src] && !mRegLocks[dst] )
+        {
+          mReadUnit.readSrcReadDst( { mRegs[src], mRegs[dst] } );
+          mComputeUnit = std::move( mReadUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_SRC_READ_LOCK_DST:
+      if ( !mComputeUnit )
+      {
+        auto [src, dst] = mReadUnit.readSrcReadLockDst();
+        if ( !mRegLocks[src] && !mRegLocks[dst] )
+        {
+          mRegLocks[dst] = true;
+          mReadUnit.readSrcReadLockDst( { mRegs[src], mRegs[dst] } );
+          assert( mReadUnit.getType() == ExecutionUnit::AwaiterType::DIVIDE_INIT );
+          mDivideUnit = std::move( mReadUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_SRC_READ_LOCK_DST_LOCK_FLAGS:
+      if ( !mComputeUnit )
+      {
+        auto [src, dst] = mReadUnit.readSrcReadLockDstLockFlags();
+        if ( !mRegLocks[src] && !mRegLocks[dst] )
+        {
+          mRegLocks[dst] = true;
+          mFlagsSemaphore += 1;
+          mReadUnit.readSrcReadLockDstLockFlags( { mRegs[src], mRegs[dst] } );
+          mComputeUnit = std::move( mReadUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_SRC_READ_LOCK_DST_READ_LOCK_FLAGS:
+      if ( !mComputeUnit )
+      {
+        auto [src, dst] = mReadUnit.readSrcReadLockDstReadLockFlags();
+        if ( !mRegLocks[src] && !mRegLocks[dst] && mFlagsSemaphore == 0 )
+        {
+          mRegLocks[dst] = true;
+          mFlagsSemaphore += 1;
+          mReadUnit.readSrcReadLockDstReadLockFlags( { mRegs[src], mRegs[dst] } );
+          mComputeUnit = std::move( mReadUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_PC:
+      if ( !mWriteUnit )
+      {
+        mReadUnit.readPC( mPC );
+        mWriteUnit = std::move( mReadUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MOVE_Q:
+      if ( !mWriteUnit )
+      {
+        mReadUnit.advance();
+        assert( mReadUnit.getType() == ExecutionUnit::AwaiterType::WRITE_DST );
+        mWriteUnit = std::move( mReadUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::NOP:
+      mReadUnit.advance();
+      assert( mReadUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+      mExecutionUnitPool[++mPoolTop] = std::move( mReadUnit );
+      break;
+    }
   }
 
 
@@ -145,8 +334,8 @@ void DSP::processCycle()
     }
     assert( mPrefetcher );
     auto opcode = mPrefetcher.get();
-    opcode.translatedSrc = mRegisterFile + opcode.src;
-    opcode.translatedDst = mRegisterFile + opcode.dst;
+    opcode.srcReg = mRegisterFile + opcode.srcValue;
+    opcode.dstReg = mRegisterFile + opcode.dstValue;
     mReadUnit = std::move( mExecutionUnitPool[mPoolTop--] );
     mReadUnit.decode( opcode );
   }
