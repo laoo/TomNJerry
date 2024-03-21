@@ -177,8 +177,7 @@ ExecutionUnit ExecutionUnit::create()
       int32_t cycle = 16;
       uint32_t q = dst;
       uint32_t r = 0;
-      auto [offset] = co_await DivideInit{};
-      if ( offset )
+      if ( auto [offset] = co_await DivideInit{}; offset )
       {
         q <<= 16;
         r = dst >> 16;
@@ -572,25 +571,80 @@ ExecutionUnit ExecutionUnit::create()
     {
       auto [src, dst] = co_await ReadSrcReadDst{ .src = opcode.srcReg, .dst = opcode.dstReg };
       co_await IO{};
-      auto [success] = co_await MemoryStoreLong{ .addr = dst, .value = src };
-      if ( !success )
+      if ( auto [success] = co_await MemoryStoreLong{ .addr = dst, .value = src }; !success )
       {
         co_await MemoryStoreLongExternal{ .addr = dst, .value = src };
       }
       break;
     }
     case RISCOpcode::STORE14N:
-      throw Ex{} << "NYI";
+    {
+      auto [base] = co_await ReadSrc{ .src = 14 };
+      auto [dst] = co_await ReadDstNoScoreboard{ .dst = opcode.srcReg };
+      uint32_t addr = base + ( opcode.srcValue == 0 ? 32 : opcode.srcValue ) * 4;
+      co_await IO{};
+      if ( auto [success] = co_await MemoryStoreLong{ .addr = addr, .value = dst }; !success )
+      {
+        co_await MemoryStoreLongExternal{ .addr = addr, .value = dst };
+      }
+      break;
+    }
     case RISCOpcode::STORE14R:
-      throw Ex{} << "NYI";
+    {
+      auto [base, off] = co_await ReadSrcReadDst{ .src = 14, .dst = opcode.srcReg };
+      auto [dst] = co_await ReadDstNoScoreboard{ .dst = opcode.srcReg };
+      uint32_t addr = base + off;
+      co_await IO{};
+      if ( auto [success] = co_await MemoryStoreLong{ .addr = addr, .value = dst }; !success )
+      {
+        co_await MemoryStoreLongExternal{ .addr = addr, .value = dst };
+      }
+      break;
+    }
     case RISCOpcode::STORE15N:
-      throw Ex{} << "NYI";
+    {
+      auto [base] = co_await ReadSrc{ .src = 15 };
+      auto [dst] = co_await ReadDstNoScoreboard{ .dst = opcode.srcReg };
+      uint32_t addr = base + ( opcode.srcValue == 0 ? 32 : opcode.srcValue ) * 4;
+      co_await IO{};
+      if ( auto [success] = co_await MemoryStoreLong{ .addr = addr, .value = dst }; !success )
+      {
+        co_await MemoryStoreLongExternal{ .addr = addr, .value = dst };
+      }
+      break;
+    }
     case RISCOpcode::STORE15R:
-      throw Ex{} << "NYI";
+    {
+      auto [base, off] = co_await ReadSrcReadDst{ .src = 15, .dst = opcode.srcReg };
+      auto [dst] = co_await ReadDstNoScoreboard{ .dst = opcode.srcReg };
+      uint32_t addr = base + off;
+      co_await IO{};
+      if ( auto [success] = co_await MemoryStoreLong{ .addr = addr, .value = dst }; !success )
+      {
+        co_await MemoryStoreLongExternal{ .addr = addr, .value = dst };
+      }
+      break;
+    }
     case RISCOpcode::STOREB:
-      throw Ex{} << "NYI";
+    {
+      auto [src, dst] = co_await ReadSrcReadDst{ .src = opcode.srcReg, .dst = opcode.dstReg };
+      co_await IO{};
+      if ( auto [success] = co_await MemoryStoreByte{ .addr = dst, .value = ( uint8_t )src }; !success )
+      {
+        co_await MemoryStoreByteExternal{ .addr = dst, .value = ( uint8_t )src };
+      }
+      break;
+    }
     case RISCOpcode::STOREW:
-      throw Ex{} << "NYI";
+    {
+      auto [src, dst] = co_await ReadSrcReadDst{ .src = opcode.srcReg, .dst = opcode.dstReg };
+      co_await IO{};
+      if ( auto [success] = co_await MemoryStoreWord{ .addr = dst, .value = ( uint16_t )src }; !success )
+      {
+        co_await MemoryStoreWordExternal{ .addr = dst, .value = ( uint16_t )src };
+      }
+      break;
+    }
     case RISCOpcode::SUB:
     {
       auto [src, dst] = co_await ReadSrcReadLockDstLockFlags{ .src = opcode.srcReg, .dst = opcode.dstReg };

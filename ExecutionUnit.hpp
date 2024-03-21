@@ -149,6 +149,7 @@ public:
   struct MemoryStoreLongExternal { uint32_t addr; uint32_t value; };
 
   //read unit
+  struct ReadDstNoScoreboard { int8_t dst; struct Res { uint32_t dst; }; };
   struct ReadDstLockFlags { int8_t dst; struct Res { uint32_t dst; }; };
   struct ReadLockDst { int8_t dst; struct Res { uint32_t dst; }; };
   struct ReadLockDstLockFlags { int8_t dst; struct Res { uint32_t dst; }; };
@@ -194,6 +195,7 @@ public:
     MEMORY_STORE_WORD_EXTERNAL,
     MEMORY_STORE_LONG_EXTERNAL,
 
+    READ_DST_NO_SCOREBOARD,
     READ_DST_LOCK_FLAGS,
     READ_LOCK_DST,
     READ_LOCK_DST_LOCK_FLAGS,
@@ -398,6 +400,13 @@ public:
         ReadSrc::Res res;
         auto await_resume() { return res; }
       } readSrcAwaiter;
+
+      struct ReadDstNoScoreboardAwaiter : BaseAwaiter
+      {
+        ReadDstNoScoreboard arg;
+        ReadDstNoScoreboard::Res res;
+        auto await_resume() { return res; }
+      } readDstNoScoreboardAwaiter;
 
       struct ReadSrcReadDstAwaiter : BaseAwaiter
       {
@@ -823,6 +832,25 @@ public:
       awaiter.readLockDstLockFlagsAwaiter.res = res;
     }
 
+    Awaiter::ReadDstNoScoreboardAwaiter& await_transform( ReadDstNoScoreboard const& arg )
+    {
+      type = AwaiterType::READ_DST_NO_SCOREBOARD;
+      awaiter.readDstNoScoreboardAwaiter.arg = arg;
+      return awaiter.readDstNoScoreboardAwaiter;
+    }
+
+    ReadDstNoScoreboard readDstNoScoreboard() const
+    {
+      assert( type == AwaiterType::READ_DST_NO_SCOREBOARD );
+      return awaiter.readDstNoScoreboardAwaiter.arg;
+    }
+
+    void readDstNoScoreboard( ReadDstNoScoreboard::Res res )
+    {
+      assert( type == AwaiterType::READ_DST_NO_SCOREBOARD );
+      awaiter.readDstNoScoreboardAwaiter.res = res;
+    }
+
     Awaiter::ReadSrcAwaiter& await_transform( ReadSrc const& arg )
     {
       type = AwaiterType::READ_SRC;
@@ -1135,6 +1163,17 @@ public:
   void readLockDstLockFlags( ReadLockDstLockFlags::Res res )
   {
     mCoro.promise().readLockDstLockFlags( res );
+    mCoro();
+  }
+
+  ReadDstNoScoreboard readDstNoScoreboard() const
+  {
+    return mCoro.promise().readDstNoScoreboard();
+  }
+
+  void readDstNoScoreboard( ReadDstNoScoreboard::Res res )
+  {
+    mCoro.promise().readDstNoScoreboard( res );
     mCoro();
   }
 

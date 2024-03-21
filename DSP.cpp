@@ -251,6 +251,10 @@ void DSP::processCycle()
         auto [src, dst] = mReadUnit.readSrcReadDst();
         if ( !mRegLocks[src] && !mRegLocks[dst] )
         {
+          if ( divideCycle == 0 )
+          {
+            //WARN
+          }
           mReadUnit.readSrcReadDst( { mRegs[src], mRegs[dst] } );
           mComputeUnit = std::move( mReadUnit );
         }
