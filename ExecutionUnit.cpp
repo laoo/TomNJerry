@@ -466,7 +466,19 @@ ExecutionUnit ExecutionUnit::create()
       break;
     }
     case RISCOpcode::MTOI:
-      throw Ex{} << "NYI";
+    {
+      auto [src] = co_await ReadSrc{ .src = ( int8_t )( opcode.srcReg ^ 31 ) };
+
+      uint32_t result = ( ( ( int32_t )src >> 8 ) & 0xFF800000 ) | ( src & 0x007FFFFF );
+
+      co_await Compute{};
+      co_await WriteDstWriteFlags{
+        .valuenz = result,
+        .c = ( uint16_t )( ( result >> 31 ) ? 1 : 0 ),
+        .reg = opcode.dstReg
+      };
+      break;
+    }
     case RISCOpcode::MULT:
     {
       auto [src, dst] = co_await ReadSrcReadLockDstLockFlags{ .src = opcode.srcReg, .dst = opcode.dstReg };
@@ -550,23 +562,121 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::RESMAC:
       throw Ex{} << "NYI";
     case RISCOpcode::ROR:
-      throw Ex{} << "NYI";
+    {
+      auto [src,dst] = co_await ReadSrcReadLockDstLockFlags{ .src = opcode.srcReg, .dst = opcode.dstReg };
+      uint32_t result = std::rotr( dst, src );
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = ( uint16_t )( dst >> 31 ),
+        .reg = opcode.dstReg
+      };
+      break;
+    }
     case RISCOpcode::RORQ:
-      throw Ex{} << "NYI";
+    {
+      uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
+      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      uint32_t result = std::rotr( dst, src );
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = ( uint16_t )( dst >> 31 ),
+        .reg = opcode.dstReg
+      };
+      break;
+    }
     case RISCOpcode::SAT16S:
       throw Ex{} << "NYI";
     case RISCOpcode::SAT32S:
       throw Ex{} << "NYI";
     case RISCOpcode::SH:
-      throw Ex{} << "NYI";
+    {
+      auto [src, dst] = co_await ReadSrcReadLockDstLockFlags{ .src = opcode.srcReg, .dst = opcode.dstReg };
+      bool shiftRight = ( int32_t )src >= 0;
+      uint32_t absShift = shiftRight ? src : -src;
+      uint32_t shiftResult = shiftRight ? dst >> absShift : dst << absShift;
+      //limit amount of shift to 31, shift of 32 and above will shift out all bits and we don't want to stumble upon a problem that CPU is using only 5 lsbs to do 32-bit shift
+      uint32_t result = absShift < 32 ? shiftResult : 0;
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = ( uint16_t )( src >= 0 ? ( dst & 1 ) : ( dst >> 31 ) ),
+        .reg = opcode.dstReg
+      };
+      break;
+    }
     case RISCOpcode::SHA:
-      throw Ex{} << "NYI";
+    {
+      auto [src, dst] = co_await ReadSrcReadLockDstLockFlags{ .src = opcode.srcReg, .dst = opcode.dstReg };
+      co_await Compute{};
+      if ( ( int32_t )src >= 0 )
+      {
+        //shift right
+        uint32_t absShift = src;
+        int32_t shiftArg = ( int32_t )dst;
+        //limit amount of shift to 31, shift of 32 and above will shift out all bits and we don't want to stumble upon a problem that CPU is using only 5 lsbs to do 32-bit shift
+        uint32_t result = absShift > 31 ? ( shiftArg >> 31 ) : ( shiftArg >> absShift );
+        co_await UnlockWriteDstUnlockWriteFlags{
+          .valuenz = result,
+          .c = ( uint16_t )( dst & 1 ),
+          .reg = opcode.dstReg
+        };
+      }
+      else
+      {
+        // shift left
+        uint32_t absShift = -src;
+        //limit amount of shift to 31, shift of 32 and above will shift out all bits and we don't want to stumble upon a problem that CPU is using only 5 lsbs to do 32-bit shift
+        uint32_t result = absShift > 31 ? 0 : ( dst << absShift );
+        co_await UnlockWriteDstUnlockWriteFlags{
+          .valuenz = result,
+          .c = ( uint16_t )( dst >> 31 ),
+          .reg = opcode.dstReg
+        };
+      }
+      break;
+    }
     case RISCOpcode::SHARQ:
-      throw Ex{} << "NYI";
+    {
+      uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
+      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      uint32_t result = ( uint32_t )( ( ( int64_t )( int32_t )dst ) >> src );
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = ( uint16_t )( dst & 1 ),
+        .reg = opcode.dstReg
+      };
+      break;
+    }
     case RISCOpcode::SHLQ:
-      throw Ex{} << "NYI";
+    {
+      //TODO: verify if this is correct
+      uint32_t src = opcode.srcValue == 0 ? 32 : 32 - opcode.srcValue;
+      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      uint32_t result = ( uint64_t )dst << src;
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = ( uint32_t )result,
+        .c = ( uint16_t )( dst >> 31 ),
+        .reg = opcode.dstReg
+      };
+      break;
+    }
     case RISCOpcode::SHRQ:
-      throw Ex{} << "NYI";
+    {
+      uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
+      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      uint32_t result = ( uint64_t )dst >> src;
+      co_await Compute{};
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = ( uint32_t )result,
+        .c = ( uint16_t )( dst & 1 ),
+        .reg = opcode.dstReg
+      };
+      break;
+    }
     case RISCOpcode::STORE:
     {
       auto [src, dst] = co_await ReadSrcReadDst{ .src = opcode.srcReg, .dst = opcode.dstReg };
@@ -720,7 +830,7 @@ ExecutionUnit ExecutionUnit::create()
       break;
     }
     default:
-      throw Ex{} << "NYI";
+      throw Ex{} << "Unsupported opcode " << (int)opcode.opcode;
     }
   }
   co_return;
