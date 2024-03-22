@@ -143,14 +143,38 @@ private:
 
 
 private:
+  bool isAddressLocal( uint32_t address ) const;
+
   void storeLong( uint32_t address, uint32_t data );
-  uint32_t loadLong( uint32_t address );
+
+  uint32_t loadByteLocal( uint32_t address );
+  uint32_t loadWordLocal( uint32_t address );
+  uint32_t loadLongLocal( uint32_t address );
+
+  std::optional<uint32_t> loadByteExternal( uint32_t address );
+  std::optional<uint32_t> loadWordExternal( uint32_t address );
+  std::optional<uint32_t> loadLongExternal( uint32_t address );
+
+  void storeByteLocal( uint32_t address, uint8_t value );
+  void storeWordLocal( uint32_t address, uint16_t value );
+  void storeLongLocal( uint32_t address, uint32_t value );
+
+  bool storeByteExternal( uint32_t address, uint8_t value );
+  bool storeWordExternal( uint32_t address, uint16_t value );
+  bool storeLongExternal( uint32_t address, uint32_t value );
+
+  void writeFlags( uint32_t nz, uint16_t c );
+  std::tuple<bool,bool,bool> readFlags() const;
   void processCycle();
   void prefetch();
   int prefetchFill();
   Prefetch::Pull prefetchPull();
   void ctrlSet( uint16_t value );
   void flagsSet( uint16_t value );
+
+  bool fetch();
+  bool fetchOpcode( RISCOpcode & out );
+  int fetchOperand();
 
 private:
   Prefetcher mPrefetcher;
@@ -161,8 +185,7 @@ private:
   ExecutionUnit mReadUnit{};
   ExecutionUnit mComputeUnit{};
   ExecutionUnit mWriteUnit{};
-  ExecutionUnit mInternalMemoryUnit{};
-  ExecutionUnit mExternalMemoryUnit{};
+  ExecutionUnit mMemoryUnit{};
   ExecutionUnit mDivideUnit{};
 
 
@@ -180,10 +203,14 @@ private:
   int32_t mRemain = 0;
   uint32_t mDivCtrl = 0;
   uint32_t mMachi = 0;
+  uint64_t mAccumulator = 0;
 
   Prefetch mPrefetch = {};
   uint64_t mCycle = ~0;
   uint64_t mLastLocalRAMAccessCycle = ~0;
   uint32_t mRegisterFile = 0;
+  bool mExternalAccessAck = false;
+  uint32_t mExternalAccessAddress = 0;
+  uint32_t mExternalLoadValue = 0;
 
 };

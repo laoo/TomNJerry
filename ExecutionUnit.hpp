@@ -89,98 +89,92 @@ class ExecutionUnit
 
 
 public:
-
-  /*
-
-  * ReadDst
-  * ReadDstLockFlags
-  * ReadLockDst
-  * ReadLockDstLockFlags
-  * ReadLockDstReadFlags
-  * ReadLockDstReadLockFlags
-  * ReadSrc
-  * ReadSrcLockFlags
-  * ReadSrcReadFlags
-  * ReadSrcReadLockFlags
-  * ReadSrcReadDst
-  * ReadSrcReadLockDst
-  * ReadSrcReadDstLockFlags
-  * ReadSrcReadDstReadFlags
-  * ReadSrcReadDstReadLockFlags
-  * ReadSrcReadLockDstLockFlags
-  * ReadSrcReadLockDstReadFlags
-  * ReadSrcReadLockDstReadLockFlags
-  *
-  * WriteDst
-  * UnlockWriteDst
-  * UnlockWriteFlags
-  * UnlockWriteDstUnlockWriteFlags
-
-  */
-
-  //execute unit
-  struct Decode { struct Res { RISCOpcode opcode; }; };
-  struct GetCodeLo { struct Res { uint16_t code; }; };
-  struct GetCodeHi { struct Res { uint16_t code; }; };
-  struct GetMod { struct Res { uint32_t mod; }; };
-  struct Compute {};
-  struct DivideInit { struct Res { bool offset; }; };
-  struct DivideCycle { int32_t cycle; };
-  struct NOP {};
-  struct IO {};
-  struct MoveQ {};
-
-  //internal memory unit
-  struct MemoryLoadByte { uint32_t src; struct Res { uint8_t value; bool success; }; };
-  struct MemoryLoadWord { uint32_t src; struct Res { uint16_t value; bool success; }; };
-  struct MemoryLoadLong { uint32_t src; struct Res { uint32_t value; bool success; }; };
-
-  struct MemoryStoreByte { uint32_t addr; uint8_t value; struct Res { bool success; }; };
-  struct MemoryStoreWord { uint32_t addr; uint16_t value; struct Res { bool success; }; };
-  struct MemoryStoreLong { uint32_t addr; uint32_t value; struct Res { bool success; }; };
-
-  //external memory unit
-  struct MemoryLoadByteExternal { uint32_t src; struct Res { uint8_t value; }; };
-  struct MemoryLoadWordExternal { uint32_t src; struct Res { uint16_t value; }; };
-  struct MemoryLoadLongExternal { uint32_t src; struct Res { uint32_t value; }; };
-
-  struct MemoryStoreByteExternal { uint32_t addr; uint8_t value; };
-  struct MemoryStoreWordExternal { uint32_t addr; uint16_t value; };
-  struct MemoryStoreLongExternal { uint32_t addr; uint32_t value; };
+  //decode unit
+  struct Decode { struct Res { RISCOpcode opcode; }; }; //->read unit
 
   //read unit
-  struct ReadDstNoScoreboard { int8_t dst; struct Res { uint32_t dst; }; };
-  struct ReadDstLockFlags { int8_t dst; struct Res { uint32_t dst; }; };
-  struct ReadLockDst { int8_t dst; struct Res { uint32_t dst; }; };
-  struct ReadLockDstLockFlags { int8_t dst; struct Res { uint32_t dst; }; };
-  struct ReadSrc { int8_t src; struct Res { uint32_t src; }; };
-  struct ReadSrcReadDst { int8_t src; int8_t dst; struct Res { uint32_t src; uint32_t dst; }; };
-  struct ReadSrcReadLockDst { int8_t src; int8_t dst; struct Res { uint32_t src; uint32_t dst; }; };
-  struct ReadSrcReadLockDstLockFlags { int8_t src; int8_t dst; struct Res { uint32_t src; uint32_t dst; }; };
-  struct ReadSrcReadLockDstReadLockFlags { int8_t src; int8_t dst; struct Res { uint32_t src; uint32_t dst; uint16_t c; }; };
-  struct ReadPC { struct Res { uint32_t pc; }; };
+  struct ReadReg { int8_t reg; struct Res { uint32_t value; }; }; //->compute unit
+  struct ReadRegMove { int8_t reg; struct Res { uint32_t value; }; }; //->write unit
+  struct ReadRegReadFlags { int8_t reg; struct Res { uint32_t value; bool n; bool z; bool c; }; }; //->compute unit
+  struct ReadRegLockFlags { int8_t reg; struct Res { uint32_t value; }; }; //->compute unit
+  struct ReadLockReg { int8_t reg; struct Res { uint32_t value; }; }; //->compute unit
+  struct ReadLockRegLockFlags { int8_t reg; struct Res { uint32_t value; }; };  //->compute unit
+  struct ReadSrcReadDst { int8_t src; int8_t dst; struct Res { uint32_t src; uint32_t dst; }; }; //->compute unit
+  struct ReadSrcReadLockDst { int8_t src; int8_t dst; struct Res { uint32_t src; uint32_t dst; }; }; //->compute unit
+  struct ReadSrcReadDstLockFlags { int8_t src; int8_t dst; struct Res { uint32_t src; uint32_t dst; }; }; //->compute unit
+  struct ReadSrcReadLockDstLockFlags { int8_t src; int8_t dst; struct Res { uint32_t src; uint32_t dst; }; }; //->compute unit
+  struct ReadSrcReadLockDstReadLockFlags { int8_t src; int8_t dst; struct Res { uint32_t src; uint32_t dst; uint16_t c; }; }; //->compute unit
+  struct GetCodeLo { struct Res { uint16_t code; }; }; //->read unit
+  struct GetCodeHi { struct Res { uint16_t code; }; }; //->write unit
+  struct ReadPC { struct Res { uint32_t pc; }; }; //->write unit
+  struct GetAcc { struct Res { int8_t acc; }; }; //->write unit
+  struct MoveQ {}; //->write unit
+  struct NOP {}; //->decode unit
+  struct JRInit {}; //->compute unit
+
+  //compute unit
+  struct ComputePending {};  //->compute unit
+  struct Compute {};  //->write unit
+  struct GetMod { struct Res { uint32_t mod; }; }; //->write unit
+  struct PrepareJump { struct Res { uint32_t pc; }; }; //->write unit
+  struct DivideInit { struct Res { bool offset; }; }; //->divide unit
+  struct ReadRegNoScoreboard { int8_t reg; struct Res { uint32_t value; }; }; //->compute unit
+  struct MemoryLoadByte { uint32_t src; struct Res { uint32_t value; bool success; }; }; //->memory unit, write unit
+  struct MemoryLoadWord { uint32_t src; struct Res { uint32_t value; bool success; }; }; //->memory unit, write unit
+  struct MemoryLoadLong { uint32_t src; struct Res { uint32_t value; bool success; }; }; //->memory unit, write unit
+  struct MemoryStoreByte { uint32_t addr; uint8_t value; struct Res { bool success; }; }; //->decode unit, memory unit
+  struct MemoryStoreWord { uint32_t addr; uint16_t value; struct Res { bool success; }; }; //->decode unit, memory unit
+  struct MemoryStoreLong { uint32_t addr; uint32_t value; struct Res { bool success; }; }; //->decode unit, memory unit
+
+  //memory unit
+  struct MemoryLoadByteExternal { uint32_t src; struct Res { uint32_t value; }; }; //->write unit
+  struct MemoryLoadWordExternal { uint32_t src; struct Res { uint32_t value; }; }; //->write unit
+  struct MemoryLoadLongExternal { uint32_t src; struct Res { uint32_t value; }; }; //->write unit
+  struct MemoryStoreByteExternal { uint32_t addr; uint8_t value; }; //->decode unit
+  struct MemoryStoreWordExternal { uint32_t addr; uint16_t value; }; //->decode unit
+  struct MemoryStoreLongExternal { uint32_t addr; uint32_t value; }; //->decode unit
 
   //write unit
-  struct WriteDst { uint32_t value; int8_t reg; };
-  struct WriteDstWriteFlags { uint32_t valuenz; uint16_t c; int8_t reg; };
-  struct UnlockWriteDst { uint32_t value; int8_t reg; };
-  struct UnlockWriteDstRemain { uint32_t value; uint32_t remain; int8_t reg; };
-  struct UnlockWriteFlags { uint32_t nz;  uint16_t c; };
-  struct UnlockWriteDstUnlockWriteFlags { uint32_t valuenz; uint16_t c; int8_t reg; };
+  struct WritePC { uint32_t pc; }; //->decode unit
+  struct WriteDst { uint32_t value; int8_t reg; }; //->decode unit
+  struct WriteDstWriteFlags { uint32_t valuenz; uint16_t c; int8_t reg; }; //->decode unit
+  struct UnlockWriteFlags { uint32_t nz;  uint16_t c; }; //->decode unit
+  struct UnlockWriteDst { uint32_t value; int8_t reg; }; //->decode unit
+  struct UnlockWriteDstUnlockWriteFlags { uint32_t valuenz; uint16_t c; int8_t reg; }; //->decode unit
+  struct UnlockWriteDstRemain { uint32_t value; uint32_t remain; int8_t reg; }; //->decode unit
+
+  //divide unit
+  struct DivideCycle { int32_t cycle; }; //-> divide unit, write unit
 
   enum struct AwaiterType
   {
     DECODE,
+
+    READ_REG,
+    READ_REG_MOVE,
+    READ_REG_READ_FLAGS,
+    READ_REG_LOCK_FLAGS,
+    READ_LOCK_REG,
+    READ_LOCK_REG_LOCK_FLAGS,
+    READ_SRC_READ_DST,
+    READ_SRC_READ_LOCK_DST,
+    READ_SRC_READ_DST_LOCK_FLAGS,
+    READ_SRC_READ_LOCK_DST_LOCK_FLAGS,
+    READ_SRC_READ_LOCK_DST_READ_LOCK_FLAGS,
     GET_CODE_LO,
     GET_CODE_HI,
-    GET_MOD,
-    COMPUTE,
-    DIVIDE_INIT,
-    DIVIDE_CYCLE,
-    NOP,
-    IO,
+    READ_PC,
+    GET_ACC,
     MOVE_Q,
+    NOP,
+    JR_INIT,
 
+    COMPUTE_PENDING,
+    COMPUTE,
+    GET_MOD,
+    PREPARE_JUMP,
+    DIVIDE_INIT,
+    READ_REG_NO_SCOREBOARD,
     MEMORY_LOAD_BYTE,
     MEMORY_LOAD_WORD,
     MEMORY_LOAD_LONG,
@@ -188,30 +182,22 @@ public:
     MEMORY_STORE_WORD,
     MEMORY_STORE_LONG,
 
+    WRITE_PC,
+    WRITE_DST,
+    WRITE_DST_WRITE_FLAGS,
+    UNLOCK_WRITE_FLAGS,
+    UNLOCK_WRITE_DST,
+    UNLOCK_WRITE_DST_UNLOCK_WRITE_FLAGS,
+    UNLOCK_WRITE_DST_REMAIN,
+
+    DIVIDE_CYCLE,
+
     MEMORY_LOAD_BYTE_EXTERNAL,
     MEMORY_LOAD_WORD_EXTERNAL,
     MEMORY_LOAD_LONG_EXTERNAL,
     MEMORY_STORE_BYTE_EXTERNAL,
     MEMORY_STORE_WORD_EXTERNAL,
-    MEMORY_STORE_LONG_EXTERNAL,
-
-    READ_DST_NO_SCOREBOARD,
-    READ_DST_LOCK_FLAGS,
-    READ_LOCK_DST,
-    READ_LOCK_DST_LOCK_FLAGS,
-    READ_SRC,
-    READ_SRC_READ_DST,
-    READ_SRC_READ_LOCK_DST,
-    READ_SRC_READ_LOCK_DST_LOCK_FLAGS,
-    READ_SRC_READ_LOCK_DST_READ_LOCK_FLAGS,
-    READ_PC,
-
-    WRITE_DST,
-    WRITE_DST_WRITE_FLAGS,
-    UNLOCK_WRITE_DST,
-    UNLOCK_WRITE_DST_REMAIN,
-    UNLOCK_WRITE_FLAGS,
-    UNLOCK_WRITE_DST_UNLOCK_WRITE_FLAGS,
+    MEMORY_STORE_LONG_EXTERNAL
   };
 
   struct promise_type
@@ -263,9 +249,25 @@ public:
         auto await_resume() { return res; }
       } getModAwaiter;
 
+      struct GetAccAwaiter : BaseAwaiter
+      {
+        GetAcc::Res res;
+        auto await_resume() { return res; }
+      } getAccAwaiter;
+
       struct ComputeAwaiter : BaseAwaiter
       {
       } computeAwaiter;
+
+      struct ComputePendingAwaiter : BaseAwaiter
+      {
+      } computePendingAwaiter;
+
+      struct PrepareJumpAwaiter : BaseAwaiter
+      {
+        PrepareJump::Res res;
+        auto await_resume() { return res; }
+      } prepareJumpAwaiter;
 
       struct DivideInitAwaiter : BaseAwaiter
       {
@@ -282,14 +284,13 @@ public:
       {
       } nopAwaiter;
 
-      struct IOAwaiter : BaseAwaiter
-      {
-      } ioAwaiter;
-
       struct MoveQAwaiter : BaseAwaiter
       {
       } moveQAwaiter;
 
+      struct JRInitAwaiter : BaseAwaiter
+      {
+      } jrInitAwaiter;
 
       struct MemoryLoadByteAwaiter : BaseAwaiter
       {
@@ -372,41 +373,54 @@ public:
         Decode::Res res;
       } memoryStoreLongExternalAwaiter;
 
-
-      struct ReadDstLockFlagsAwaiter : BaseAwaiter
+      struct ReadRegLockFlagsAwaiter : BaseAwaiter
       {
-        ReadDstLockFlags arg;
-        ReadDstLockFlags::Res res;
+        ReadRegLockFlags arg;
+        ReadRegLockFlags::Res res;
         auto await_resume() { return res; }
-      } readDstLockFlagsAwaiter;
+      } readRegLockFlagsAwaiter;
 
-      struct ReadLockDstAwaiter : BaseAwaiter
+      struct ReadLockRegAwaiter : BaseAwaiter
       {
-        ReadLockDst arg;
-        ReadLockDst::Res res;
+        ReadLockReg arg;
+        ReadLockReg::Res res;
         auto await_resume() { return res; }
-      } readLockDstAwaiter;
+      } readLockRegAwaiter;
 
-      struct ReadLockDstLockFlagsAwaiter : BaseAwaiter
+      struct ReadLockRegLockFlagsAwaiter : BaseAwaiter
       {
-        ReadLockDstLockFlags arg;
-        ReadLockDstLockFlags::Res res;
+        ReadLockRegLockFlags arg;
+        ReadLockRegLockFlags::Res res;
         auto await_resume() { return res; }
-      } readLockDstLockFlagsAwaiter;
+      } readLockRegLockFlagsAwaiter;
 
-      struct ReadSrcAwaiter : BaseAwaiter
+      struct ReadRegAwaiter : BaseAwaiter
       {
-        ReadSrc arg;
-        ReadSrc::Res res;
+        ReadReg arg;
+        ReadReg::Res res;
         auto await_resume() { return res; }
-      } readSrcAwaiter;
+      } readRegAwaiter;
 
-      struct ReadDstNoScoreboardAwaiter : BaseAwaiter
+      struct ReadRegMoveAwaiter : BaseAwaiter
       {
-        ReadDstNoScoreboard arg;
-        ReadDstNoScoreboard::Res res;
+        ReadRegMove arg;
+        ReadRegMove::Res res;
         auto await_resume() { return res; }
-      } readDstNoScoreboardAwaiter;
+      } readRegMoveAwaiter;
+
+      struct ReadRegReadFlagsAwaiter : BaseAwaiter
+      {
+        ReadRegReadFlags arg;
+        ReadRegReadFlags::Res res;
+        auto await_resume() { return res; }
+      } readRegReadFlagsAwaiter;
+
+      struct ReadRegNoScoreboardAwaiter : BaseAwaiter
+      {
+        ReadRegNoScoreboard arg;
+        ReadRegNoScoreboard::Res res;
+        auto await_resume() { return res; }
+      } readRegNoScoreboardAwaiter;
 
       struct ReadSrcReadDstAwaiter : BaseAwaiter
       {
@@ -421,6 +435,13 @@ public:
         ReadSrcReadLockDstLockFlags::Res res;
         auto await_resume() { return res; }
       } readSrcReadLockDstLockFlagsAwaiter;
+
+      struct ReadSrcReadDstLockFlagsAwaiter : BaseAwaiter
+      {
+        ReadSrcReadDstLockFlags arg;
+        ReadSrcReadDstLockFlags::Res res;
+        auto await_resume() { return res; }
+      } readSrcReadDstLockFlagsAwaiter;
 
       struct ReadSrcReadLockDstAwaiter : BaseAwaiter
       {
@@ -441,7 +462,6 @@ public:
         ReadPC::Res res;
         auto await_resume() { return res; }
       } readPCAwaiter;
-
 
       struct WriteDstAwaiter : BaseAwaiter
       {
@@ -472,6 +492,12 @@ public:
       {
         UnlockWriteDstUnlockWriteFlags arg;
       } unlockWriteDstUnlockWriteFlagsAwaiter;
+
+      struct WritePCAwaiter : BaseAwaiter
+      {
+        WritePC arg;
+      } writePCAwaiter;
+
     } awaiter{};
 
     Awaiter::DecodeAwaiter& await_transform( Decode )
@@ -516,10 +542,40 @@ public:
       awaiter.getModAwaiter.res = mod;
     }
 
+    Awaiter::GetAccAwaiter& await_transform( GetAcc )
+    {
+      type = AwaiterType::GET_ACC;
+      return awaiter.getAccAwaiter;
+    }
+
+    void getAcc( GetAcc::Res acc )
+    {
+      assert( type == AwaiterType::GET_ACC );
+      awaiter.getAccAwaiter.res = acc;
+    }
+
     Awaiter::ComputeAwaiter& await_transform( Compute )
     {
       type = AwaiterType::COMPUTE;
       return awaiter.computeAwaiter;
+    }
+
+    Awaiter::ComputePendingAwaiter& await_transform( ComputePending )
+    {
+      type = AwaiterType::COMPUTE_PENDING;
+      return awaiter.computePendingAwaiter;
+    }
+
+    Awaiter::PrepareJumpAwaiter& await_transform( PrepareJump )
+    {
+      type = AwaiterType::PREPARE_JUMP;
+      return awaiter.prepareJumpAwaiter;
+    }
+
+    void prepareJump( PrepareJump::Res pc )
+    {
+      assert( type == AwaiterType::PREPARE_JUMP );
+      awaiter.prepareJumpAwaiter.res = pc;
     }
 
     Awaiter::DivideInitAwaiter& await_transform( DivideInit )
@@ -553,16 +609,16 @@ public:
       return awaiter.nopAwaiter;
     }
 
-    Awaiter::IOAwaiter& await_transform( IO )
-    {
-      type = AwaiterType::IO;
-      return awaiter.ioAwaiter;
-    }
-
     Awaiter::MoveQAwaiter& await_transform( MoveQ )
     {
       type = AwaiterType::MOVE_Q;
       return awaiter.moveQAwaiter;
+    }
+
+    Awaiter::JRInitAwaiter& await_transform( JRInit )
+    {
+      type = AwaiterType::JR_INIT;
+      return awaiter.jrInitAwaiter;
     }
 
     Awaiter::MemoryLoadByteAwaiter& await_transform( MemoryLoadByte const& arg )
@@ -775,99 +831,137 @@ public:
       return awaiter.memoryStoreLongExternalAwaiter.arg;
     }
 
-    Awaiter::ReadDstLockFlagsAwaiter& await_transform( ReadDstLockFlags const& arg )
+    Awaiter::ReadRegLockFlagsAwaiter& await_transform( ReadRegLockFlags const& arg )
     {
-      type = AwaiterType::READ_DST_LOCK_FLAGS;
-      awaiter.readDstLockFlagsAwaiter.arg = arg;
-      return awaiter.readDstLockFlagsAwaiter;
+      type = AwaiterType::READ_REG_LOCK_FLAGS;
+      awaiter.readRegLockFlagsAwaiter.arg = arg;
+      return awaiter.readRegLockFlagsAwaiter;
     }
 
-    ReadDstLockFlags readDstLockFlags() const
+    ReadRegLockFlags readRegLockFlags() const
     {
-      assert( type == AwaiterType::READ_DST_LOCK_FLAGS );
-      return awaiter.readDstLockFlagsAwaiter.arg;
+      assert( type == AwaiterType::READ_REG_LOCK_FLAGS );
+      return awaiter.readRegLockFlagsAwaiter.arg;
     }
 
-    void readDstLockFlags( ReadDstLockFlags::Res res )
+    void readRegLockFlags( ReadRegLockFlags::Res res )
     {
-      assert( type == AwaiterType::READ_DST_LOCK_FLAGS );
-      awaiter.readDstLockFlagsAwaiter.res = res;
+      assert( type == AwaiterType::READ_REG_LOCK_FLAGS );
+      awaiter.readRegLockFlagsAwaiter.res = res;
     }
 
-    Awaiter::ReadLockDstAwaiter& await_transform( ReadLockDst const& arg )
+    Awaiter::ReadLockRegAwaiter& await_transform( ReadLockReg const& arg )
     {
-      type = AwaiterType::READ_LOCK_DST;
-      awaiter.readLockDstAwaiter.arg = arg;
-      return awaiter.readLockDstAwaiter;
+      type = AwaiterType::READ_LOCK_REG;
+      awaiter.readLockRegAwaiter.arg = arg;
+      return awaiter.readLockRegAwaiter;
     }
 
-    ReadLockDst readLockDst() const
+    ReadLockReg readLockReg() const
     {
-      assert( type == AwaiterType::READ_LOCK_DST );
-      return awaiter.readLockDstAwaiter.arg;
+      assert( type == AwaiterType::READ_LOCK_REG );
+      return awaiter.readLockRegAwaiter.arg;
     }
 
-    void readLockDst( ReadLockDst::Res res )
+    void readLockReg( ReadLockReg::Res res )
     {
-      assert( type == AwaiterType::READ_LOCK_DST );
-      awaiter.readLockDstAwaiter.res = res;
+      assert( type == AwaiterType::READ_LOCK_REG );
+      awaiter.readLockRegAwaiter.res = res;
     }
 
-    Awaiter::ReadLockDstLockFlagsAwaiter& await_transform( ReadLockDstLockFlags const& arg )
+    Awaiter::ReadLockRegLockFlagsAwaiter& await_transform( ReadLockRegLockFlags const& arg )
     {
-      type = AwaiterType::READ_LOCK_DST_LOCK_FLAGS;
-      awaiter.readLockDstLockFlagsAwaiter.arg = arg;
-      return awaiter.readLockDstLockFlagsAwaiter;
+      type = AwaiterType::READ_LOCK_REG_LOCK_FLAGS;
+      awaiter.readLockRegLockFlagsAwaiter.arg = arg;
+      return awaiter.readLockRegLockFlagsAwaiter;
     }
 
-    ReadLockDstLockFlags readLockDstLockFlags() const
+    ReadLockRegLockFlags readLockRegLockFlags() const
     {
-      assert( type == AwaiterType::READ_LOCK_DST_LOCK_FLAGS );
-      return awaiter.readLockDstLockFlagsAwaiter.arg;
+      assert( type == AwaiterType::READ_LOCK_REG_LOCK_FLAGS );
+      return awaiter.readLockRegLockFlagsAwaiter.arg;
     }
 
-    void readLockDstLockFlags( ReadLockDstLockFlags::Res res )
+    void readLockRegLockFlags( ReadLockRegLockFlags::Res res )
     {
-      assert( type == AwaiterType::READ_LOCK_DST_LOCK_FLAGS );
-      awaiter.readLockDstLockFlagsAwaiter.res = res;
+      assert( type == AwaiterType::READ_LOCK_REG_LOCK_FLAGS );
+      awaiter.readLockRegLockFlagsAwaiter.res = res;
     }
 
-    Awaiter::ReadDstNoScoreboardAwaiter& await_transform( ReadDstNoScoreboard const& arg )
+    Awaiter::ReadRegNoScoreboardAwaiter& await_transform( ReadRegNoScoreboard const& arg )
     {
-      type = AwaiterType::READ_DST_NO_SCOREBOARD;
-      awaiter.readDstNoScoreboardAwaiter.arg = arg;
-      return awaiter.readDstNoScoreboardAwaiter;
+      type = AwaiterType::READ_REG_NO_SCOREBOARD;
+      awaiter.readRegNoScoreboardAwaiter.arg = arg;
+      return awaiter.readRegNoScoreboardAwaiter;
     }
 
-    ReadDstNoScoreboard readDstNoScoreboard() const
+    ReadRegNoScoreboard readRegNoScoreboard() const
     {
-      assert( type == AwaiterType::READ_DST_NO_SCOREBOARD );
-      return awaiter.readDstNoScoreboardAwaiter.arg;
+      assert( type == AwaiterType::READ_REG_NO_SCOREBOARD );
+      return awaiter.readRegNoScoreboardAwaiter.arg;
     }
 
-    void readDstNoScoreboard( ReadDstNoScoreboard::Res res )
+    void readRegNoScoreboard( ReadRegNoScoreboard::Res res )
     {
-      assert( type == AwaiterType::READ_DST_NO_SCOREBOARD );
-      awaiter.readDstNoScoreboardAwaiter.res = res;
+      assert( type == AwaiterType::READ_REG_NO_SCOREBOARD );
+      awaiter.readRegNoScoreboardAwaiter.res = res;
     }
 
-    Awaiter::ReadSrcAwaiter& await_transform( ReadSrc const& arg )
+    Awaiter::ReadRegAwaiter& await_transform( ReadReg const& arg )
     {
-      type = AwaiterType::READ_SRC;
-      awaiter.readSrcAwaiter.arg = arg;
-      return awaiter.readSrcAwaiter;
+      type = AwaiterType::READ_REG;
+      awaiter.readRegAwaiter.arg = arg;
+      return awaiter.readRegAwaiter;
     }
 
-    ReadSrc readSrc() const
+    ReadReg readReg() const
     {
-      assert( type == AwaiterType::READ_SRC );
-      return awaiter.readSrcAwaiter.arg;
+      assert( type == AwaiterType::READ_REG );
+      return awaiter.readRegAwaiter.arg;
     }
 
-    void readSrc( ReadSrc::Res res )
+    void readReg( ReadReg::Res res )
     {
-      assert( type == AwaiterType::READ_SRC );
-      awaiter.readSrcAwaiter.res = res;
+      assert( type == AwaiterType::READ_REG );
+      awaiter.readRegAwaiter.res = res;
+    }
+
+    Awaiter::ReadRegMoveAwaiter& await_transform( ReadRegMove const& arg )
+    {
+      type = AwaiterType::READ_REG_MOVE;
+      awaiter.readRegMoveAwaiter.arg = arg;
+      return awaiter.readRegMoveAwaiter;
+    }
+
+    ReadRegMove readRegMove() const
+    {
+      assert( type == AwaiterType::READ_REG_MOVE );
+      return awaiter.readRegMoveAwaiter.arg;
+    }
+
+    void readRegMove( ReadRegMove::Res res )
+    {
+      assert( type == AwaiterType::READ_REG_MOVE );
+      awaiter.readRegMoveAwaiter.res = res;
+    }
+
+    Awaiter::ReadRegReadFlagsAwaiter& await_transform( ReadRegReadFlags const& arg )
+    {
+      type = AwaiterType::READ_REG_READ_FLAGS;
+      awaiter.readRegReadFlagsAwaiter.arg = arg;
+      return awaiter.readRegReadFlagsAwaiter;
+    }
+
+    ReadRegReadFlags readRegReadFlags() const
+    {
+      assert( type == AwaiterType::READ_REG_READ_FLAGS );
+      return awaiter.readRegReadFlagsAwaiter.arg;
+    }
+
+    void readRegReadFlags( ReadRegReadFlags::Res res )
+    {
+      assert( type == AwaiterType::READ_REG_READ_FLAGS );
+      awaiter.readRegReadFlagsAwaiter.res = res;
     }
 
     Awaiter::ReadSrcReadDstAwaiter& await_transform( ReadSrcReadDst const& arg )
@@ -925,6 +1019,25 @@ public:
     {
       assert( type == AwaiterType::READ_SRC_READ_LOCK_DST_LOCK_FLAGS );
       awaiter.readSrcReadLockDstLockFlagsAwaiter.res = res;
+    }
+
+    Awaiter::ReadSrcReadDstLockFlagsAwaiter& await_transform( ReadSrcReadDstLockFlags const& arg )
+    {
+      type = AwaiterType::READ_SRC_READ_DST_LOCK_FLAGS;
+      awaiter.readSrcReadDstLockFlagsAwaiter.arg = arg;
+      return awaiter.readSrcReadDstLockFlagsAwaiter;
+    }
+
+    ReadSrcReadDstLockFlags readSrcReadDstLockFlags() const
+    {
+      assert( type == AwaiterType::READ_SRC_READ_DST_LOCK_FLAGS );
+      return awaiter.readSrcReadDstLockFlagsAwaiter.arg;
+    }
+
+    void readSrcReadDstLockFlags( ReadSrcReadDstLockFlags::Res res )
+    {
+      assert( type == AwaiterType::READ_SRC_READ_DST_LOCK_FLAGS );
+      awaiter.readSrcReadDstLockFlagsAwaiter.res = res;
     }
 
     Awaiter::ReadSrcReadLockDstReadLockFlagsAwaiter& await_transform( ReadSrcReadLockDstReadLockFlags const& arg )
@@ -1035,6 +1148,19 @@ public:
       assert( type == AwaiterType::UNLOCK_WRITE_DST_UNLOCK_WRITE_FLAGS );
       return awaiter.unlockWriteDstUnlockWriteFlagsAwaiter.arg;
     }
+
+    Awaiter::WritePCAwaiter& await_transform( WritePC const& arg )
+    {
+      type = AwaiterType::WRITE_PC;
+      awaiter.writePCAwaiter.arg = arg;
+      return awaiter.writePCAwaiter;
+    }
+
+    WritePC writePC() const
+    {
+      assert( type == AwaiterType::WRITE_PC );
+      return awaiter.writePCAwaiter.arg;
+    }
   };
 
 public:
@@ -1101,6 +1227,18 @@ public:
     mCoro();
   }
 
+  void getAcc( int8_t acc )
+  {
+    mCoro.promise().getAcc( { acc } );
+    mCoro();
+  }
+
+  void prepareJump( uint32_t pc )
+  {
+    mCoro.promise().prepareJump( { pc } );
+    mCoro();
+  }
+
   void divideInit( bool offset )
   {
     mCoro.promise().divideInit( { offset } );
@@ -1117,15 +1255,81 @@ public:
     mCoro();
   }
 
+  MemoryLoadByte memoryLoadByte() const
+  {
+    return mCoro.promise().memoryLoadByte();
+  }
+
+  MemoryLoadWord memoryLoadWord() const
+  {
+    return mCoro.promise().memoryLoadWord();
+  }
+
   MemoryLoadLong memoryLoadLong() const
   {
     return mCoro.promise().memoryLoadLong();
   }
 
-  void memoryLoadLong( MemoryLoadLong::Res res )
+
+  MemoryLoadByteExternal memoryLoadByteExternal() const
   {
-    mCoro.promise().memoryLoadLong( res );
+    return mCoro.promise().memoryLoadByteExternal();
+  }
+
+  MemoryLoadWordExternal memoryLoadWordExternal() const
+  {
+    return mCoro.promise().memoryLoadWordExternal();
+  }
+
+  MemoryLoadLongExternal memoryLoadLongExternal() const
+  {
+    return mCoro.promise().memoryLoadLongExternal();
+  }
+
+  void memoryLoadByte( uint32_t value )
+  {
+    mCoro.promise().memoryLoadByte( { value } );
     mCoro();
+  }
+
+  void memoryLoadWord( uint32_t value )
+  {
+    mCoro.promise().memoryLoadWord( { value } );
+    mCoro();
+  }
+
+  void memoryLoadByteExternal( uint32_t value )
+  {
+    mCoro.promise().memoryLoadByteExternal( { value } );
+    mCoro();
+  }
+
+  void memoryLoadLongExternal( uint32_t value )
+  {
+    mCoro.promise().memoryLoadLongExternal( { value } );
+    mCoro();
+  }
+
+  void memoryLoadWordExternal( uint32_t value )
+  {
+    mCoro.promise().memoryLoadWordExternal( { value } );
+    mCoro();
+  }
+
+  void memoryLoadLong( uint32_t value )
+  {
+    mCoro.promise().memoryLoadLong( { value } );
+    mCoro();
+  }
+
+  MemoryStoreByte memoryStoreByte() const
+  {
+    return mCoro.promise().memoryStoreByte();
+  }
+
+  MemoryStoreWord memoryStoreWord() const
+  {
+    return mCoro.promise().memoryStoreWord();
   }
 
   MemoryStoreLong memoryStoreLong() const
@@ -1133,58 +1337,95 @@ public:
     return mCoro.promise().memoryStoreLong();
   }
 
-  ReadDstLockFlags readDstLockFlags() const
+  MemoryStoreByteExternal memoryStoreByteExternal() const
   {
-    return mCoro.promise().readDstLockFlags();
+    return mCoro.promise().memoryStoreByteExternal();
   }
 
-  void readDstLockFlags( ReadDstLockFlags::Res res )
+  MemoryStoreWordExternal memoryStoreWordExternal() const
   {
-    mCoro.promise().readDstLockFlags( res );
+    return mCoro.promise().memoryStoreWordExternal();
+  }
+
+  MemoryStoreLongExternal memoryStoreLongExternal() const
+  {
+    return mCoro.promise().memoryStoreLongExternal();
+  }
+
+  ReadRegLockFlags readRegLockFlags() const
+  {
+    return mCoro.promise().readRegLockFlags();
+  }
+
+  void readRegLockFlags( uint32_t value )
+  {
+    mCoro.promise().readRegLockFlags( { value } );
     mCoro();
   }
 
-  ReadLockDst readLockDst() const
+  ReadLockReg readLockReg() const
   {
-    return mCoro.promise().readLockDst();
+    return mCoro.promise().readLockReg();
   }
 
-  void readLockDst( ReadLockDst::Res res )
+  void readLockReg( uint32_t value )
   {
-    mCoro.promise().readLockDst( res );
+    mCoro.promise().readLockReg( { value } );
     mCoro();
   }
 
-  ReadLockDstLockFlags readLockDstLockFlags() const
+  ReadLockRegLockFlags readLockRegLockFlags() const
   {
-    return mCoro.promise().readLockDstLockFlags();
+    return mCoro.promise().readLockRegLockFlags();
   }
 
-  void readLockDstLockFlags( ReadLockDstLockFlags::Res res )
+  void readLockRegLockFlags( uint32_t value )
   {
-    mCoro.promise().readLockDstLockFlags( res );
+    mCoro.promise().readLockRegLockFlags( { value } );
     mCoro();
   }
 
-  ReadDstNoScoreboard readDstNoScoreboard() const
+  ReadRegNoScoreboard readRegNoScoreboard() const
   {
-    return mCoro.promise().readDstNoScoreboard();
+    return mCoro.promise().readRegNoScoreboard();
   }
 
-  void readDstNoScoreboard( ReadDstNoScoreboard::Res res )
+  void readRegNoScoreboard( uint32_t value )
   {
-    mCoro.promise().readDstNoScoreboard( res );
+    mCoro.promise().readRegNoScoreboard( { value } );
     mCoro();
   }
 
-  ReadSrc readSrc() const
+  ReadReg readReg() const
   {
-    return mCoro.promise().readSrc();
+    return mCoro.promise().readReg();
   }
 
-  void readSrc( ReadSrc::Res res )
+  void readReg( uint32_t value )
   {
-    mCoro.promise().readSrc( res );
+    mCoro.promise().readReg( { value } );
+    mCoro();
+  }
+
+  ReadRegMove readRegMove() const
+  {
+    return mCoro.promise().readRegMove();
+  }
+
+  void readRegMove( uint32_t value )
+  {
+    mCoro.promise().readRegMove( { value } );
+    mCoro();
+  }
+
+  ReadRegReadFlags readRegReadFlags() const
+  {
+    return mCoro.promise().readRegReadFlags();
+  }
+
+  void readRegReadFlags( ReadRegReadFlags::Res res )
+  {
+    mCoro.promise().readRegReadFlags( res );
     mCoro();
   }
 
@@ -1221,6 +1462,17 @@ public:
     mCoro();
   }
 
+  ReadSrcReadDstLockFlags readSrcReadDstLockFlags() const
+  {
+    return mCoro.promise().readSrcReadDstLockFlags();
+  }
+
+  void readSrcReadDstLockFlags( ReadSrcReadDstLockFlags::Res res )
+  {
+    mCoro.promise().readSrcReadDstLockFlags( res );
+    mCoro();
+  }
+
   ReadSrcReadLockDstReadLockFlags readSrcReadLockDstReadLockFlags() const
   {
     return mCoro.promise().readSrcReadLockDstReadLockFlags();
@@ -1238,9 +1490,19 @@ public:
     mCoro();
   }
 
+  WritePC writePC() const
+  {
+    return mCoro.promise().writePC();
+  }
+
   WriteDst writeDst() const
   {
     return mCoro.promise().writeDst();
+  }
+
+  WriteDstWriteFlags writeDstUnlockWriteFlags() const
+  {
+    return mCoro.promise().writeDstUnlockWriteFlags();
   }
 
   UnlockWriteDst unlockWriteDst() const

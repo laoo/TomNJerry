@@ -62,6 +62,11 @@ RISCOpcode DSP::mapOpcode( uint16_t code )
   return { map[( code >> 10 )], (uint8_t)( ( code >> 5 ) & 31), (uint8_t)(code & 31) };
 }
 
+bool DSP::isAddressLocal( uint32_t address ) const
+{
+  return true;
+}
+
 void DSP::storeLong( uint32_t address, uint32_t data )
 {
   assert( ( address & 0xff0000 ) == 0xf10000 );
@@ -114,46 +119,390 @@ void DSP::storeLong( uint32_t address, uint32_t data )
   }
 }
 
-uint32_t DSP::loadLong( uint32_t address )
+uint32_t DSP::loadByteLocal( uint32_t address )
 {
   return 0;
 }
 
+uint32_t DSP::loadWordLocal( uint32_t address )
+{
+  return 0;
+}
+
+uint32_t DSP::loadLongLocal( uint32_t address )
+{
+  return {};
+}
+
+std::optional<uint32_t> DSP::loadByteExternal( uint32_t address )
+{
+  return std::optional<uint32_t>();
+}
+
+std::optional<uint32_t> DSP::loadWordExternal( uint32_t address )
+{
+  return std::optional<uint32_t>();
+}
+
+std::optional<uint32_t> DSP::loadLongExternal( uint32_t address )
+{
+  return std::optional<uint32_t>();
+}
+
+void DSP::storeByteLocal( uint32_t address, uint8_t value )
+{
+}
+
+void DSP::storeWordLocal( uint32_t address, uint16_t value )
+{
+}
+
+void DSP::storeLongLocal( uint32_t address, uint32_t value )
+{
+}
+
+bool DSP::storeByteExternal( uint32_t address, uint8_t value )
+{
+  return false;
+}
+
+bool DSP::storeWordExternal( uint32_t address, uint16_t value )
+{
+  return false;
+}
+
+bool DSP::storeLongExternal( uint32_t address, uint32_t value )
+{
+  return false;
+}
+
+
+void DSP::writeFlags( uint32_t nz, uint16_t c )
+{
+}
+
+std::tuple<bool, bool, bool> DSP::readFlags() const
+{
+  return std::tuple<bool, bool, bool>();
+}
 
 void DSP::processCycle()
 {
   mCycle += 1;
 
+  bool localMemoryAccessed = false;
   int8_t writeSlot = -1;
   int32_t divideCycle = -1;
 
-  if ( mDivideUnit )
+  if ( mWriteUnit )
   {
-    switch ( mDivideUnit.getType() )
+    switch ( mWriteUnit.getType() )
     {
-    case ExecutionUnit::AwaiterType::DIVIDE_INIT:
-      mDivideUnit.divideInit( ( mDivCtrl & 1 ) != 0 );
-      break;
-    case ExecutionUnit::AwaiterType::DIVIDE_CYCLE:
+    case ExecutionUnit::AwaiterType::WRITE_PC:
       {
-        auto [cycle] = mDivideUnit.divideCycle();
-        divideCycle = cycle;
-        mDivideUnit.advance();
+        auto [pc] = mWriteUnit.writePC();
+        mPC = pc;
+        mWriteUnit.advance();
+        assert( mWriteUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mWriteUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::WRITE_DST:
+      {
+        auto [value,reg] = mWriteUnit.writeDst();
+        mRegs[reg] = value;
+        writeSlot = reg;
+        mWriteUnit.advance();
+        assert( mWriteUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mWriteUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::WRITE_DST_WRITE_FLAGS:
+      {
+        auto [valuenz,c,reg] = mWriteUnit.writeDstUnlockWriteFlags();
+        writeFlags( valuenz, c );
+        mRegs[reg] = valuenz;
+        writeSlot = reg;
+        mWriteUnit.advance();
+        assert( mWriteUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mWriteUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::UNLOCK_WRITE_FLAGS:
+      {
+        auto [valuenz, c] = mWriteUnit.unlockWriteFlags();
+        writeFlags( valuenz, c );
+        assert( mFlagsSemaphore > 0 );
+        mFlagsSemaphore -= 1;
+        assert( mFlagsSemaphore >= 0 );
+        mWriteUnit.advance();
+        assert( mWriteUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mWriteUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::UNLOCK_WRITE_DST:
+      {
+        auto [value,reg] = mWriteUnit.unlockWriteDst();
+        mRegs[reg] = value;
+        assert( mRegLocks[reg] );
+        mRegLocks[reg] = false;
+        writeSlot = reg;
+        mWriteUnit.advance();
+        assert( mWriteUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mWriteUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::UNLOCK_WRITE_DST_UNLOCK_WRITE_FLAGS:
+      {
+        auto [valuenz,c,reg] = mWriteUnit.unlockWriteDstUnlockWriteFlags();
+        mRegs[reg] = valuenz;
+        writeSlot = reg;
+        assert( mRegLocks[reg] );
+        mRegLocks[reg] = false;
+        writeFlags( valuenz, c );
+        assert( mFlagsSemaphore > 0 );
+        mFlagsSemaphore -= 1;
+        assert( mFlagsSemaphore >= 0 );
+        mWriteUnit.advance();
+        assert( mWriteUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mWriteUnit );
       }
       break;
     case ExecutionUnit::AwaiterType::UNLOCK_WRITE_DST_REMAIN:
       {
-        auto [quotient, remain, reg] = mDivideUnit.unlockWriteDstRemain();
+        auto [value,remain,reg] = mWriteUnit.unlockWriteDstRemain();
+        mRegs[reg] = value;
+        writeSlot = reg;
+        assert( mRegLocks[reg] );
         mRegLocks[reg] = false;
-        mRegs[reg] = quotient;
         mRemain = remain;
-        mDivideUnit.advance();
-        assert( mDivideUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
-        mExecutionUnitPool[++mPoolTop] = std::move( mDivideUnit );
+        mWriteUnit.advance();
+        assert( mWriteUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mWriteUnit );
       }
       break;
     default:
-      throw Ex{} << "Unexpected divide unit type " << (int)mDivideUnit.getType();
+      throw Ex{} << "Unexpected write unit type " << ( int )mComputeUnit.getType();
+    }
+  }
+
+  if ( mDivideUnit )
+  {
+    //TODO  make proper transition to write unit taking into account write slot
+    assert( mDivideUnit.getType() == ExecutionUnit::AwaiterType::DIVIDE_CYCLE );
+    auto [cycle] = mDivideUnit.divideCycle();
+    divideCycle = cycle;
+    mDivideUnit.advance();
+    if ( cycle == 0 )
+    {
+      assert( mDivideUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+      mExecutionUnitPool[++mPoolTop] = std::move( mComputeUnit );
+    }
+  }
+
+  if ( mMemoryUnit )
+  {
+    switch ( mMemoryUnit.getType() )
+    {
+    case ExecutionUnit::AwaiterType::MEMORY_LOAD_BYTE_EXTERNAL:
+      if ( !mWriteUnit )
+      {
+        if ( auto opt = loadByteExternal( mMemoryUnit.memoryLoadByteExternal().src ) )
+        {
+          mMemoryUnit.memoryLoadByteExternal( *opt );
+          mWriteUnit = std::move( mMemoryUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MEMORY_LOAD_WORD_EXTERNAL:
+      if ( !mWriteUnit )
+      {
+        if ( auto opt = loadWordExternal( mMemoryUnit.memoryLoadWordExternal().src ) )
+        {
+          mMemoryUnit.memoryLoadWordExternal( *opt );
+          mWriteUnit = std::move( mMemoryUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MEMORY_LOAD_LONG_EXTERNAL:
+      if ( !mWriteUnit )
+      {
+        if ( auto opt = loadLongExternal( mMemoryUnit.memoryLoadLongExternal().src ) )
+        {
+          mMemoryUnit.memoryLoadLongExternal( *opt );
+          mWriteUnit = std::move( mMemoryUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MEMORY_STORE_BYTE_EXTERNAL:
+      if ( auto [addr, value] = mMemoryUnit.memoryStoreByteExternal(); storeByteExternal( addr, value ) )
+      {
+        mComputeUnit.advance();
+        assert( mComputeUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mComputeUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MEMORY_STORE_WORD_EXTERNAL:
+      if ( auto [addr, value] = mMemoryUnit.memoryStoreWordExternal(); storeWordExternal( addr, value ) )
+      {
+        mComputeUnit.advance();
+        assert( mComputeUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mComputeUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MEMORY_STORE_LONG_EXTERNAL:
+      if ( auto [addr, value] = mMemoryUnit.memoryStoreLongExternal(); storeLongExternal( addr, value ) )
+      {
+        mComputeUnit.advance();
+        assert( mComputeUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mComputeUnit );
+      }
+      break;
+    default:
+      throw Ex{} << "Unexpected memory unit type " << ( int )mMemoryUnit.getType();
+    }
+  }
+
+  if ( mComputeUnit )
+  {
+    switch ( mComputeUnit.getType() )
+    {
+    case ExecutionUnit::AwaiterType::COMPUTE_PENDING:
+      mComputeUnit.advance();
+      break;
+    case ExecutionUnit::AwaiterType::COMPUTE:
+      if ( !mWriteUnit )
+      {
+        mComputeUnit.advance();
+        mWriteUnit = std::move( mComputeUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::GET_MOD:
+      if ( !mWriteUnit )
+      {
+        mComputeUnit.getMod( mMod );
+        mWriteUnit = std::move( mComputeUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::PREPARE_JUMP:
+      if ( !mWriteUnit )
+      {
+        mPrefetcher.prepareJump();
+        mComputeUnit.prepareJump( mPC );
+        mWriteUnit = std::move( mComputeUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::DIVIDE_INIT:
+      if ( !mDivideUnit )
+      {
+        mComputeUnit.divideInit( ( mDivCtrl & 1 ) != 0 );
+        mDivideUnit = std::move( mComputeUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_REG_NO_SCOREBOARD:
+      {
+        auto [reg] = mComputeUnit.readRegNoScoreboard();
+        mComputeUnit.readRegNoScoreboard( mRegs[reg] );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MEMORY_LOAD_BYTE:
+      if ( auto [addr] = mComputeUnit.memoryLoadByte(); isAddressLocal( addr ) )
+      {
+        if ( !mWriteUnit && !localMemoryAccessed )
+        {
+          uint32_t value = loadByteLocal( addr );
+          mComputeUnit.memoryLoadByte( value );
+          mWriteUnit = std::move( mComputeUnit );
+          localMemoryAccessed = true;
+        }
+      }
+      else if ( !mMemoryUnit )
+      {
+        mComputeUnit.advance();
+        mMemoryUnit = std::move( mComputeUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MEMORY_LOAD_WORD:
+      if ( auto [addr] = mComputeUnit.memoryLoadWord(); isAddressLocal( addr ) )
+      {
+        if ( !mWriteUnit && !localMemoryAccessed )
+        {
+          uint32_t value = loadWordLocal( addr );
+          mComputeUnit.memoryLoadWord( value );
+          mWriteUnit = std::move( mComputeUnit );
+          localMemoryAccessed = true;
+        }
+      }
+      else if ( !mMemoryUnit )
+      {
+        mComputeUnit.advance();
+        mMemoryUnit = std::move( mComputeUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MEMORY_LOAD_LONG:
+      if ( auto [addr] = mComputeUnit.memoryLoadLong(); isAddressLocal( addr ) )
+      {
+        if ( !mWriteUnit && !localMemoryAccessed )
+        {
+          uint32_t value = loadLongLocal( addr );
+          mComputeUnit.memoryLoadLong( value );
+          mWriteUnit = std::move( mComputeUnit );
+          localMemoryAccessed = true;
+        }
+      }
+      else if ( !mMemoryUnit )
+      {
+        mComputeUnit.advance();
+        mMemoryUnit = std::move( mComputeUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MEMORY_STORE_BYTE:
+      if ( auto [addr,value] = mComputeUnit.memoryStoreByte(); isAddressLocal( addr ) && !localMemoryAccessed )
+      {
+        storeByteLocal( addr, value );
+        mComputeUnit.advance();
+        assert( mComputeUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mComputeUnit );
+        localMemoryAccessed = true;
+      }
+      else if ( !mMemoryUnit )
+      {
+        mComputeUnit.advance();
+        mMemoryUnit = std::move( mComputeUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MEMORY_STORE_WORD:
+      if ( auto [addr, value] = mComputeUnit.memoryStoreWord(); isAddressLocal( addr ) && !localMemoryAccessed )
+      {
+        storeWordLocal( addr, value );
+        mComputeUnit.advance();
+        assert( mComputeUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mComputeUnit );
+        localMemoryAccessed = true;
+      }
+      else if ( !mMemoryUnit )
+      {
+        mComputeUnit.advance();
+        mMemoryUnit = std::move( mComputeUnit );
+      }
+      break;
+    case ExecutionUnit::AwaiterType::MEMORY_STORE_LONG:
+      if ( auto [addr, value] = mComputeUnit.memoryStoreLong(); isAddressLocal( addr ) && !localMemoryAccessed )
+      {
+        storeLongLocal( addr, value );
+        mComputeUnit.advance();
+        assert( mComputeUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
+        mExecutionUnitPool[++mPoolTop] = std::move( mComputeUnit );
+        localMemoryAccessed = true;
+      }
+      else if ( !mMemoryUnit )
+      {
+        mComputeUnit.advance();
+        mMemoryUnit = std::move( mComputeUnit );
+      }
+      break;
+    default:
+      throw Ex{} << "Unexpected compute unit type " << ( int )mComputeUnit.getType();
     }
   }
 
@@ -161,86 +510,73 @@ void DSP::processCycle()
   {
     switch( mReadUnit.getType() )
     {
-    case ExecutionUnit::AwaiterType::GET_CODE_LO:
+    case ExecutionUnit::AwaiterType::READ_REG:
+      if ( !mComputeUnit )
       {
-        if ( !mPrefetcher )
+        auto [reg] = mReadUnit.readReg();
+        if ( !mRegLocks[reg] )
         {
-          if ( auto pull = prefetchPull() )
-          {
-            mPrefetcher.put( pull.data() );
-          }
-          else
-          {
-            break;
-          }
+          mReadUnit.readReg( mRegs[reg] );
+          mComputeUnit = std::move( mReadUnit );
         }
-        assert( mPrefetcher );
-        mReadUnit.getCodeLo( mPrefetcher.getCode() );
       }
       break;
-    case ExecutionUnit::AwaiterType::GET_CODE_HI:
+    case ExecutionUnit::AwaiterType::READ_REG_MOVE:
       if ( !mWriteUnit )
       {
-        if ( !mPrefetcher )
+        auto [reg] = mReadUnit.readReg();
+        if ( !mRegLocks[reg] )
         {
-          if ( auto pull = prefetchPull() )
-          {
-            mPrefetcher.put( pull.data() );
-          }
-          else
-          {
-            break;
-          }
+          mReadUnit.readReg( mRegs[reg] );
+          mWriteUnit = std::move( mReadUnit );
         }
-        assert( mPrefetcher );
-        mReadUnit.getCodeHi( mPrefetcher.getCode() );
-        mWriteUnit = std::move( mReadUnit );
       }
       break;
-    case ExecutionUnit::AwaiterType::READ_DST_LOCK_FLAGS:
+    case ExecutionUnit::AwaiterType::READ_REG_READ_FLAGS:
       if ( !mComputeUnit )
       {
-        auto [dst] = mReadUnit.readDstLockFlags();
-        if ( !mRegLocks[dst] )
+        auto [reg] = mReadUnit.readRegReadFlags();
+        if ( !mRegLocks[reg] && mFlagsSemaphore == 0 )
         {
-          mReadUnit.readDstLockFlags( { mRegs[dst] } );
+          auto [n,z,c] = readFlags();
+          mReadUnit.readRegReadFlags( { mRegs[reg], n, z, c } );
+          mComputeUnit = std::move( mReadUnit );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_REG_LOCK_FLAGS:
+      if ( !mComputeUnit )
+      {
+        auto [reg] = mReadUnit.readRegLockFlags();
+        if ( !mRegLocks[reg] )
+        {
           mFlagsSemaphore += 1;
+          mReadUnit.readRegLockFlags( mRegs[reg] );
           mComputeUnit = std::move( mReadUnit );
         }
       }
       break;
-    case ExecutionUnit::AwaiterType::READ_LOCK_DST:
+    case ExecutionUnit::AwaiterType::READ_LOCK_REG:
       if ( !mComputeUnit )
       {
-        auto [dst] = mReadUnit.readLockDst();
-        if ( !mRegLocks[dst] )
+        auto [reg] = mReadUnit.readLockReg();
+        if ( !mRegLocks[reg] )
         {
-          mRegLocks[dst] = true;
-          mReadUnit.readLockDst( { mRegs[dst] } );
+          mRegLocks[reg] = true;
+          mReadUnit.readLockReg( mRegs[reg] );
           mComputeUnit = std::move( mReadUnit );
         }
       }
       break;
-    case ExecutionUnit::AwaiterType::READ_LOCK_DST_LOCK_FLAGS:
+    case ExecutionUnit::AwaiterType::READ_LOCK_REG_LOCK_FLAGS:
       if ( !mComputeUnit )
       {
-        auto [dst] = mReadUnit.readLockDstLockFlags();
-        if ( !mRegLocks[dst] )
+        auto [reg] = mReadUnit.readLockRegLockFlags();
+        if ( !mRegLocks[reg] )
         {
-          mRegLocks[dst] = true;
+          mRegLocks[reg] = true;
           mFlagsSemaphore += 1;
-          mReadUnit.readLockDstLockFlags( { mRegs[dst] } );
-          mComputeUnit = std::move( mReadUnit );
-        }
-      }
-      break;
-    case ExecutionUnit::AwaiterType::READ_SRC:
-      if ( !mComputeUnit )
-      {
-        auto [src] = mReadUnit.readSrc();
-        if ( !mRegLocks[src] )
-        {
-          mReadUnit.readSrc( { mRegs[src] } );
+          mReadUnit.readLockRegLockFlags( mRegs[reg] );
           mComputeUnit = std::move( mReadUnit );
         }
       }
@@ -251,51 +587,94 @@ void DSP::processCycle()
         auto [src, dst] = mReadUnit.readSrcReadDst();
         if ( !mRegLocks[src] && !mRegLocks[dst] )
         {
-          if ( divideCycle == 0 )
+          if ( writeSlot < 0 || writeSlot == src || writeSlot == dst )
           {
-            //WARN
+            mReadUnit.readSrcReadDst( { mRegs[src], mRegs[dst] } );
+            mComputeUnit = std::move( mReadUnit );
           }
-          mReadUnit.readSrcReadDst( { mRegs[src], mRegs[dst] } );
-          mComputeUnit = std::move( mReadUnit );
         }
       }
       break;
     case ExecutionUnit::AwaiterType::READ_SRC_READ_LOCK_DST:
       if ( !mComputeUnit )
       {
-        auto [src, dst] = mReadUnit.readSrcReadLockDst();
+        auto [src, dst] = mReadUnit.readSrcReadDst();
         if ( !mRegLocks[src] && !mRegLocks[dst] )
         {
-          mRegLocks[dst] = true;
-          mReadUnit.readSrcReadLockDst( { mRegs[src], mRegs[dst] } );
-          assert( mReadUnit.getType() == ExecutionUnit::AwaiterType::DIVIDE_INIT );
-          mDivideUnit = std::move( mReadUnit );
+          if ( writeSlot < 0 || writeSlot == src || writeSlot == dst )
+          {
+            mRegLocks[dst] = true;
+            mReadUnit.readSrcReadDst( { mRegs[src], mRegs[dst] } );
+            mComputeUnit = std::move( mReadUnit );
+          }
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::READ_SRC_READ_DST_LOCK_FLAGS:
+      if ( !mComputeUnit )
+      {
+        auto [src, dst] = mReadUnit.readSrcReadDst();
+        if ( !mRegLocks[src] && !mRegLocks[dst] )
+        {
+          if ( writeSlot < 0 || writeSlot == src || writeSlot == dst )
+          {
+            mFlagsSemaphore += 1;
+            mReadUnit.readSrcReadDst( { mRegs[src], mRegs[dst] } );
+            mComputeUnit = std::move( mReadUnit );
+          }
         }
       }
       break;
     case ExecutionUnit::AwaiterType::READ_SRC_READ_LOCK_DST_LOCK_FLAGS:
       if ( !mComputeUnit )
       {
-        auto [src, dst] = mReadUnit.readSrcReadLockDstLockFlags();
+        auto [src, dst] = mReadUnit.readSrcReadDst();
         if ( !mRegLocks[src] && !mRegLocks[dst] )
         {
-          mRegLocks[dst] = true;
-          mFlagsSemaphore += 1;
-          mReadUnit.readSrcReadLockDstLockFlags( { mRegs[src], mRegs[dst] } );
-          mComputeUnit = std::move( mReadUnit );
+          if ( writeSlot < 0 || writeSlot == src || writeSlot == dst )
+          {
+            mRegLocks[dst] = true;
+            mFlagsSemaphore += 1;
+            mReadUnit.readSrcReadDst( { mRegs[src], mRegs[dst] } );
+            mComputeUnit = std::move( mReadUnit );
+          }
         }
       }
       break;
     case ExecutionUnit::AwaiterType::READ_SRC_READ_LOCK_DST_READ_LOCK_FLAGS:
       if ( !mComputeUnit )
       {
-        auto [src, dst] = mReadUnit.readSrcReadLockDstReadLockFlags();
+        auto [src, dst] = mReadUnit.readSrcReadDst();
         if ( !mRegLocks[src] && !mRegLocks[dst] && mFlagsSemaphore == 0 )
         {
-          mRegLocks[dst] = true;
-          mFlagsSemaphore += 1;
-          mReadUnit.readSrcReadLockDstReadLockFlags( { mRegs[src], mRegs[dst] } );
-          mComputeUnit = std::move( mReadUnit );
+          if ( writeSlot < 0 || writeSlot == src || writeSlot == dst )
+          {
+            mRegLocks[dst] = true;
+            mFlagsSemaphore = 1;
+            mReadUnit.readSrcReadDst( { mRegs[src], mRegs[dst] } );
+            mComputeUnit = std::move( mReadUnit );
+          }
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::GET_CODE_LO:
+      if ( !localMemoryAccessed )
+      {
+        int code = fetchOperand();
+        if ( code >= 0 )
+        {
+          mReadUnit.getCodeLo( code );
+        }
+      }
+      break;
+    case ExecutionUnit::AwaiterType::GET_CODE_HI:
+      if ( !mWriteUnit && !localMemoryAccessed )
+      {
+        int code = fetchOperand();
+        if ( code >= 0 )
+        {
+          mReadUnit.getCodeHi( code );
+          mWriteUnit = std::move( mReadUnit );
         }
       }
       break;
@@ -306,11 +685,17 @@ void DSP::processCycle()
         mWriteUnit = std::move( mReadUnit );
       }
       break;
+    case ExecutionUnit::AwaiterType::GET_ACC:
+      if ( !mWriteUnit )
+      {
+        mReadUnit.getAcc( (int8_t)( mAccumulator >> 32 ) );
+        mWriteUnit = std::move( mReadUnit );
+      }
+      break;
     case ExecutionUnit::AwaiterType::MOVE_Q:
       if ( !mWriteUnit )
       {
         mReadUnit.advance();
-        assert( mReadUnit.getType() == ExecutionUnit::AwaiterType::WRITE_DST );
         mWriteUnit = std::move( mReadUnit );
       }
       break;
@@ -319,29 +704,28 @@ void DSP::processCycle()
       assert( mReadUnit.getType() == ExecutionUnit::AwaiterType::DECODE );
       mExecutionUnitPool[++mPoolTop] = std::move( mReadUnit );
       break;
+    case ExecutionUnit::AwaiterType::JR_INIT:
+      if ( !mComputeUnit )
+      {
+        mReadUnit.advance();
+        mComputeUnit = std::move( mReadUnit );
+      }
+      break;
+    default:
+      throw Ex{} << "Unexpected read unit type " << ( int )mReadUnit.getType();
     }
   }
 
-
-  if ( !mReadUnit )
+  if ( !mReadUnit && !localMemoryAccessed )
   {
-    if ( !mPrefetcher )
+    RISCOpcode opcode;
+    if ( fetchOpcode( opcode ) )
     {
-      if ( auto pull = prefetchPull() )
-      {
-        mPrefetcher.put( pull.data() );
-      }
-      else
-      {
-        return;
-      }
+      opcode.srcReg = mRegisterFile + opcode.srcValue;
+      opcode.dstReg = mRegisterFile + opcode.dstValue;
+      mReadUnit = std::move( mExecutionUnitPool[mPoolTop--] );
+      mReadUnit.decode( opcode );
     }
-    assert( mPrefetcher );
-    auto opcode = mPrefetcher.get();
-    opcode.srcReg = mRegisterFile + opcode.srcValue;
-    opcode.dstReg = mRegisterFile + opcode.dstValue;
-    mReadUnit = std::move( mExecutionUnitPool[mPoolTop--] );
-    mReadUnit.decode( opcode );
   }
 }
 
@@ -432,4 +816,46 @@ void DSP::flagsSet( uint16_t value )
   mFlags.regpage = ( value & FLAGS::REGPAGE ) != 0;
 
   mRegisterFile = mFlags.regpage ? 32 : 0;
+}
+
+bool DSP::fetch()
+{
+  if ( !mPrefetcher )
+  {
+    if ( auto pull = prefetchPull() )
+    {
+      mPrefetcher.put( pull.data() );
+    }
+    else
+    {
+      return false;
+    }
+  }
+  assert( mPrefetcher );
+  return true;
+}
+
+bool DSP::fetchOpcode( RISCOpcode& out )
+{
+  if ( fetch() )
+  {
+    out = mPrefetcher.get();
+    return true;
+  }
+  else
+  {
+    return false;
+  }
+}
+
+int DSP::fetchOperand()
+{
+  if ( fetch() )
+  {
+    return mPrefetcher.getCode();
+  }
+  else
+  {
+    return -1;
+  }
 }

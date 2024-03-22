@@ -1,6 +1,50 @@
 #include "ExecutionUnit.hpp"
 #include "Ex.hpp"
 
+namespace
+{
+bool testCondition( uint32_t condition, bool n, bool z, bool c )
+{
+  switch ( condition )
+  {
+  case 0x00:
+    return true;
+  case 0x01:
+    return !z;
+  case 0x02:
+    return z;
+  case 0x04:
+    return !c;
+  case 0x05:
+    return !c && !z;
+  case 0x06:
+    return !c && z;
+  case 0x08:
+    return c;
+  case 0x09:
+    return c && !z;
+  case 0x0a:
+    return c && z;
+  case 0x14:
+    return !n;
+  case 0x15:
+    return !n && !z;
+  case 0x16:
+    return !n && z;
+  case 0x18:
+    return n;
+  case 0x19:
+    return n && !z;
+  case 0x1a:
+    return n && z;
+  case 0x1f:
+    return false;
+  default:
+    //LOG_WARN( WARN_ILLEGAL_CONDITION );
+    return true;
+  }
+}
+}
 
 ExecutionUnit ExecutionUnit::create()
 {
@@ -10,7 +54,7 @@ ExecutionUnit ExecutionUnit::create()
     switch ( opcode.opcode ) {
     case RISCOpcode::ABS:
     {
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       co_await Compute{};
       if ( dst == 0x80000000 )
       {
@@ -59,8 +103,9 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::ADDQ:
     {
       uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       uint32_t result = src + dst;
+      co_await Compute{};
       co_await UnlockWriteDstUnlockWriteFlags{
         .valuenz = result,
         .c = ( uint16_t )( result < src ? 1 : 0 ),
@@ -71,7 +116,7 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::ADDQMOD:
     {
       uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       auto [mod] = co_await GetMod{};
       uint32_t result = ( dst & mod ) | ( ( src + dst ) & ( ~mod ) );
       co_await UnlockWriteDstUnlockWriteFlags{
@@ -84,7 +129,7 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::ADDQT:
     {
       uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
-      auto [dst] = co_await ReadLockDst{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockReg{ .reg = opcode.dstReg };
       uint32_t result = src + dst;
       co_await Compute{};
       co_await UnlockWriteDst{
@@ -108,7 +153,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::BCLR:
     {
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       uint32_t result = dst & ~( 1 << opcode.srcValue );
       co_await Compute{};
       co_await UnlockWriteDstUnlockWriteFlags{
@@ -120,7 +165,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::BSET:
     {
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       uint32_t result = dst | ( 1 << opcode.srcValue );
       co_await Compute{};
       co_await UnlockWriteDstUnlockWriteFlags{
@@ -132,7 +177,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::BTST:
     {
-      auto [dst] = co_await ReadDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadRegLockFlags{ .reg = opcode.dstReg };
       uint32_t result = dst & ( 1 << opcode.srcValue );
       co_await Compute{};
       co_await UnlockWriteFlags{
@@ -144,13 +189,12 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::CMP:
     {
-      auto [src, dst] = co_await ReadSrcReadLockDstLockFlags{ .src = opcode.srcReg, .dst = opcode.dstReg };
-      uint32_t result = src + dst;
+      auto [src, dst] = co_await ReadSrcReadDstLockFlags{ .src = opcode.srcReg, .dst = opcode.dstReg };
+      uint32_t result = dst - src;
       co_await Compute{};
-      co_await UnlockWriteDstUnlockWriteFlags{
-        .valuenz = result,
-        .c = ( uint16_t )( result < src ? 1 : 0 ),
-        .reg = opcode.dstReg
+      co_await UnlockWriteFlags{
+        .nz = result,
+        .c = ( uint16_t )( src < dst ? 1 : 0 ),
       };
       break;
     }
@@ -160,13 +204,12 @@ ExecutionUnit ExecutionUnit::create()
       int64_t i1 = ( int64_t )i0;
       int64_t i2 = i1 >> 3;
       uint32_t src = ( uint32_t )i2;
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadRegLockFlags{ .reg = opcode.dstReg };
       uint32_t result = dst - src;
       co_await Compute{};
-      co_await UnlockWriteDstUnlockWriteFlags{
-        .valuenz = result,
-        .c = ( uint16_t )( result < src ? 1 : 0 ),
-        .reg = opcode.dstReg
+      co_await UnlockWriteFlags{
+        .nz = result,
+        .c = ( uint16_t )( src < dst ? 1 : 0 ),
       };
       break;
     }
@@ -223,12 +266,50 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::IMULTN:
       throw Ex{} << "NYI";
     case RISCOpcode::JR:
-      throw Ex{} << "NYI";
+    {
+      if ( opcode.dstValue == 0 )
+      {
+        co_await JRInit{};
+        int32_t off = ( ( int8_t )( opcode.srcValue << 3 ) >> 2 );
+        co_await ComputePending{};
+        auto [pc] = co_await PrepareJump{};
+        co_await WritePC{ .pc = pc + off };
+      }
+      else
+      {
+        auto [dest, n, z, c] = co_await ReadRegReadFlags{ .reg = opcode.srcReg };
+        if ( testCondition( opcode.dstValue, n, z, c ) )
+        {
+          int32_t off = ( ( int8_t )( opcode.srcValue << 3 ) >> 2 );
+          co_await ComputePending{};
+          auto [pc] = co_await PrepareJump{};
+          co_await WritePC{ .pc = pc + off };
+        }
+      }
+      break;
+    }
     case RISCOpcode::JUMP:
-      throw Ex{} << "NYI";
+    {
+      if ( opcode.dstValue == 0 )
+      {
+        auto [dest] = co_await ReadReg{ .reg = opcode.srcReg };
+        co_await PrepareJump{};
+        co_await WritePC{ .pc = dest };
+      }
+      else
+      {
+        auto [dest,n,z,c] = co_await ReadRegReadFlags{ .reg = opcode.srcReg };
+        if ( testCondition( opcode.dstValue, n, z, c ) )
+        {
+          co_await PrepareJump{};
+          co_await WritePC{ .pc = dest };
+        }
+      }
+      break;
+    }
     case RISCOpcode::LOAD:
     {
-      auto [src] = co_await ReadSrc{ .src = opcode.srcReg };
+      auto [src] = co_await ReadReg{ .reg = opcode.srcReg };
       auto [value, success] = co_await MemoryLoadLong{ .src = src };
       if ( success )
       {
@@ -249,9 +330,9 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::LOAD14N:
     {
-      auto [base] = co_await ReadSrc{ .src = 14 };
+      auto [base] = co_await ReadReg{ .reg = 14 };
       uint32_t addr = base + ( opcode.srcValue == 0 ? 32 : opcode.srcValue ) * 4;
-      co_await IO{};
+      co_await ComputePending{};
       auto [value,success] = co_await MemoryLoadLong{ .src = addr };
       if ( success )
       {
@@ -274,7 +355,7 @@ ExecutionUnit ExecutionUnit::create()
     {
       auto [base, off] = co_await ReadSrcReadDst{ .src = 14, .dst = opcode.srcReg };
       uint32_t addr = base + off;
-      co_await IO{};
+      co_await ComputePending{};
       auto [value, success] = co_await MemoryLoadLong{ .src = addr };
       if ( success )
       {
@@ -295,9 +376,9 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::LOAD15N:
     {
-      auto [base] = co_await ReadSrc{ .src = 15 };
+      auto [base] = co_await ReadReg{ .reg = 15 };
       uint32_t addr = base + ( opcode.srcValue == 0 ? 32 : opcode.srcValue ) * 4;
-      co_await IO{};
+      co_await ComputePending{};
       auto [value, success] = co_await MemoryLoadLong{ .src = addr };
       if ( success )
       {
@@ -320,7 +401,7 @@ ExecutionUnit ExecutionUnit::create()
     {
       auto [base, off] = co_await ReadSrcReadDst{ .src = 15, .dst = opcode.srcReg };
       uint32_t addr = base + off;
-      co_await IO{};
+      co_await ComputePending{};
       auto [value, success] = co_await MemoryLoadLong{ .src = addr };
       if ( success )
       {
@@ -341,7 +422,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::LOADB:
     {
-      auto [src] = co_await ReadSrc{ .src = opcode.srcReg };
+      auto [src] = co_await ReadReg{ .reg = opcode.srcReg };
       auto [value, success] = co_await MemoryLoadByte{ .src = src };
       if ( success )
       {
@@ -362,7 +443,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::LOADW:
     {
-      auto [src] = co_await ReadSrc{ .src = opcode.srcReg };
+      auto [src] = co_await ReadReg{ .reg = opcode.srcReg };
       auto [value, success] = co_await MemoryLoadWord{ .src = src };
       if ( success )
       {
@@ -383,7 +464,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::MIRROR:
     {
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
 
       uint8_t b0 = dst & 0xff;
       uint8_t b1 = ( dst >> 8 ) & 0xff;
@@ -412,7 +493,7 @@ ExecutionUnit ExecutionUnit::create()
       throw Ex{} << "NYI";
     case RISCOpcode::MOVE:
     {
-      auto [src] = co_await ReadSrc{ .src = opcode.srcReg };
+      auto [src] = co_await ReadRegMove{ .reg = opcode.srcReg };
       co_await WriteDst{
         .value = src,
         .reg = opcode.dstReg
@@ -421,7 +502,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::MOVEFA:
     {
-      auto [src] = co_await ReadSrc{ .src = (int8_t)( opcode.srcReg ^ 31 ) };
+      auto [src] = co_await ReadRegMove{ .reg = (int8_t)( opcode.srcReg ^ 31 ) };
       co_await WriteDst{
         .value = src,
         .reg = opcode.dstReg
@@ -458,7 +539,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::MOVETA:
     {
-      auto [src] = co_await ReadSrc{ .src = opcode.srcReg };
+      auto [src] = co_await ReadRegMove{ .reg = opcode.srcReg };
       co_await WriteDst{
         .value = src,
         .reg = (int8_t)( opcode.dstReg ^ 32 )
@@ -467,7 +548,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::MTOI:
     {
-      auto [src] = co_await ReadSrc{ .src = ( int8_t )( opcode.srcReg ^ 31 ) };
+      auto [src] = co_await ReadReg{ .reg = ( int8_t )( opcode.srcReg ^ 31 ) };
 
       uint32_t result = ( ( ( int32_t )src >> 8 ) & 0xFF800000 ) | ( src & 0x007FFFFF );
 
@@ -493,7 +574,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::NEG:
     {
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       co_await Compute{};
       uint32_t result = -dst;
       co_await UnlockWriteDstUnlockWriteFlags{
@@ -510,7 +591,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::NORMI:
     {
-      auto [src] = co_await ReadSrc{ .src = ( int8_t )( opcode.srcReg ^ 31 ) };
+      auto [src] = co_await ReadReg{ .reg = ( int8_t )( opcode.srcReg ^ 31 ) };
 
       uint32_t result = 0;
 
@@ -537,7 +618,7 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::NOT:
     {
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       co_await Compute{};
       uint32_t result = ~dst;
       co_await UnlockWriteDstUnlockWriteFlags{
@@ -576,7 +657,7 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::RORQ:
     {
       uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       uint32_t result = std::rotr( dst, src );
       co_await Compute{};
       co_await UnlockWriteDstUnlockWriteFlags{
@@ -587,9 +668,29 @@ ExecutionUnit ExecutionUnit::create()
       break;
     }
     case RISCOpcode::SAT16S:
-      throw Ex{} << "NYI";
+    {
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
+      co_await Compute{};
+      uint32_t result = ( ( int32_t )dst < -32768 ) ? -32768 : ( ( int32_t )dst > 32767 ) ? 32767 : ( int32_t )dst;
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = 0,
+        .reg = opcode.dstReg
+      };
+      break;
+    }
     case RISCOpcode::SAT32S:
-      throw Ex{} << "NYI";
+    {
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
+      auto [acc] = co_await GetAcc{};
+      uint32_t result = ( acc < -1 ) ? ( int32_t )0x80000000 : ( acc > 0 ) ? ( int32_t )0x7FFFFFFF : dst;
+      co_await UnlockWriteDstUnlockWriteFlags{
+        .valuenz = result,
+        .c = 0,
+        .reg = opcode.dstReg
+      };
+      break;
+    }
     case RISCOpcode::SH:
     {
       auto [src, dst] = co_await ReadSrcReadLockDstLockFlags{ .src = opcode.srcReg, .dst = opcode.dstReg };
@@ -640,7 +741,7 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::SHARQ:
     {
       uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       uint32_t result = ( uint32_t )( ( ( int64_t )( int32_t )dst ) >> src );
       co_await Compute{};
       co_await UnlockWriteDstUnlockWriteFlags{
@@ -654,7 +755,7 @@ ExecutionUnit ExecutionUnit::create()
     {
       //TODO: verify if this is correct
       uint32_t src = opcode.srcValue == 0 ? 32 : 32 - opcode.srcValue;
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       uint32_t result = ( uint64_t )dst << src;
       co_await Compute{};
       co_await UnlockWriteDstUnlockWriteFlags{
@@ -667,7 +768,7 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::SHRQ:
     {
       uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       uint32_t result = ( uint64_t )dst >> src;
       co_await Compute{};
       co_await UnlockWriteDstUnlockWriteFlags{
@@ -680,7 +781,7 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::STORE:
     {
       auto [src, dst] = co_await ReadSrcReadDst{ .src = opcode.srcReg, .dst = opcode.dstReg };
-      co_await IO{};
+      co_await ComputePending{};
       if ( auto [success] = co_await MemoryStoreLong{ .addr = dst, .value = src }; !success )
       {
         co_await MemoryStoreLongExternal{ .addr = dst, .value = src };
@@ -689,10 +790,10 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::STORE14N:
     {
-      auto [base] = co_await ReadSrc{ .src = 14 };
-      auto [dst] = co_await ReadDstNoScoreboard{ .dst = opcode.srcReg };
+      auto [base] = co_await ReadReg{ .reg = 14 };
+      auto [dst] = co_await ReadRegNoScoreboard{ .reg = opcode.srcReg };
       uint32_t addr = base + ( opcode.srcValue == 0 ? 32 : opcode.srcValue ) * 4;
-      co_await IO{};
+      co_await ComputePending{};
       if ( auto [success] = co_await MemoryStoreLong{ .addr = addr, .value = dst }; !success )
       {
         co_await MemoryStoreLongExternal{ .addr = addr, .value = dst };
@@ -702,9 +803,9 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::STORE14R:
     {
       auto [base, off] = co_await ReadSrcReadDst{ .src = 14, .dst = opcode.srcReg };
-      auto [dst] = co_await ReadDstNoScoreboard{ .dst = opcode.srcReg };
+      auto [dst] = co_await ReadRegNoScoreboard{ .reg = opcode.srcReg };
       uint32_t addr = base + off;
-      co_await IO{};
+      co_await ComputePending{};
       if ( auto [success] = co_await MemoryStoreLong{ .addr = addr, .value = dst }; !success )
       {
         co_await MemoryStoreLongExternal{ .addr = addr, .value = dst };
@@ -713,10 +814,10 @@ ExecutionUnit ExecutionUnit::create()
     }
     case RISCOpcode::STORE15N:
     {
-      auto [base] = co_await ReadSrc{ .src = 15 };
-      auto [dst] = co_await ReadDstNoScoreboard{ .dst = opcode.srcReg };
+      auto [base] = co_await ReadReg{ .reg = 15 };
+      auto [dst] = co_await ReadRegNoScoreboard{ .reg = opcode.srcReg };
       uint32_t addr = base + ( opcode.srcValue == 0 ? 32 : opcode.srcValue ) * 4;
-      co_await IO{};
+      co_await ComputePending{};
       if ( auto [success] = co_await MemoryStoreLong{ .addr = addr, .value = dst }; !success )
       {
         co_await MemoryStoreLongExternal{ .addr = addr, .value = dst };
@@ -726,9 +827,9 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::STORE15R:
     {
       auto [base, off] = co_await ReadSrcReadDst{ .src = 15, .dst = opcode.srcReg };
-      auto [dst] = co_await ReadDstNoScoreboard{ .dst = opcode.srcReg };
+      auto [dst] = co_await ReadRegNoScoreboard{ .reg = opcode.srcReg };
       uint32_t addr = base + off;
-      co_await IO{};
+      co_await ComputePending{};
       if ( auto [success] = co_await MemoryStoreLong{ .addr = addr, .value = dst }; !success )
       {
         co_await MemoryStoreLongExternal{ .addr = addr, .value = dst };
@@ -738,7 +839,7 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::STOREB:
     {
       auto [src, dst] = co_await ReadSrcReadDst{ .src = opcode.srcReg, .dst = opcode.dstReg };
-      co_await IO{};
+      co_await ComputePending{};
       if ( auto [success] = co_await MemoryStoreByte{ .addr = dst, .value = ( uint8_t )src }; !success )
       {
         co_await MemoryStoreByteExternal{ .addr = dst, .value = ( uint8_t )src };
@@ -748,7 +849,7 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::STOREW:
     {
       auto [src, dst] = co_await ReadSrcReadDst{ .src = opcode.srcReg, .dst = opcode.dstReg };
-      co_await IO{};
+      co_await ComputePending{};
       if ( auto [success] = co_await MemoryStoreWord{ .addr = dst, .value = ( uint16_t )src }; !success )
       {
         co_await MemoryStoreWordExternal{ .addr = dst, .value = ( uint16_t )src };
@@ -782,7 +883,7 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::SUBQ:
     {
       uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       uint32_t result = dst - src;
       co_await Compute{};
       co_await UnlockWriteDstUnlockWriteFlags{
@@ -795,7 +896,7 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::SUBQMOD:
     {
       uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
-      auto [dst] = co_await ReadLockDstLockFlags{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockRegLockFlags{ .reg = opcode.dstReg };
       auto [mod] = co_await GetMod{};
       uint32_t result = ( dst & mod ) | ( ( dst - src ) & ( ~mod ) );
       co_await UnlockWriteDstUnlockWriteFlags{
@@ -808,7 +909,7 @@ ExecutionUnit ExecutionUnit::create()
     case RISCOpcode::SUBQT:
     {
       uint32_t src = opcode.srcValue == 0 ? 32 : opcode.srcValue;
-      auto [dst] = co_await ReadLockDst{ .dst = opcode.dstReg };
+      auto [dst] = co_await ReadLockReg{ .reg = opcode.dstReg };
       uint32_t result = dst - src;
       co_await Compute{};
       co_await UnlockWriteDst{

@@ -83,8 +83,10 @@ public:
       case RISCOpcode::MOVEI:
       {
         co_yield opcode;
-        co_yield co_await Code{};
-        co_yield co_await Code{};
+        uint16_t low = co_await Code{};
+        co_yield low;
+        uint16_t high = co_await Code{};
+        co_yield high;
         break;
       }
       default:
@@ -146,6 +148,11 @@ public:
     uint16_t result = mCoro.promise().mRawOutput;
     mCoro();
     return result;
+  }
+
+  void prepareJump()
+  {
+
   }
 };
 
